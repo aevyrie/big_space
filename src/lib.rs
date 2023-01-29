@@ -36,9 +36,10 @@
 //! # Getting Started
 //!
 //! All that's needed to start using this plugin:
-//! 1. Add the [`FloatingOriginPlugin`] to your `App`
-//! 2. Add the [`GridCell`] component to all spatial entities
-//! 3. Add the [`FloatingOrigin`] component to the active camera
+//! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
+//! 2. Add the [`FloatingOriginPlugin`] to your `App`
+//! 3. Add the [`GridCell`] component to all spatial entities
+//! 4. Add the [`FloatingOrigin`] component to the active camera
 //!
 //! Take a look at [`FloatingOriginSettings`] resource for configuration options, as well as some
 //! useful helper methods.
