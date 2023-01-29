@@ -30,7 +30,7 @@ fn setup(
             ..default()
         },
         GridCell::<i128>::default(), // All spatial entities need this component
-        FloatingOrigin, // Important: marks this as the entity to use as teh floating origin
+        FloatingOrigin, // Important: marks this as the entity to use as the floating origin
         CameraController {
             max_speed: 10e12,
             smoothness: 0.9,

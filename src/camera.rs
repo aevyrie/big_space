@@ -9,12 +9,12 @@ use bevy::{
 pub struct CameraControllerPlugin;
 impl Plugin for CameraControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CameraInput>()
-            .add_system(default_camera_inputs.before(camera_controller))
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
-                camera_controller.after(TransformSystem::TransformPropagate),
-            );
+        app.init_resource::<CameraInput>().add_system_set_to_stage(
+            CoreStage::PostUpdate,
+            SystemSet::new()
+                .with_system(default_camera_inputs.before(camera_controller))
+                .with_system(camera_controller.after(TransformSystem::TransformPropagate)),
+        );
     }
 }
 
