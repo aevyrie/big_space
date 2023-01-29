@@ -2,17 +2,46 @@
 //! observable universe, with no added dependencies, while remaining largely compatible with the
 //! rest of the Bevy ecosystem.
 //!
-//! ## Problem
+//! ### Problem
 //!
 //! Objects far from the origin suffer from reduced precision, causing rendered meshes to jitter and
 //! jiggle, and transformation calculations to encounter catastrophic cancellation.
 //!
-//! ## Solution
+//! As the camera moves farther from the origin, the scale of floats needed to describe the position
+//! of meshes and the camera get larger, which in turn means there is less precision available.
+//! Consequently, when the matrix math is done to compute the position of objects in view space,
+//! mesh vertices will be displaced due to this lost precision.
 //!
-//! While using the [`FloatingOriginPlugin`], entities are placed into a large fixed precision grid,
-//! and their [`Transform`]s are recomputed to be relative to their current grid cell. If an entity
-//! moves into a neighboring cell, its transform will be recomputed. This prevents `Transforms` from
-//! ever becoming larger than a single grid cell.
+//! ### Solution
+//!
+//! While using the [`FloatingOriginPlugin`], entities are placed into a [`GridCell`] in a large
+//! fixed precision grid. Inside a `GridCell`, an entity's `Transform` is relative to the center of
+//! that grid cell. If an entity moves into a neighboring cell, its transform will be recomputed
+//! relative to the center of that new cell. This prevents `Transforms` from ever becoming larger
+//! than a single grid cell, and thus prevents floating point precision artifacts.
+//!
+//! The same thing happens to the entity marked with the [`FloatingOrigin`] component. The only
+//! difference is that the `GridCell` of the floating origin is used when computing the
+//! `GlobalTransform` of all other entities. To an outside observer, as the floating origin camera
+//! moves through space and reaches the limits of its `GridCell`, it would appear to teleport to the
+//! opposite side of the cell, similar to the spaceship in the game *Asteroids*.
+//!
+//! The `GlobalTransform` of all entities is computed relative to the floating origin's grid cell.
+//! Because of this, entities very far from the origin will have very large, imprecise positions.
+//! However, this is always relative to the camera (floating origin), so these artifacts will always
+//! be too far away to be seen, no matter where the camera moves. Because this only affects the
+//! `GlobalTransform` and not the `Transform`, this also means that entities will never permanently
+//! lose precision just because they were far from the origin at some point.
+//!
+//! # Getting Started
+//!
+//! All that's needed to start using this plugin:
+//! 1. Add the [`FloatingOriginPlugin`] to your `App`
+//! 2. Add the [`GridCell`] component to all spatial entities
+//! 3. Add the [`FloatingOrigin`] component to the active camera
+//!
+//! Take a look at [`FloatingOriginSettings`] resource for configuration options, as well as some
+//! useful helper methods.
 //!
 //! # Moving Entities
 //!
@@ -38,28 +67,29 @@
 //!
 //! If you are updating the position of an entity with absolute positions, and the position exceeds
 //! the bounds of the entity's grid cell, the floating origin plugin will recenter that entity into
-//! its new cell. Every time you update that entity, you will be fighting with the floating origin
-//! plugin as it constantly recenters your entity. This can especially cause problems with camera
-//! controllers which may not expect the large discontinuity in position as an entity moves between
-//! cells.
+//! its new cell. Every time you update that entity, you will be fighting with the plugin as it
+//! constantly recenters your entity. This can especially cause problems with camera controllers
+//! which may not expect the large discontinuity in position as an entity moves between cells.
 //!
 //! The other reason to avoid this is you will likely run into precision issues! This plugin exists
 //! because single precision is limited, and the larger the position coordinates get, the less
 //! precision you have.
 //!
-//! However, if you have something that cannot accumulate error, like the orbit of a planet, you can
-//! instead do the orbital calculation (position as a function of time) to compute the absolute
-//! position of the planet, then directly compute the [`GridCell`] and [`Transform`] of that entity
-//! using [`FloatingOriginSettings::translation_to_grid`]. If the star this planet is orbiting
-//! around is also moving through space, note that you can add/subtract grid cells. This means you
-//! can do each calculation in the reference frame of the moving body, and sum up the computed
-//! translations and grid cell offsets to get a more precise result.
+//! However, if you have something that must not accumulate error, like the orbit of a planet, you
+//! can instead do the orbital calculation (position as a function of time) to compute the absolute
+//! position of the planet with high precision, then directly compute the [`GridCell`] and
+//! [`Transform`] of that entity using [`FloatingOriginSettings::translation_to_grid`]. If the star
+//! this planet is orbiting around is also moving through space, note that you can add/subtract grid
+//! cells. This means you can do each calculation in the reference frame of the moving body, and sum
+//! up the computed translations and grid cell offsets to get a more precise result.
 
+#![allow(clippy::type_complexity)]
 #![deny(missing_docs)]
 
 use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
 use std::marker::PhantomData;
 
+pub mod camera;
 pub mod debug;
 pub mod precision;
 
@@ -173,12 +203,16 @@ impl FloatingOriginSettings {
     }
 
     /// Convert a large translation into a small translation relative to a grid cell.
-    pub fn translation_to_grid<P: GridPrecision>(&self, input: Vec3) -> (GridCell<P>, Vec3) {
-        let l = self.grid_edge_length;
-        let Vec3 { x, y, z } = input;
+    pub fn translation_to_grid<P: GridPrecision>(
+        &self,
+        input: impl Into<DVec3>,
+    ) -> (GridCell<P>, Vec3) {
+        let l = self.grid_edge_length as f64;
+        let input = input.into();
+        let DVec3 { x, y, z } = input;
 
-        if input.abs().max_element() < self.maximum_distance_from_origin {
-            return (GridCell::default(), input);
+        if input.abs().max_element() < self.maximum_distance_from_origin as f64 {
+            return (GridCell::default(), input.as_vec3());
         }
 
         let x_r = (x / l).round();
@@ -190,12 +224,20 @@ impl FloatingOriginSettings {
 
         (
             GridCell {
-                x: P::from_f32(x_r),
-                y: P::from_f32(y_r),
-                z: P::from_f32(z_r),
+                x: P::from_f32(x_r as f32),
+                y: P::from_f32(y_r as f32),
+                z: P::from_f32(z_r as f32),
             },
-            Vec3::new(t_x, t_y, t_z),
+            Vec3::new(t_x as f32, t_y as f32, t_z as f32),
         )
+    }
+
+    /// Convert a large translation into a small translation relative to a grid cell.
+    pub fn imprecise_translation_to_grid<P: GridPrecision>(
+        &self,
+        input: Vec3,
+    ) -> (GridCell<P>, Vec3) {
+        self.translation_to_grid(input.as_dvec3())
     }
 }
 
@@ -333,7 +375,7 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
             > settings.maximum_distance_from_origin
         {
             let (grid_cell_delta, translation) =
-                settings.translation_to_grid(transform.as_ref().translation);
+                settings.imprecise_translation_to_grid(transform.as_ref().translation);
             *grid_pos = *grid_pos + grid_cell_delta;
             transform.translation = translation;
         }
@@ -376,7 +418,6 @@ fn update_global_from_cell_local<P: GridPrecision>(
 ) {
     let grid_cell_delta = entity_cell - origin_cell;
     *global = local
-        .clone()
         .with_translation(settings.grid_position(&grid_cell_delta, local))
         .into();
 }
@@ -450,7 +491,7 @@ pub fn transform_propagate_system<P: GridPrecision>(
             changed |= changed_children;
             for child in children {
                 let _ = propagate_recursive(
-                    &global_transform,
+                    global_transform,
                     &mut transform_query,
                     &children_query,
                     *child,

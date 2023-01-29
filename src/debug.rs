@@ -161,7 +161,6 @@ pub fn build_cube(
 
     let polyline = polylines.add(Polyline {
         vertices: vertices.into(),
-        ..Default::default()
     });
 
     let material = polyline_materials.add(PolylineMaterial {

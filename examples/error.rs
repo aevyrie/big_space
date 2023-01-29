@@ -26,7 +26,7 @@ fn main() {
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
 /// 10_000_000_000_000_000_000_000_000_000_000_000_000
-const DISTANCE: f32 = 20_000_000.0;
+const DISTANCE: f32 = 10_000_000.0;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
 /// disabling the plugin. Normally you would make your active camera the floating origin to avoid
