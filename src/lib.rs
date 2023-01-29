@@ -90,8 +90,10 @@ use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
 use std::marker::PhantomData;
 
 pub mod camera;
-pub mod debug;
 pub mod precision;
+
+#[cfg(feature = "debug")]
+pub mod debug;
 
 use precision::*;
 
@@ -264,7 +266,7 @@ pub struct FloatingSpatialBundle<P: GridPrecision> {
     pub grid_position: GridCell<P>,
 }
 
-/// Defines the grid cell this entity's [`Transform`] is relative to.
+/// Defines the grid cell this entity's `Transform` is relative to.
 ///
 /// This component is generic over a few integer types to allow you to select the grid size you
 /// need. These correspond to a total usable volume of a cube with the following edge lengths:
@@ -272,7 +274,7 @@ pub struct FloatingSpatialBundle<P: GridPrecision> {
 /// **Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter**
 ///
 /// - i8: 2,560 km = 74% of the diameter of the Moon
-/// - i16 655,350 km = 85% of the diameter of the Moon's orbit around Earth
+/// - i16: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
 /// - i32: 0.0045 light years = ~4 times the width of the solar system
 /// - i64: 19.5 million light years = ~100 times the width of the milky way galaxy
 /// - i128: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe

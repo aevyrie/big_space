@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 bevy = { version = "0.9", default_features = false }
-bevy_polyline = "0.4"
+bevy_polyline = { version = "0.4", optional = true }
 
 [dev-dependencies]
 bevy = { version = "0.9", default_features = false, features = [
@@ -17,3 +17,7 @@ bevy = { version = "0.9", default_features = false, features = [
     "bevy_winit",
     "x11",
 ] }
+
+[features]
+default = ["debug"]
+debug = ["bevy_polyline"]
