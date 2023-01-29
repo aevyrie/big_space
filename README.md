@@ -10,11 +10,24 @@ A floating origin plugin for [Bevy](https://github.com/bevyengine/bevy).
 
 https://user-images.githubusercontent.com/2632925/211051046-6fc7db1d-dcf8-4d71-8bcf-d8f55ec64ab3.mp4
 
+### [Read the docs](https://docs.rs/big_space)
+
 </div>
 
 ## Features
 
 Lots of space to play in.
+
+This is a simple floating origin plugin, useful if you want to work with very, very large scales. It works with bevy's existing `f32`-based `Transform`s, which means it's largely compatible with the bevy ecosystem.
+
+The plugin is generic over a few integer types, to trade off scale and precision for memory use. Some fun numbers with a worst case precision of 0.5mm:
+  - `i8`: 2,560 km = 74% of the diameter of the Moon
+  - `i16`: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
+  - `i32`: 0.0045 light years = ~4 times the width of the solar system
+  - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
+  - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
+
+From the docs: https://docs.rs/big_space/latest/big_space/struct.GridCell.html
 
 # Bevy Version Support
 
