@@ -8,7 +8,7 @@
 
 A floating origin plugin for [Bevy](https://github.com/bevyengine/bevy).
 
-https://user-images.githubusercontent.com/2632925/211051046-6fc7db1d-dcf8-4d71-8bcf-d8f55ec64ab3.mp4
+https://user-images.githubusercontent.com/2632925/215318129-5bab3095-a7dd-455b-a4b6-71840cde096c.mp4
 
 ### [Read the docs](https://docs.rs/big_space)
 
