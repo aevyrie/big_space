@@ -13,7 +13,7 @@ impl Plugin for CameraControllerPlugin {
             CoreStage::PostUpdate,
             SystemSet::new()
                 .with_system(default_camera_inputs.before(camera_controller))
-                .with_system(camera_controller.after(TransformSystem::TransformPropagate)),
+                .with_system(camera_controller.before(TransformSystem::TransformPropagate)),
         );
     }
 }
