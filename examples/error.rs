@@ -81,7 +81,7 @@ fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator
 }
 
 fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let font = asset_server.load("fonts/FiraMono-Medium.ttf");
+    let font = asset_server.load("fonts/FiraMono-Regular.ttf");
     commands.spawn(TextBundle {
         style: Style {
             align_self: AlignSelf::FlexStart,

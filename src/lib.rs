@@ -362,6 +362,13 @@ impl<P: GridPrecision> std::ops::Sub for &GridCell<P> {
     }
 }
 
+impl<P: GridPrecision> std::ops::AddAssign for GridCell<P> {
+    fn add_assign(&mut self, rhs: Self) {
+        use std::ops::Add;
+        *self = self.add(rhs);
+    }
+}
+
 /// Marks the entity to use as the floating origin. All other entities will be positioned relative
 /// to this entity's [`GridCell`].
 #[derive(Component, Reflect)]
