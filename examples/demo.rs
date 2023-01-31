@@ -4,7 +4,7 @@ use bevy::{
     render::primitives::{Aabb, Sphere},
 };
 use big_space::{
-    camera::{CameraController, CameraInput, CameraVelocity},
+    camera::{CameraController, CameraInput},
     FloatingOrigin, GridCell,
 };
 
@@ -37,11 +37,7 @@ fn setup(
         },
         GridCell::<i128>::default(), // All spatial entities need this component
         FloatingOrigin, // Important: marks this as the entity to use as the floating origin
-        CameraController {
-            max_speed: 10e35,
-            smoothness: 0.8,
-            ..default()
-        }, // Built-in camera controller
+        CameraController::default().with_max_speed(10e35), // Built-in camera controller
     ));
 
     let mesh_handle = meshes.add(
@@ -53,15 +49,15 @@ fn setup(
         .unwrap(),
     );
     let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::MIDNIGHT_BLUE,
+        base_color: Color::BLUE,
         perceptual_roughness: 0.8,
         reflectance: 1.0,
         ..default()
     });
 
     let mut translation = Vec3::ZERO;
-    for i in 1..=100i128 {
-        let j = i.pow(14) as f32;
+    for i in 1..=37_i128 {
+        let j = 10_f32.powf(i as f32 - 10.0) as f32;
         translation.x += j;
         commands.spawn((
             PbrBundle {
@@ -119,7 +115,8 @@ fn ui_text_system(
     mut text: Query<&mut Text, With<BigSpaceDebugText>>,
     time: Res<Time>,
     origin: Query<(&GridCell<i128>, &Transform), With<FloatingOrigin>>,
-    velocity: Res<CameraVelocity>,
+    camera: Query<&CameraController>,
+    objects: Query<&Transform, With<Handle<Mesh>>>,
 ) {
     let (cell, transform) = origin.single();
     let translation = transform.translation;
@@ -131,14 +128,34 @@ fn ui_text_system(
         translation.x, translation.y, translation.z
     );
 
-    let speed = velocity.translation().length() / time.delta_seconds_f64();
+    let velocity = camera.single().velocity();
+    let speed = velocity.0.length() / time.delta_seconds_f64();
     let camera_text = if speed > 3.0e8 {
-        format!("Camera Speed: {:.0e} x speed of light", speed / 3.0e8)
+        format!("Camera Speed: {:.0e} * speed of light", speed / 3.0e8)
     } else {
-        format!("Camera Speed: {:.2e}", speed)
+        format!("Camera Speed: {:.2e} m/s", speed)
     };
 
-    text.single_mut().sections[0].value = format!("{grid_text}\n{translation_text}\n{camera_text}");
+    let nearest_text = if let Some(nearest) = camera.single().nearest_object() {
+        let dia = objects.get(nearest.0).unwrap().scale.max_element();
+        let dia_fact = match dia {
+            d if d > 8.8e26 => "(Greater than the diameter of the observable universe)",
+            d if d > 1e21 => "(Greater than the diameter of the Milky Way galaxy)",
+            d if d > 7e12 => "(Greater than the diameter of Pluto's orbit)",
+            d if d > 1.4e9 => "(Greater than the diameter of the Sun)",
+            d if d > 1.4e8 => "(Greater than the diameter of Earth)",
+            d if d > 12e6 => "(Greater than the diameter of Earth)",
+            d if d > 3e6 => "(Greater than the diameter of the Moon)",
+            _ => "",
+        };
+        let dist = nearest.1;
+        format!("Nearest sphere diameter: {dia:.0e} m    {dia_fact}\nNearest sphere distance: {dist:.0e} m",)
+    } else {
+        "".into()
+    };
+
+    text.single_mut().sections[0].value =
+        format!("{grid_text}\n{translation_text}\n{camera_text}\n{nearest_text}");
 }
 
 fn cursor_grab_system(

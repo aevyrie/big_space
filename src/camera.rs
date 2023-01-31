@@ -18,45 +18,83 @@ use crate::{precision::GridPrecision, FloatingOriginSettings, GridCell};
 pub struct CameraControllerPlugin<P: GridPrecision>(PhantomData<P>);
 impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CameraInput>()
-            .init_resource::<CameraVelocity>()
-            .add_system_set_to_stage(
-                CoreStage::PostUpdate,
-                SystemSet::new()
-                    .with_system(
-                        default_camera_inputs
-                            .before(camera_controller::<P>)
-                            .with_run_criteria(|input: Res<CameraInput>| {
-                                if input.defaults_disabled {
-                                    ShouldRun::No
-                                } else {
-                                    ShouldRun::Yes
-                                }
-                            }),
-                    )
-                    .with_system(
-                        camera_controller::<P>.before(TransformSystem::TransformPropagate),
-                    ),
-            );
+        app.init_resource::<CameraInput>().add_system_set_to_stage(
+            CoreStage::PostUpdate,
+            SystemSet::new()
+                .with_system(
+                    default_camera_inputs
+                        .before(camera_controller::<P>)
+                        .with_run_criteria(|input: Res<CameraInput>| {
+                            if input.defaults_disabled {
+                                ShouldRun::No
+                            } else {
+                                ShouldRun::Yes
+                            }
+                        }),
+                )
+                .with_system(nearest_objects.before(camera_controller::<P>))
+                .with_system(camera_controller::<P>.before(TransformSystem::TransformPropagate)),
+        );
     }
 }
 
 /// Per-camera settings for the `big_space` floating origin camera controller.
 #[derive(Clone, Debug, Reflect, Component)]
 pub struct CameraController {
-    /// Smoothness of motion, from `0.0` to `1.0`.
+    /// Smoothness of translation, from `0.0` to `1.0`.
     pub smoothness: f64,
+    /// Rotational smoothness, from `0.0` to `1.0`.
+    pub rotational_smoothness: f64,
     /// Maximum possible speed.
     pub max_speed: f64,
     /// Whether the camera should slow down when approaching an entity's [`Aabb`].
     pub slow_near_objects: bool,
+    nearest_object: Option<(Entity, f64)>,
+    vel_translation: DVec3,
+    vel_rotation: DQuat,
 }
+
+impl CameraController {
+    /// Sets the `smoothness` parameter of the controller, and returns the modified result.
+    pub fn with_smoothness(mut self, translation: f64, rotation: f64) -> Self {
+        self.smoothness = translation;
+        self.rotational_smoothness = rotation;
+        self
+    }
+
+    /// Sets the `max_speed` parameter of the controller, and returns the modified result.
+    pub fn with_max_speed(mut self, max_speed: f64) -> Self {
+        self.max_speed = max_speed;
+        self
+    }
+
+    /// Sets the `slow_near_objects` parameter of the controller, and returns the modified result.
+    pub fn with_slowing(mut self, slow_near_objects: bool) -> Self {
+        self.slow_near_objects = slow_near_objects;
+        self
+    }
+
+    /// Returns the translational and rotational velocity of the camera.
+    pub fn velocity(&self) -> (DVec3, DQuat) {
+        (self.vel_translation, self.vel_rotation)
+    }
+
+    /// Returns the object nearest the camera, and its distance.
+    pub fn nearest_object(&self) -> Option<(Entity, f64)> {
+        self.nearest_object
+    }
+}
+
 impl Default for CameraController {
     fn default() -> Self {
         Self {
-            smoothness: 0.2,
+            smoothness: 0.8,
+            rotational_smoothness: 0.5,
             max_speed: 10e8,
             slow_near_objects: true,
+            nearest_object: None,
+            vel_translation: DVec3::ZERO,
+            vel_rotation: DQuat::IDENTITY,
         }
     }
 }
@@ -129,23 +167,23 @@ pub fn default_camera_inputs(
     }
 }
 
-/// Tracks the camera's velocity
-#[derive(Debug, Default, Resource, Reflect)]
-pub struct CameraVelocity {
-    entity: Option<Entity>,
-    translation: DVec3,
-    rotation: DQuat,
-}
-
-impl CameraVelocity {
-    /// Get the translation component of the camera velocity.
-    pub fn translation(&self) -> DVec3 {
-        self.translation
-    }
-
-    /// Get the rotation component of the camera velocity.
-    pub fn rotation(&self) -> DQuat {
-        self.rotation
+/// Find the object nearest the camera
+pub fn nearest_objects(
+    objects: Query<(Entity, &GlobalTransform, &Aabb)>,
+    mut camera: Query<(&GlobalTransform, &mut CameraController)>,
+) {
+    for (cam_global_transform, mut controller) in camera.iter_mut() {
+        let nearest_object = objects
+            .iter()
+            .map(|(entity, transform, aabb)| {
+                let dist = (transform.translation().as_dvec3() + aabb.center.as_dvec3()
+                    - cam_global_transform.translation().as_dvec3())
+                .length()
+                    - aabb.half_extents.as_dvec3().max_element();
+                (entity, dist)
+            })
+            .reduce(|nearest, this| if this.1 < nearest.1 { this } else { nearest });
+        controller.nearest_object = nearest_object;
     }
 }
 
@@ -154,66 +192,43 @@ pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
     settings: Res<FloatingOriginSettings>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(
-        Entity,
-        &mut Transform,
-        &GlobalTransform,
-        &CameraController,
-        &mut GridCell<P>,
-    )>,
-    objects: Query<(&GlobalTransform, &Aabb)>,
-    mut velocity: ResMut<CameraVelocity>,
+    mut camera: Query<(&mut Transform, &mut CameraController, &mut GridCell<P>)>,
 ) {
-    let (entity, mut cam_transform, cam_global_transform, controller, mut cell) =
-        camera.single_mut();
+    for (mut cam_transform, mut controller, mut cell) in camera.iter_mut() {
+        let speed = match (controller.nearest_object, controller.slow_near_objects) {
+            (Some(nearest), true) => nearest.1,
+            _ => controller.max_speed,
+        } * (1.0 + input.boost as usize as f64);
 
-    let speed = if controller.slow_near_objects {
-        let mut nearest_object = f64::MAX;
-        for (transform, aabb) in &objects {
-            let distance = (transform.translation().as_dvec3() + aabb.center.as_dvec3()
-                - cam_global_transform.translation().as_dvec3())
-            .length()
-                - aabb.half_extents.as_dvec3().max_element();
-            nearest_object = nearest_object.min(distance);
-        }
-        nearest_object.abs().clamp(1.0, controller.max_speed)
-    } else {
-        controller.max_speed
-    } * (1.0 + input.boost as usize as f64);
+        let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.999);
+        let lerp_rotation = 1.0 - controller.rotational_smoothness.clamp(0.0, 0.999);
 
-    let lerp_val = 1.0 - controller.smoothness.clamp(0.0, 0.999); // The lerp factor
+        let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
+        let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
 
-    if velocity.entity != Some(entity) {
-        velocity.entity = Some(entity);
-        velocity.translation = DVec3::ZERO;
-        velocity.rotation = DQuat::IDENTITY;
+        let cam_rot = cam_transform.rotation.as_f64();
+        let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
+        let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
+        // Convert the high precision translation to a grid cell and low precision translation
+        let (cell_offset, new_translation) = settings.translation_to_grid(vel_t_next);
+        *cell += cell_offset;
+        cam_transform.translation += new_translation;
+
+        let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
+        cam_transform.rotation *= new_rotation.as_f32();
+
+        // Store the new velocity to be used in the next frame
+        controller.vel_translation = if vel_t_next.length().abs() < 0.001 {
+            DVec3::ZERO
+        } else {
+            vel_t_next
+        };
+        controller.vel_rotation = if new_rotation.to_axis_angle().1.abs() < 0.001 {
+            DQuat::IDENTITY
+        } else {
+            new_rotation
+        };
+
+        input.reset();
     }
-
-    let (vel_t_current, vel_r_current) = (velocity.translation, velocity.rotation);
-    let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
-
-    let cam_rot = cam_transform.rotation.as_f64();
-    let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
-    let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_val);
-    // Convert the high precision translation to a grid cell and low precision translation
-    let (cell_offset, new_translation) = settings.translation_to_grid(vel_t_next);
-    *cell += cell_offset;
-    cam_transform.translation += new_translation;
-
-    let new_rotation = vel_r_current.slerp(vel_r_target, lerp_val);
-    cam_transform.rotation *= new_rotation.as_f32();
-
-    // Store the new velocity to be used in the next frame
-    velocity.translation = if vel_t_next.length().abs() < 0.001 {
-        DVec3::ZERO
-    } else {
-        vel_t_next
-    };
-    velocity.rotation = if new_rotation.to_axis_angle().1.abs() < 0.001 {
-        DQuat::IDENTITY
-    } else {
-        new_rotation
-    };
-
-    input.reset();
 }
