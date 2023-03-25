@@ -13,10 +13,10 @@ pub struct FloatingOriginDebugPlugin<P: GridPrecision>(PhantomData<P>);
 impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
     fn build(&self, app: &mut App) {
         app.add_plugin(bevy_polyline::PolylinePlugin)
-            .add_system_to_stage(CoreStage::Update, build_cube)
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
+            .add_system(build_cube.in_base_set(CoreSet::Update))
+            .add_system(
                 update_debug_bounds::<P>
+                    .in_base_set(CoreSet::PostUpdate)
                     .after(crate::recenter_transform_on_grid::<P>)
                     .before(crate::update_global_from_grid::<P>),
             );
@@ -58,7 +58,7 @@ pub fn update_debug_bounds<P: GridPrecision>(
             *polyline = cube_polyline.polyline.clone();
         }
         if let Some((occupied_cell, has_origin)) = occupied_cells.next() {
-            visibility.is_visible = true;
+            *visibility = Visibility::Visible;
             *cell = *occupied_cell;
             if has_origin.is_some() {
                 *matl = cube_polyline.origin_matl.clone();
@@ -67,7 +67,7 @@ pub fn update_debug_bounds<P: GridPrecision>(
             }
         } else {
             // If there are more debug bounds than occupied cells, hide the extras.
-            visibility.is_visible = false;
+            *visibility = Visibility::Hidden;
         }
     }
 
