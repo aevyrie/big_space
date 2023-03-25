@@ -141,7 +141,6 @@ impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
                 )
                     .in_set(TransformSystem::TransformPropagate),
             )
-            //
             .add_systems(
                 (
                     recenter_transform_on_grid::<P>.before(update_global_from_grid::<P>),

@@ -17,18 +17,16 @@ use crate::{precision::GridPrecision, FloatingOriginSettings, GridCell};
 pub struct CameraControllerPlugin<P: GridPrecision>(PhantomData<P>);
 impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CameraInput>()
-            //CoreStage::PostUpdate,
-            .add_systems(
-                (
-                    default_camera_inputs
-                        .before(camera_controller::<P>)
-                        .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                    nearest_objects.before(camera_controller::<P>),
-                    camera_controller::<P>.before(TransformSystem::TransformPropagate),
-                )
-                    .in_base_set(CoreSet::PostUpdate),
-            );
+        app.init_resource::<CameraInput>().add_systems(
+            (
+                default_camera_inputs
+                    .before(camera_controller::<P>)
+                    .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
+                nearest_objects.before(camera_controller::<P>),
+                camera_controller::<P>.before(TransformSystem::TransformPropagate),
+            )
+                .in_base_set(CoreSet::PostUpdate),
+        );
     }
 }
 
