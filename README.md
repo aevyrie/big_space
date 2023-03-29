@@ -4,13 +4,14 @@
 
 [![crates.io](https://img.shields.io/crates/v/big_space)](https://crates.io/crates/big_space)
 [![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
+[![test suite](https://github.com/aevyrie/big_space/actions/workflows/rust.yml/badge.svg)](https://github.com/aevyrie/big_space/actions/workflows/rust.yml)
 [![Bevy tracking](https://img.shields.io/badge/Bevy%20tracking-main-lightblue)](https://github.com/bevyengine/bevy/blob/main/docs/plugins_guidelines.md#main-branch-tracking)
 
 A floating origin plugin for [Bevy](https://github.com/bevyengine/bevy).
 
 https://user-images.githubusercontent.com/2632925/215318129-5bab3095-a7dd-455b-a4b6-71840cde096c.mp4
 
-### [Read the docs](https://docs.rs/big_space)
+### [Read the docs](https://docs.rs/big_space) 📖
 
 </div>
 
@@ -35,6 +36,7 @@ I intend to track the `main` branch of Bevy. PRs supporting this are welcome!
 
 | bevy | big_space |
 | ---- | --------- |
+| 0.10 | 0.2       |
 | 0.9  | 0.1       |
 
 # License
