@@ -129,38 +129,8 @@ pub fn build_cube(
         Vec3::NAN,
     ];
 
-    let vertices = [
-        vertices[indices[0]],
-        vertices[indices[1]],
-        vertices[indices[2]],
-        vertices[indices[3]],
-        vertices[indices[4]],
-        vertices[indices[5]],
-        vertices[indices[6]],
-        vertices[indices[7]],
-        vertices[indices[8]],
-        vertices[indices[9]],
-        vertices[indices[10]],
-        vertices[indices[11]],
-        vertices[indices[12]],
-        vertices[indices[13]],
-        vertices[indices[14]],
-        vertices[indices[15]],
-        vertices[indices[16]],
-        vertices[indices[17]],
-        vertices[indices[18]],
-        vertices[indices[19]],
-        vertices[indices[20]],
-        vertices[indices[21]],
-        vertices[indices[22]],
-        vertices[indices[23]],
-        vertices[indices[24]],
-        vertices[indices[25]],
-        vertices[indices[26]],
-    ];
-
     let polyline = polylines.add(Polyline {
-        vertices: vertices.into(),
+        vertices: indices.map(|i| vertices[i]).into(),
     });
 
     let material = polyline_materials.add(PolylineMaterial {
