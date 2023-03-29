@@ -1,0 +1,14 @@
+name: test suite
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt
+      - run: cargo check --all-targets --all-features
+      - run: cargo clippy --all-targets
+      - run: cargo test --all-targets
