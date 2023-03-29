@@ -126,38 +126,30 @@ impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
             .register_type::<GlobalTransform>()
             .register_type::<GridCell<P>>()
             .add_plugin(ValidParentCheckPlugin::<GlobalTransform>::default())
+            .configure_set(TransformSystem::TransformPropagate.in_base_set(CoreSet::PostUpdate))
+            .edit_schedule(CoreSchedule::Startup, |schedule| {
+                schedule.configure_set(
+                    TransformSystem::TransformPropagate.in_base_set(StartupSet::PostStartup),
+                );
+            })
             // add transform systems to startup so the first update is "correct"
-            .add_startup_system_to_stage(
-                StartupStage::PostStartup,
-                recenter_transform_on_grid::<P>
-                    .label(TransformSystem::TransformPropagate)
-                    .before(update_global_from_grid::<P>),
+            .add_startup_systems(
+                (
+                    recenter_transform_on_grid::<P>,
+                    update_global_from_grid::<P>,
+                    transform_propagate_system::<P>,
+                )
+                    .chain()
+                    .in_set(TransformSystem::TransformPropagate),
             )
-            .add_startup_system_to_stage(
-                StartupStage::PostStartup,
-                update_global_from_grid::<P>
-                    .label(TransformSystem::TransformPropagate)
-                    .before(transform_propagate_system::<P>),
-            )
-            .add_startup_system_to_stage(
-                StartupStage::PostStartup,
-                transform_propagate_system::<P>.label(TransformSystem::TransformPropagate),
-            )
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
-                recenter_transform_on_grid::<P>
-                    .label(TransformSystem::TransformPropagate)
-                    .before(update_global_from_grid::<P>),
-            )
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
-                update_global_from_grid::<P>
-                    .label(TransformSystem::TransformPropagate)
-                    .before(transform_propagate_system::<P>),
-            )
-            .add_system_to_stage(
-                CoreStage::PostUpdate,
-                transform_propagate_system::<P>.label(TransformSystem::TransformPropagate),
+            .add_systems(
+                (
+                    recenter_transform_on_grid::<P>,
+                    update_global_from_grid::<P>,
+                    transform_propagate_system::<P>,
+                )
+                    .chain()
+                    .in_set(TransformSystem::TransformPropagate),
             );
     }
 }
@@ -380,16 +372,18 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
     settings: Res<FloatingOriginSettings>,
     mut query: Query<(&mut GridCell<P>, &mut Transform), (Changed<Transform>, Without<Parent>)>,
 ) {
-    query.par_for_each_mut(1024, |(mut grid_pos, mut transform)| {
-        if transform.as_ref().translation.abs().max_element()
-            > settings.maximum_distance_from_origin
-        {
-            let (grid_cell_delta, translation) =
-                settings.imprecise_translation_to_grid(transform.as_ref().translation);
-            *grid_pos = *grid_pos + grid_cell_delta;
-            transform.translation = translation;
-        }
-    });
+    query
+        .par_iter_mut()
+        .for_each_mut(|(mut grid_pos, mut transform)| {
+            if transform.as_ref().translation.abs().max_element()
+                > settings.maximum_distance_from_origin
+            {
+                let (grid_cell_delta, translation) =
+                    settings.imprecise_translation_to_grid(transform.as_ref().translation);
+                *grid_pos = *grid_pos + grid_cell_delta;
+                transform.translation = translation;
+            }
+        });
 }
 
 /// Compute the `GlobalTransform` relative to the floating origin.
@@ -408,14 +402,18 @@ pub fn update_global_from_grid<P: GridPrecision>(
 
     if origin_grid_pos_changed {
         let mut all_entities = entities.p1();
-        all_entities.par_for_each_mut(1024, |(local, global, entity_cell)| {
-            update_global_from_cell_local(&settings, entity_cell, origin_cell, local, global);
-        });
+        all_entities
+            .par_iter_mut()
+            .for_each_mut(|(local, global, entity_cell)| {
+                update_global_from_cell_local(&settings, entity_cell, origin_cell, local, global);
+            });
     } else {
         let mut moved_cell_entities = entities.p0();
-        moved_cell_entities.par_for_each_mut(1024, |(local, global, entity_cell)| {
-            update_global_from_cell_local(&settings, entity_cell, origin_cell, local, global);
-        });
+        moved_cell_entities
+            .par_iter_mut()
+            .for_each_mut(|(local, global, entity_cell)| {
+                update_global_from_cell_local(&settings, entity_cell, origin_cell, local, global);
+            });
     }
 }
 

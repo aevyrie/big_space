@@ -2,6 +2,7 @@ use bevy::{
     math::Vec3A,
     prelude::*,
     render::primitives::{Aabb, Sphere},
+    window::{CursorGrabMode, PrimaryWindow, Window, WindowMode},
 };
 use big_space::{
     camera::{CameraController, CameraInput},
@@ -97,7 +98,7 @@ fn ui_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 color: Color::WHITE,
             },
         )
-        .with_text_alignment(TextAlignment::TOP_LEFT)
+        .with_text_alignment(TextAlignment::Left)
         .with_style(Style {
             position_type: PositionType::Absolute,
             position: UiRect {
@@ -159,25 +160,26 @@ fn ui_text_system(
 }
 
 fn cursor_grab_system(
-    mut windows: ResMut<Windows>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut cam: ResMut<CameraInput>,
     btn: Res<Input<MouseButton>>,
     key: Res<Input<KeyCode>>,
 ) {
-    use bevy::window::CursorGrabMode;
-    let window = windows.get_primary_mut().unwrap();
+    let Some(mut window) = windows.get_single_mut().ok() else {
+        return;
+    };
 
     if btn.just_pressed(MouseButton::Left) {
-        window.set_cursor_grab_mode(CursorGrabMode::Locked);
-        window.set_cursor_visibility(false);
-        window.set_mode(WindowMode::BorderlessFullscreen);
+        window.cursor.grab_mode = CursorGrabMode::Locked;
+        window.cursor.visible = false;
+        window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
     }
 
     if key.just_pressed(KeyCode::Escape) {
-        window.set_cursor_grab_mode(CursorGrabMode::None);
-        window.set_cursor_visibility(true);
-        window.set_mode(WindowMode::Windowed);
+        window.cursor.grab_mode = CursorGrabMode::None;
+        window.cursor.visible = true;
+        window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }
 }
