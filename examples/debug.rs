@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use bevy::prelude::*;
 use big_space::{FloatingOrigin, GridCell};
 
@@ -32,8 +34,7 @@ fn movement(
             |t: f32| -> Vec3 { Vec3::new(t.cos() * 2.0, t.sin() * 2.0, (t * 1.3).sin() * 2.0) };
         let p0 = pos(t_0);
         let p1 = pos(t_1);
-        let dp = p1 - p0;
-        dp
+        p1 - p0
     };
 
     q.p0().single_mut().translation += delta_translation(20.0);

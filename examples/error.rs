@@ -54,15 +54,13 @@ fn toggle_plugin(
         } else {
             "Floating Origin Disabled"
         }
+    } else if cell_max >= cell.x + i {
+        cell.x = i64::min(cell_max, cell.x + i);
+        cell.y = i64::min(cell_max, cell.y + i);
+        cell.z = i64::min(cell_max, cell.z + i);
+        "Enabling..."
     } else {
-        if cell_max >= cell.x + i {
-            cell.x = i64::min(cell_max, cell.x + i);
-            cell.y = i64::min(cell_max, cell.y + i);
-            cell.z = i64::min(cell_max, cell.z + i);
-            "Enabling..."
-        } else {
-            "Floating Origin Enabled"
-        }
+        "Floating Origin Enabled"
     };
 
     let dist = (cell_max - cell.x) * 10_000;
@@ -92,7 +90,7 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             sections: vec![TextSection {
                 value: "hello: ".to_string(),
                 style: TextStyle {
-                    font: font.clone(),
+                    font,
                     font_size: 30.0,
                     color: Color::WHITE,
                 },

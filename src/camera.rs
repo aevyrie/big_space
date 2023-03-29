@@ -131,8 +131,7 @@ impl CameraInput {
             self.roll * dt,
         );
 
-        let translation =
-            DVec3::new(self.right as f64, self.up as f64, self.forward as f64) * speed * dt as f64;
+        let translation = DVec3::new(self.right, self.up, self.forward) * speed * dt;
 
         (translation, rotation)
     }

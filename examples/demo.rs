@@ -58,7 +58,7 @@ fn setup(
 
     let mut translation = Vec3::ZERO;
     for i in 1..=37_i128 {
-        let j = 10_f32.powf(i as f32 - 10.0) as f32;
+        let j = 10_f32.powf(i as f32 - 10.0);
         translation.x += j;
         commands.spawn((
             PbrBundle {

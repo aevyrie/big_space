@@ -53,13 +53,13 @@
 //!
 //! Instead of:
 //!
-//! ```no_run
+//! ```ignore
 //! transform.translation = a_huge_imprecise_position;
 //! ```
 //!
 //! do:
 //!
-//! ```no_run
+//! ```ignore
 //! let delta = new_pos - old_pos;
 //! transform.translation += delta;
 //! ```
@@ -88,69 +88,88 @@
 #![deny(missing_docs)]
 
 use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
+use propagation::propagate_transforms;
 use std::marker::PhantomData;
 
 pub mod camera;
 pub mod precision;
+pub mod propagation;
 
 #[cfg(feature = "debug")]
 pub mod debug;
 
 use precision::*;
 
-/// Add this plugin to your [`App`] to for floating origin functionality.
-#[derive(Default)]
+/// Add this plugin to your [`App`] for floating origin functionality.
 pub struct FloatingOriginPlugin<P: GridPrecision> {
-    /// Initial floating origin settings.
-    pub settings: FloatingOriginSettings,
+    /// The edge length of a single cell.
+    pub grid_edge_length: f32,
+    /// How far past the extents of a cell an entity must travel before a grid recentering occurs.
+    /// This prevents entities from rapidly switching between cells when moving along a boundary.
+    pub switching_threshold: f32,
     phantom: PhantomData<P>,
 }
 
+impl<P: GridPrecision> Default for FloatingOriginPlugin<P> {
+    fn default() -> Self {
+        Self::new(10_000f32, 100f32)
+    }
+}
+
 impl<P: GridPrecision> FloatingOriginPlugin<P> {
-    /// # `switching_threshold`:
-    ///
-    /// How far past the extents of a cell an entity must travel before a grid recentering occurs.
-    /// This prevents entities from rapidly switching between cells when moving along a boundary.
+    /// Construct a new plugin with the following settings.
     pub fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
         FloatingOriginPlugin {
-            settings: FloatingOriginSettings::new(grid_edge_length, switching_threshold),
-            ..Default::default()
+            grid_edge_length,
+            switching_threshold,
+            phantom: PhantomData::default(),
         }
     }
 }
 
 impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
     fn build(&self, app: &mut App) {
-        app.insert_resource(self.settings.clone())
-            .register_type::<Transform>()
-            .register_type::<GlobalTransform>()
-            .register_type::<GridCell<P>>()
-            .add_plugin(ValidParentCheckPlugin::<GlobalTransform>::default())
-            .configure_set(TransformSystem::TransformPropagate.in_base_set(CoreSet::PostUpdate))
-            .edit_schedule(CoreSchedule::Startup, |schedule| {
-                schedule.configure_set(
-                    TransformSystem::TransformPropagate.in_base_set(StartupSet::PostStartup),
-                );
-            })
-            // add transform systems to startup so the first update is "correct"
-            .add_startup_systems(
-                (
-                    recenter_transform_on_grid::<P>,
-                    update_global_from_grid::<P>,
-                    transform_propagate_system::<P>,
-                )
-                    .chain()
-                    .in_set(TransformSystem::TransformPropagate),
-            )
-            .add_systems(
-                (
-                    recenter_transform_on_grid::<P>,
-                    update_global_from_grid::<P>,
-                    transform_propagate_system::<P>,
-                )
-                    .chain()
-                    .in_set(TransformSystem::TransformPropagate),
+        app.insert_resource(FloatingOriginSettings::new(
+            self.grid_edge_length,
+            self.switching_threshold,
+        ))
+        .register_type::<Transform>()
+        .register_type::<GlobalTransform>()
+        .register_type::<GridCell<P>>()
+        .add_plugin(ValidParentCheckPlugin::<GlobalTransform>::default())
+        .configure_set(TransformSystem::TransformPropagate.in_base_set(CoreSet::PostUpdate))
+        .edit_schedule(CoreSchedule::Startup, |schedule| {
+            schedule.configure_set(
+                TransformSystem::TransformPropagate.in_base_set(StartupSet::PostStartup),
             );
+        })
+        // add transform systems to startup so the first update is "correct"
+        .add_startup_systems(
+            (
+                recenter_transform_on_grid::<P>,
+                sync_simple_transforms::<P>
+                    .after(recenter_transform_on_grid::<P>)
+                    .before(propagate_transforms::<P>),
+                update_global_from_grid::<P>
+                    .after(recenter_transform_on_grid::<P>)
+                    .before(propagate_transforms::<P>),
+                propagate_transforms::<P>,
+            )
+                .in_set(TransformSystem::TransformPropagate),
+        )
+        .add_systems(
+            (
+                recenter_transform_on_grid::<P>,
+                sync_simple_transforms::<P>
+                    .after(recenter_transform_on_grid::<P>)
+                    .before(propagate_transforms::<P>),
+                update_global_from_grid::<P>
+                    .after(recenter_transform_on_grid::<P>)
+                    .before(propagate_transforms::<P>),
+                propagate_transforms::<P>,
+            )
+                .in_set(TransformSystem::TransformPropagate),
+        );
     }
 }
 
@@ -236,12 +255,6 @@ impl FloatingOriginSettings {
     }
 }
 
-impl Default for FloatingOriginSettings {
-    fn default() -> Self {
-        Self::new(10_000f32, 100f32)
-    }
-}
-
 /// Minimal bundle needed to position an entity in floating origin space.
 ///
 /// This is the floating origin equivalent of the [`SpatialBundle`].
@@ -282,7 +295,7 @@ pub struct FloatingSpatialBundle<P: GridPrecision> {
 /// define a type alias!
 ///
 /// ```
-/// # use crate::GridCell;
+/// # use big_space::GridCell;
 /// type GalacticGrid = GridCell<i64>;
 /// ```
 ///
@@ -380,16 +393,16 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
             {
                 let (grid_cell_delta, translation) =
                     settings.imprecise_translation_to_grid(transform.as_ref().translation);
-                *grid_pos = *grid_pos + grid_cell_delta;
+                *grid_pos += grid_cell_delta;
                 transform.translation = translation;
             }
         });
 }
 
-/// Compute the `GlobalTransform` relative to the floating origin.
+/// Compute the `GlobalTransform` relative to the floating origin's cell.
 pub fn update_global_from_grid<P: GridPrecision>(
     settings: Res<FloatingOriginSettings>,
-    origin: Query<(&GridCell<P>, Changed<GridCell<P>>), With<FloatingOrigin>>,
+    origin: Query<Ref<GridCell<P>>, With<FloatingOrigin>>,
     mut entities: ParamSet<(
         Query<
             (&Transform, &mut GlobalTransform, &GridCell<P>),
@@ -398,21 +411,21 @@ pub fn update_global_from_grid<P: GridPrecision>(
         Query<(&Transform, &mut GlobalTransform, &GridCell<P>)>,
     )>,
 ) {
-    let (origin_cell, origin_grid_pos_changed) = origin.single();
+    let origin_cell = origin.single();
 
-    if origin_grid_pos_changed {
+    if origin_cell.is_changed() {
         let mut all_entities = entities.p1();
         all_entities
             .par_iter_mut()
             .for_each_mut(|(local, global, entity_cell)| {
-                update_global_from_cell_local(&settings, entity_cell, origin_cell, local, global);
+                update_global_from_cell_local(&settings, entity_cell, &origin_cell, local, global);
             });
     } else {
         let mut moved_cell_entities = entities.p0();
         moved_cell_entities
             .par_iter_mut()
             .for_each_mut(|(local, global, entity_cell)| {
-                update_global_from_cell_local(&settings, entity_cell, origin_cell, local, global);
+                update_global_from_cell_local(&settings, entity_cell, &origin_cell, local, global);
             });
     }
 }
@@ -430,128 +443,23 @@ fn update_global_from_cell_local<P: GridPrecision>(
         .into();
 }
 
-/// Update [`GlobalTransform`] component of entities based on entity hierarchy and
-/// [`Transform`] component.
-pub fn transform_propagate_system<P: GridPrecision>(
-    origin_moved: Query<(), (Changed<GridCell<P>>, With<FloatingOrigin>)>,
-    mut root_query_no_grid: Query<
+/// Update [`GlobalTransform`] component of entities that aren't in the hierarchy
+///
+/// Third party plugins should ensure that this is used in concert with [`propagate_transforms`].
+pub fn sync_simple_transforms<P: GridPrecision>(
+    mut query: Query<
+        (&Transform, &mut GlobalTransform),
         (
-            Option<(&Children, Changed<Children>)>,
-            &Transform,
             Changed<Transform>,
-            &mut GlobalTransform,
-            Entity,
+            Without<Parent>,
+            Without<Children>,
+            Without<GridCell<P>>,
         ),
-        (Without<GridCell<P>>, Without<Parent>),
     >,
-    mut root_query_grid: Query<
-        (
-            Option<(&Children, Changed<Children>)>,
-            Changed<Transform>,
-            Changed<GridCell<P>>,
-            &GlobalTransform,
-            Entity,
-        ),
-        (With<GridCell<P>>, Without<Parent>),
-    >,
-    mut transform_query: Query<(
-        &Transform,
-        Changed<Transform>,
-        &mut GlobalTransform,
-        &Parent,
-    )>,
-    children_query: Query<(&Children, Changed<Children>), (With<Parent>, With<GlobalTransform>)>,
 ) {
-    let origin_cell_changed = !origin_moved.is_empty();
-
-    for (children, transform, transform_changed, mut global_transform, entity) in
-        root_query_no_grid.iter_mut()
-    {
-        let mut changed = transform_changed || origin_cell_changed;
-
-        if transform_changed {
+    query
+        .par_iter_mut()
+        .for_each_mut(|(transform, mut global_transform)| {
             *global_transform = GlobalTransform::from(*transform);
-        }
-
-        if let Some((children, changed_children)) = children {
-            // If our `Children` has changed, we need to recalculate everything below us
-            changed |= changed_children;
-            for child in children {
-                let _ = propagate_recursive(
-                    &global_transform,
-                    &mut transform_query,
-                    &children_query,
-                    *child,
-                    entity,
-                    changed,
-                );
-            }
-        }
-    }
-
-    for (children, cell_changed, transform_changed, global_transform, entity) in
-        root_query_grid.iter_mut()
-    {
-        let mut changed = transform_changed || cell_changed || origin_cell_changed;
-
-        if let Some((children, changed_children)) = children {
-            // If our `Children` has changed, we need to recalculate everything below us
-            changed |= changed_children;
-            for child in children {
-                let _ = propagate_recursive(
-                    global_transform,
-                    &mut transform_query,
-                    &children_query,
-                    *child,
-                    entity,
-                    changed,
-                );
-            }
-        }
-    }
-}
-
-fn propagate_recursive(
-    parent: &GlobalTransform,
-    transform_query: &mut Query<(
-        &Transform,
-        Changed<Transform>,
-        &mut GlobalTransform,
-        &Parent,
-    )>,
-    children_query: &Query<(&Children, Changed<Children>), (With<Parent>, With<GlobalTransform>)>,
-    entity: Entity,
-    expected_parent: Entity,
-    mut changed: bool,
-    // We use a result here to use the `?` operator. Ideally we'd use a try block instead
-) -> Result<(), ()> {
-    let global_matrix = {
-        let (transform, transform_changed, mut global_transform, child_parent) =
-            transform_query.get_mut(entity).map_err(drop)?;
-        // Note that for parallelising, this check cannot occur here, since there is an `&mut GlobalTransform` (in global_transform)
-        assert_eq!(
-            child_parent.get(), expected_parent,
-            "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
-        );
-        changed |= transform_changed;
-        if changed {
-            *global_transform = parent.mul_transform(*transform);
-        }
-        *global_transform
-    };
-
-    let (children, changed_children) = children_query.get(entity).map_err(drop)?;
-    // If our `Children` has changed, we need to recalculate everything below us
-    changed |= changed_children;
-    for child in children {
-        let _ = propagate_recursive(
-            &global_matrix,
-            transform_query,
-            children_query,
-            *child,
-            entity,
-            changed,
-        );
-    }
-    Ok(())
+        });
 }
