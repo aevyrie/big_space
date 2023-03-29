@@ -135,18 +135,20 @@ impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
             // add transform systems to startup so the first update is "correct"
             .add_startup_systems(
                 (
-                    recenter_transform_on_grid::<P>.before(update_global_from_grid::<P>),
-                    update_global_from_grid::<P>.before(transform_propagate_system::<P>),
+                    recenter_transform_on_grid::<P>,
+                    update_global_from_grid::<P>,
                     transform_propagate_system::<P>,
                 )
+                    .chain()
                     .in_set(TransformSystem::TransformPropagate),
             )
             .add_systems(
                 (
-                    recenter_transform_on_grid::<P>.before(update_global_from_grid::<P>),
-                    update_global_from_grid::<P>.before(transform_propagate_system::<P>),
+                    recenter_transform_on_grid::<P>,
+                    update_global_from_grid::<P>,
                     transform_propagate_system::<P>,
                 )
+                    .chain()
                     .in_set(TransformSystem::TransformPropagate),
             );
     }
