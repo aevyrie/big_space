@@ -183,7 +183,9 @@ pub struct FloatingOriginSettings {
 }
 
 impl FloatingOriginSettings {
-    fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
+    /// Construct a new [`FloatingOriginSettings`] struct. This cannot be updated after the plugin
+    /// is built.
+    pub fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
         Self {
             grid_edge_length,
             maximum_distance_from_origin: grid_edge_length / 2.0 + switching_threshold,
