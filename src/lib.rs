@@ -183,7 +183,7 @@ pub struct FloatingOriginSettings {
 }
 
 impl FloatingOriginSettings {
-    fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
+    pub fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
         Self {
             grid_edge_length,
             maximum_distance_from_origin: grid_edge_length / 2.0 + switching_threshold,
