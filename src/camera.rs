@@ -18,14 +18,14 @@ pub struct CameraControllerPlugin<P: GridPrecision>(PhantomData<P>);
 impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraInput>().add_systems(
+            PostUpdate,
             (
                 default_camera_inputs
                     .before(camera_controller::<P>)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
                 nearest_objects.before(camera_controller::<P>),
                 camera_controller::<P>.before(TransformSystem::TransformPropagate),
-            )
-                .in_base_set(CoreSet::PostUpdate),
+            ),
         );
     }
 }
@@ -148,10 +148,14 @@ pub fn default_camera_inputs(
     keyboard.pressed(KeyCode::A).then(|| cam.right -= 1.0);
     keyboard.pressed(KeyCode::D).then(|| cam.right += 1.0);
     keyboard.pressed(KeyCode::Space).then(|| cam.up += 1.0);
-    keyboard.pressed(KeyCode::LControl).then(|| cam.up -= 1.0);
+    keyboard
+        .pressed(KeyCode::ControlLeft)
+        .then(|| cam.up -= 1.0);
     keyboard.pressed(KeyCode::Q).then(|| cam.roll += 1.0);
     keyboard.pressed(KeyCode::E).then(|| cam.roll -= 1.0);
-    keyboard.pressed(KeyCode::LShift).then(|| cam.boost = true);
+    keyboard
+        .pressed(KeyCode::ShiftLeft)
+        .then(|| cam.boost = true);
     if let Some(total_mouse_motion) = mouse_move.iter().map(|e| e.delta).reduce(|sum, i| sum + i) {
         cam.pitch += total_mouse_motion.y as f64 * -0.1;
         cam.yaw += total_mouse_motion.x as f64 * -0.1;

@@ -5,13 +5,14 @@ use big_space::{FloatingOrigin, GridCell};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.build().disable::<TransformPlugin>())
-        .add_plugin(big_space::FloatingOriginPlugin::<i64>::new(0.5, 0.01))
-        .add_plugin(big_space::debug::FloatingOriginDebugPlugin::<i64>::default())
+        .add_plugins((
+            DefaultPlugins.build().disable::<TransformPlugin>(),
+            big_space::FloatingOriginPlugin::<i64>::new(0.5, 0.01),
+            big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
+        ))
         .insert_resource(ClearColor(Color::BLACK))
-        .add_startup_system(setup)
-        .add_system(movement)
-        .add_system(rotation)
+        .add_systems(Startup, setup)
+        .add_systems(Update, (movement, rotation))
         .run()
 }
 

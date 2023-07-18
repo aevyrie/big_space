@@ -86,7 +86,7 @@
 #![allow(clippy::type_complexity)]
 #![deny(missing_docs)]
 
-use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
+use bevy::{math::DVec3, prelude::*, reflect::TypePath, transform::TransformSystem};
 use propagation::propagate_transforms;
 use std::marker::PhantomData;
 
@@ -129,7 +129,7 @@ impl<P: GridPrecision> FloatingOriginPlugin<P> {
     }
 }
 
-impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
+impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOriginPlugin<P> {
     fn build(&self, app: &mut App) {
         app.insert_resource(FloatingOriginSettings::new(
             self.grid_edge_length,
@@ -138,15 +138,9 @@ impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
         .register_type::<Transform>()
         .register_type::<GlobalTransform>()
         .register_type::<GridCell<P>>()
-        .add_plugin(ValidParentCheckPlugin::<GlobalTransform>::default())
-        .configure_set(TransformSystem::TransformPropagate.in_base_set(CoreSet::PostUpdate))
-        .edit_schedule(CoreSchedule::Startup, |schedule| {
-            schedule.configure_set(
-                TransformSystem::TransformPropagate.in_base_set(StartupSet::PostStartup),
-            );
-        })
-        // add transform systems to startup so the first update is "correct"
-        .add_startup_systems(
+        .add_plugins(ValidParentCheckPlugin::<GlobalTransform>::default())
+        .add_systems(
+            PostStartup,
             (
                 recenter_transform_on_grid::<P>,
                 sync_simple_transforms::<P>
@@ -160,6 +154,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginPlugin<P> {
                 .in_set(TransformSystem::TransformPropagate),
         )
         .add_systems(
+            PostUpdate,
             (
                 recenter_transform_on_grid::<P>,
                 sync_simple_transforms::<P>

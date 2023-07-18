@@ -11,16 +11,16 @@ use big_space::{
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.build().disable::<TransformPlugin>())
-        .add_plugin(big_space::FloatingOriginPlugin::<i128>::default())
-        .add_plugin(big_space::debug::FloatingOriginDebugPlugin::<i128>::default())
-        .add_plugin(big_space::camera::CameraControllerPlugin::<i128>::default())
-        .add_plugin(bevy_framepace::FramepacePlugin)
+        .add_plugins((
+            DefaultPlugins.build().disable::<TransformPlugin>(),
+            big_space::FloatingOriginPlugin::<i128>::default(),
+            big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
+            big_space::camera::CameraControllerPlugin::<i128>::default(),
+            bevy_framepace::FramepacePlugin,
+        ))
         .insert_resource(ClearColor(Color::BLACK))
-        .add_startup_system(setup)
-        .add_system(cursor_grab_system)
-        .add_system(ui_text_system)
-        .add_startup_system(ui_setup)
+        .add_systems(Startup, (setup, ui_setup))
+        .add_systems(Update, (cursor_grab_system, ui_text_system))
         .run()
 }
 
@@ -101,11 +101,8 @@ fn ui_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         .with_text_alignment(TextAlignment::Left)
         .with_style(Style {
             position_type: PositionType::Absolute,
-            position: UiRect {
-                top: Val::Px(10.0),
-                left: Val::Px(10.0),
-                ..default()
-            },
+            top: Val::Px(10.0),
+            left: Val::Px(10.0),
             ..default()
         }),
         BigSpaceDebugText,

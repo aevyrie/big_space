@@ -10,12 +10,12 @@ use big_space::{FloatingOrigin, FloatingSpatialBundle, GridCell};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.build().disable::<TransformPlugin>())
-        .add_plugin(big_space::FloatingOriginPlugin::<i64>::default())
-        .add_startup_system(setup_scene)
-        .add_startup_system(setup_ui)
-        .add_system(rotator_system)
-        .add_system(toggle_plugin)
+        .add_plugins((
+            DefaultPlugins.build().disable::<TransformPlugin>(),
+            big_space::FloatingOriginPlugin::<i64>::default(),
+        ))
+        .add_systems(Startup, (setup_scene, setup_ui))
+        .add_systems(Update, (rotator_system, toggle_plugin))
         .run()
 }
 
