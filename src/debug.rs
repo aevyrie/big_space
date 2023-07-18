@@ -41,13 +41,13 @@ pub fn update_debug_bounds<P: GridPrecision>(
 
     for (cell, has_origin) in cells.values() {
         let cell = cell - origin_cell;
+        let scale = Vec3::splat(settings.grid_edge_length * 0.999);
+        let translation = settings.grid_position(&cell, &Transform::IDENTITY);
         gizmos.cuboid(
-            Transform::from_translation(settings.grid_position(&cell, &Transform::IDENTITY))
-                .with_scale(Vec3::splat(settings.grid_edge_length)),
-            if *has_origin {
-                Color::BLUE
-            } else {
-                Color::GREEN
+            Transform::from_translation(translation).with_scale(scale),
+            match *has_origin {
+                true => Color::BLUE,
+                false => Color::GREEN,
             },
         )
     }

@@ -15,7 +15,7 @@ bevy = { version = "0.11", default_features = false }
 
 [dev-dependencies]
 bevy = "0.11"
-bevy_framepace = "0.13"
+bevy_framepace = { version = "0.13", default-features = false }
 
 [features]
 default = ["debug"]
