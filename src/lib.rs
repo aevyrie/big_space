@@ -124,7 +124,7 @@ impl<P: GridPrecision> FloatingOriginPlugin<P> {
         FloatingOriginPlugin {
             grid_edge_length,
             switching_threshold,
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }
