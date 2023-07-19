@@ -38,7 +38,7 @@ pub struct CameraController {
     /// Rotational smoothness, from `0.0` to `1.0`.
     pub rotational_smoothness: f64,
     /// Maximum possible speed.
-    pub max_speed: f64,
+    pub speed: f64,
     /// Whether the camera should slow down when approaching an entity's [`Aabb`].
     pub slow_near_objects: bool,
     nearest_object: Option<(Entity, f64)>,
@@ -56,13 +56,19 @@ impl CameraController {
 
     /// Sets the `max_speed` parameter of the controller, and returns the modified result.
     pub fn with_max_speed(mut self, max_speed: f64) -> Self {
-        self.max_speed = max_speed;
+        self.speed = max_speed;
         self
     }
 
     /// Sets the `slow_near_objects` parameter of the controller, and returns the modified result.
     pub fn with_slowing(mut self, slow_near_objects: bool) -> Self {
         self.slow_near_objects = slow_near_objects;
+        self
+    }
+
+    /// Sets the speed of the controller, and returns the modified result.
+    pub fn with_speed(mut self, speed: f64) -> Self {
+        self.speed = speed;
         self
     }
 
@@ -82,7 +88,7 @@ impl Default for CameraController {
         Self {
             smoothness: 0.8,
             rotational_smoothness: 0.5,
-            max_speed: 10e8,
+            speed: 10e8,
             slow_near_objects: true,
             nearest_object: None,
             vel_translation: DVec3::ZERO,
@@ -195,8 +201,8 @@ pub fn camera_controller<P: GridPrecision>(
     for (mut cam_transform, mut controller, mut cell) in camera.iter_mut() {
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
             (Some(nearest), true) => nearest.1.abs(),
-            _ => controller.max_speed,
-        } * (1.0 + input.boost as usize as f64);
+            _ => controller.speed,
+        } * (controller.speed + input.boost as usize as f64);
 
         let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.999);
         let lerp_rotation = 1.0 - controller.rotational_smoothness.clamp(0.0, 0.999);

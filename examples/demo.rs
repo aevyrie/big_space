@@ -45,9 +45,10 @@ fn setup(
         },
         GridCell::<i128>::default(), // All spatial entities need this component
         FloatingOrigin, // Important: marks this as the entity to use as the floating origin
-        CameraController::default()
+        CameraController::default() // Built-in camera controller
             .with_max_speed(10e35)
-            .with_smoothness(0.9, 0.8), // Built-in camera controller
+            .with_smoothness(0.95, 0.9)
+            .with_speed(1.5),
     ));
 
     let mesh_handle = meshes.add(
@@ -182,7 +183,7 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
         (12e6, "diameter of Earth"),
         (3e6, "diameter of the Moon"),
         (9e3, "height of Mt. Everest"),
-        (2e0, "height of a human"),
+        (1.8e0, "height of a human"),
         (1e-1, "size of a cat"),
         (1e-3, "size of an insect"),
         (1e-4, "diameter of a eukaryotic cell"),
