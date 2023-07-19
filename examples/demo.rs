@@ -1,7 +1,6 @@
 use bevy::{
-    math::Vec3A,
     prelude::*,
-    render::primitives::{Aabb, Sphere},
+    transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow, Window, WindowMode},
 };
 use big_space::{
@@ -21,6 +20,10 @@ fn main() {
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
         .add_systems(Update, (cursor_grab_system, ui_text_system))
+        .add_systems(
+            PostUpdate,
+            highlight_nearest_sphere.after(TransformSystem::TransformPropagate),
+        )
         .run()
 }
 
@@ -34,11 +37,17 @@ fn setup(
         Camera3dBundle {
             transform: Transform::from_xyz(0.0, 0.0, 8.0)
                 .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+            projection: Projection::Perspective(PerspectiveProjection {
+                near: 1e-16,
+                ..default()
+            }),
             ..default()
         },
         GridCell::<i128>::default(), // All spatial entities need this component
         FloatingOrigin, // Important: marks this as the entity to use as the floating origin
-        CameraController::default().with_max_speed(10e35), // Built-in camera controller
+        CameraController::default()
+            .with_max_speed(10e35)
+            .with_smoothness(0.9, 0.8), // Built-in camera controller
     ));
 
     let mesh_handle = meshes.add(
@@ -57,8 +66,8 @@ fn setup(
     });
 
     let mut translation = Vec3::ZERO;
-    for i in 1..=37_i128 {
-        let j = 10_f32.powf(i as f32 - 10.0);
+    for i in -12..=27 {
+        let j = 10_f32.powf(i as f32);
         translation.x += j;
         commands.spawn((
             PbrBundle {
@@ -67,10 +76,6 @@ fn setup(
                 transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
                 ..default()
             },
-            Aabb::from(Sphere {
-                center: Vec3A::ZERO,
-                radius: j / 2.0,
-            }),
             GridCell::<i128>::default(),
         ));
     }
@@ -93,7 +98,7 @@ fn ui_setup(mut commands: Commands) {
         TextBundle::from_section(
             "",
             TextStyle {
-                font_size: 18.0,
+                font_size: 28.0,
                 color: Color::WHITE,
                 ..default()
             },
@@ -107,6 +112,19 @@ fn ui_setup(mut commands: Commands) {
         }),
         BigSpaceDebugText,
     ));
+}
+
+fn highlight_nearest_sphere(
+    cameras: Query<&CameraController>,
+    objects: Query<&GlobalTransform>,
+    mut gizmos: Gizmos,
+) {
+    let Some((entity, _)) = cameras.single().nearest_object() else { return };
+    let Ok(transform) = objects.get(entity) else { return };
+    let (scale, rotation, translation) = transform.to_scale_rotation_translation();
+    gizmos
+        .sphere(translation, rotation, scale.x * 0.505, Color::RED)
+        .circle_segments(128);
 }
 
 fn ui_text_system(
@@ -136,24 +154,53 @@ fn ui_text_system(
 
     let nearest_text = if let Some(nearest) = camera.single().nearest_object() {
         let dia = objects.get(nearest.0).unwrap().scale.max_element();
-        let dia_fact = match dia {
-            d if d > 8.8e26 => "(Greater than the diameter of the observable universe)",
-            d if d > 1e21 => "(Greater than the diameter of the Milky Way galaxy)",
-            d if d > 7e12 => "(Greater than the diameter of Pluto's orbit)",
-            d if d > 1.4e9 => "(Greater than the diameter of the Sun)",
-            d if d > 1.4e8 => "(Greater than the diameter of Earth)",
-            d if d > 12e6 => "(Greater than the diameter of Earth)",
-            d if d > 3e6 => "(Greater than the diameter of the Moon)",
-            _ => "",
-        };
+        let (fact_dia, fact) = closest(dia);
         let dist = nearest.1;
-        format!("Nearest sphere diameter: {dia:.0e} m    {dia_fact}\nNearest sphere distance: {dist:.0e} m",)
+        let multiple = dia / fact_dia;
+        format!("\nNearest sphere distance: {dist:.0e} m\nNearest sphere diameter: {dia:.0e} m\n{multiple:.1}x {fact}",)
     } else {
         "".into()
     };
 
     text.single_mut().sections[0].value =
         format!("{grid_text}\n{translation_text}\n{camera_text}\n{nearest_text}");
+}
+
+fn closest<'a>(diameter: f32) -> (f32, &'a str) {
+    let items = vec![
+        (8.8e26, "diameter of the observable universe"),
+        (9e25, "length of the Hercules-Corona Borealis Great Wall"),
+        (1e24, "diameter of the Local Supercluster"),
+        (9e22, "diameter of the Local Group"),
+        (1e21, "diameter of the Milky Way galaxy"),
+        (5e16, "length of the Pillars of Creation"),
+        (1.8e14, "diameter of Messier 87"),
+        (7e12, "diameter of Pluto's orbit"),
+        (24e9, "diameter of Sagittarius A"),
+        (1.4e9, "diameter of the Sun"),
+        (1.4e8, "diameter of Jupiter"),
+        (12e6, "diameter of Earth"),
+        (3e6, "diameter of the Moon"),
+        (9e3, "height of Mt. Everest"),
+        (2e0, "height of a human"),
+        (1e-1, "size of a cat"),
+        (1e-3, "size of an insect"),
+        (1e-4, "diameter of a eukaryotic cell"),
+        (1e-6, "diameter of a bacteria"),
+        (50e-9, "size of a phage"),
+        (5e-9, "size of a transistor"),
+        (100e-12, "diameter of a carbon atom"),
+        (40e-12, "diameter of a hydrogen atom"),
+        (4e-12, "diameter of an electron"),
+    ];
+
+    let mut min = items[0];
+    for item in items.iter() {
+        if (item.0 - diameter).abs() < (min.0 - diameter).abs() {
+            min = item.to_owned();
+        }
+    }
+    min
 }
 
 fn cursor_grab_system(

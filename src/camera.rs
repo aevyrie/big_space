@@ -23,7 +23,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
                 default_camera_inputs
                     .before(camera_controller::<P>)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects.before(camera_controller::<P>),
+                nearest_objects::<P>.before(camera_controller::<P>),
                 camera_controller::<P>.before(TransformSystem::TransformPropagate),
             ),
         );
@@ -163,23 +163,26 @@ pub fn default_camera_inputs(
 }
 
 /// Find the object nearest the camera
-pub fn nearest_objects(
-    objects: Query<(Entity, &GlobalTransform, &Aabb)>,
-    mut camera: Query<(&GlobalTransform, &mut CameraController)>,
+pub fn nearest_objects<T: GridPrecision>(
+    settings: Res<FloatingOriginSettings>,
+    objects: Query<(Entity, &GridCell<T>, &Transform, &Aabb)>,
+    mut camera: Query<(&mut CameraController, &GridCell<T>, &Transform)>,
 ) {
-    for (cam_global_transform, mut controller) in camera.iter_mut() {
-        let nearest_object = objects
-            .iter()
-            .map(|(entity, transform, aabb)| {
-                let dist = (transform.translation().as_dvec3() + aabb.center.as_dvec3()
-                    - cam_global_transform.translation().as_dvec3())
-                .length()
-                    - aabb.half_extents.as_dvec3().max_element();
-                (entity, dist)
-            })
-            .reduce(|nearest, this| if this.1 < nearest.1 { this } else { nearest });
-        controller.nearest_object = nearest_object;
-    }
+    let (mut camera, cam_cell, cam_transform) = camera.single_mut();
+    let nearest_object = objects
+        .iter()
+        .map(|(entity, cell, obj_transform, aabb)| {
+            let pos = settings.grid_position_double(&(cell - cam_cell), obj_transform)
+                - cam_transform.translation.as_dvec3();
+            let dist = pos.length()
+                - (aabb.half_extents.as_dvec3() * obj_transform.scale.as_dvec3())
+                    .abs()
+                    .max_element();
+            (entity, dist)
+        })
+        .filter(|v| v.1.is_finite())
+        .reduce(|nearest, this| if this.1 < nearest.1 { this } else { nearest });
+    camera.nearest_object = nearest_object;
 }
 
 /// Uses [`CameraInput`] state to update the camera position.
@@ -191,7 +194,7 @@ pub fn camera_controller<P: GridPrecision>(
 ) {
     for (mut cam_transform, mut controller, mut cell) in camera.iter_mut() {
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
-            (Some(nearest), true) => nearest.1,
+            (Some(nearest), true) => nearest.1.abs(),
             _ => controller.max_speed,
         } * (1.0 + input.boost as usize as f64);
 
@@ -213,16 +216,8 @@ pub fn camera_controller<P: GridPrecision>(
         cam_transform.rotation *= new_rotation.as_f32();
 
         // Store the new velocity to be used in the next frame
-        controller.vel_translation = if vel_t_next.length().abs() < 0.001 {
-            DVec3::ZERO
-        } else {
-            vel_t_next
-        };
-        controller.vel_rotation = if new_rotation.to_axis_angle().1.abs() < 0.001 {
-            DQuat::IDENTITY
-        } else {
-            new_rotation
-        };
+        controller.vel_translation = vel_t_next;
+        controller.vel_rotation = new_rotation;
 
         input.reset();
     }
