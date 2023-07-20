@@ -18,5 +18,6 @@ bevy = "0.11"
 bevy_framepace = { version = "0.13", default-features = false }
 
 [features]
-default = ["debug"]
+default = ["debug", "camera"]
 debug = ["bevy/bevy_gizmos"]
+camera = ["bevy/bevy_render"]

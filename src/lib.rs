@@ -90,7 +90,6 @@ use bevy::{math::DVec3, prelude::*, reflect::TypePath, transform::TransformSyste
 use propagation::propagate_transforms;
 use std::marker::PhantomData;
 
-pub mod camera;
 pub mod grid_cell;
 pub mod precision;
 pub mod propagation;
@@ -99,6 +98,9 @@ pub use grid_cell::GridCell;
 
 #[cfg(feature = "debug")]
 pub mod debug;
+
+#[cfg(feature = "camera")]
+pub mod camera;
 
 use precision::*;
 
