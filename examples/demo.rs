@@ -94,6 +94,9 @@ fn setup(
 #[derive(Component, Reflect)]
 pub struct BigSpaceDebugText;
 
+#[derive(Component, Reflect)]
+pub struct FunFactText;
+
 fn ui_setup(mut commands: Commands) {
     commands.spawn((
         TextBundle::from_section(
@@ -113,6 +116,26 @@ fn ui_setup(mut commands: Commands) {
         }),
         BigSpaceDebugText,
     ));
+
+    commands.spawn((
+        TextBundle::from_section(
+            "",
+            TextStyle {
+                font_size: 52.0,
+                color: Color::WHITE,
+                ..default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(10.0),
+            right: Val::Px(10.0),
+            left: Val::Px(10.0),
+            ..default()
+        })
+        .with_text_alignment(TextAlignment::Center),
+        FunFactText,
+    ));
 }
 
 fn highlight_nearest_sphere(
@@ -129,7 +152,8 @@ fn highlight_nearest_sphere(
 }
 
 fn ui_text_system(
-    mut text: Query<&mut Text, With<BigSpaceDebugText>>,
+    mut debug_text: Query<&mut Text, (With<BigSpaceDebugText>, Without<FunFactText>)>,
+    mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     time: Res<Time>,
     origin: Query<(&GridCell<i128>, &Transform), With<FloatingOrigin>>,
     camera: Query<&CameraController>,
@@ -153,18 +177,25 @@ fn ui_text_system(
         format!("Camera Speed: {:.2e} m/s", speed)
     };
 
-    let nearest_text = if let Some(nearest) = camera.single().nearest_object() {
+    let (nearest_text, fact_text) = if let Some(nearest) = camera.single().nearest_object() {
         let dia = objects.get(nearest.0).unwrap().scale.max_element();
         let (fact_dia, fact) = closest(dia);
         let dist = nearest.1;
         let multiple = dia / fact_dia;
-        format!("\nNearest sphere distance: {dist:.0e} m\nNearest sphere diameter: {dia:.0e} m\n{multiple:.1}x {fact}",)
+        (
+            format!(
+                "\nNearest sphere distance: {dist:.0e} m\nNearest sphere diameter: {dia:.0e} m",
+            ),
+            format!("{multiple:.1}x {fact}"),
+        )
     } else {
-        "".into()
+        ("".into(), "".into())
     };
 
-    text.single_mut().sections[0].value =
+    debug_text.single_mut().sections[0].value =
         format!("{grid_text}\n{translation_text}\n{camera_text}\n{nearest_text}");
+
+    fun_text.single_mut().sections[0].value = fact_text
 }
 
 fn closest<'a>(diameter: f32) -> (f32, &'a str) {
@@ -183,15 +214,19 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
         (12e6, "diameter of Earth"),
         (3e6, "diameter of the Moon"),
         (9e3, "height of Mt. Everest"),
-        (1.8e0, "height of a human"),
+        (3.8e2, "height of the Empire State Building"),
+        (2.5e1, "length of a train car"),
+        (1.8, "height of a human"),
         (1e-1, "size of a cat"),
+        (1e-2, "size of a mouse"),
         (1e-3, "size of an insect"),
         (1e-4, "diameter of a eukaryotic cell"),
+        (1e-5, "width of a human hair"),
         (1e-6, "diameter of a bacteria"),
-        (50e-9, "size of a phage"),
+        (5e-8, "size of a phage"),
         (5e-9, "size of a transistor"),
-        (100e-12, "diameter of a carbon atom"),
-        (40e-12, "diameter of a hydrogen atom"),
+        (1e-10, "diameter of a carbon atom"),
+        (4e-11, "diameter of a hydrogen atom"),
         (4e-12, "diameter of an electron"),
     ];
 

@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::prelude::*;
 
 use crate::{precision::GridPrecision, FloatingOrigin, FloatingOriginSettings, GridCell};
 
@@ -25,30 +25,17 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
 pub fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos,
     settings: Res<FloatingOriginSettings>,
-    occupied_cells: Query<(&GridCell<P>, Option<&FloatingOrigin>)>,
+    occupied_cells: Query<&GridCell<P>, Without<FloatingOrigin>>,
     origin_cells: Query<&GridCell<P>, With<FloatingOrigin>>,
 ) {
-    let mut cells = HashMap::<_, (GridCell<P>, bool)>::new();
     let origin_cell = origin_cells.single();
-
-    for (cell, this_is_origin) in occupied_cells.iter() {
-        let (_, current_is_origin) = cells
-            .entry((cell.x, cell.y, cell.z))
-            .or_insert((*cell, this_is_origin.is_some()));
-
-        *current_is_origin |= this_is_origin.is_some();
-    }
-
-    for (cell, has_origin) in cells.values() {
+    for cell in occupied_cells.iter() {
         let cell = cell - origin_cell;
         let scale = Vec3::splat(settings.grid_edge_length * 0.999);
         let translation = settings.grid_position(&cell, &Transform::IDENTITY);
         gizmos.cuboid(
             Transform::from_translation(translation).with_scale(scale),
-            match *has_origin {
-                true => Color::BLUE,
-                false => Color::GREEN,
-            },
+            Color::GREEN,
         )
     }
 }
