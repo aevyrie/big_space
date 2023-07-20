@@ -39,6 +39,8 @@ pub struct CameraController {
     pub rotational_smoothness: f64,
     /// Maximum possible speed.
     pub speed: f64,
+    /// Minimum and maximum speed.
+    pub speed_bounds: [f64; 2],
     /// Whether the camera should slow down when approaching an entity's [`Aabb`].
     pub slow_near_objects: bool,
     nearest_object: Option<(Entity, f64)>,
@@ -89,6 +91,7 @@ impl Default for CameraController {
             smoothness: 0.8,
             rotational_smoothness: 0.5,
             speed: 10e8,
+            speed_bounds: [1e-17, 1e30],
             slow_near_objects: true,
             nearest_object: None,
             vel_translation: DVec3::ZERO,
@@ -203,6 +206,9 @@ pub fn camera_controller<P: GridPrecision>(
             (Some(nearest), true) => nearest.1.abs(),
             _ => controller.speed,
         } * (controller.speed + input.boost as usize as f64);
+
+        let [min, max] = controller.speed_bounds;
+        let speed = speed.clamp(min, max);
 
         let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.999);
         let lerp_rotation = 1.0 - controller.rotational_smoothness.clamp(0.0, 0.999);
