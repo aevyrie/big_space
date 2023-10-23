@@ -37,7 +37,7 @@ pub struct CameraController {
     pub smoothness: f64,
     /// Rotational smoothness, from `0.0` to `1.0`.
     pub rotational_smoothness: f64,
-    /// Maximum possible speed.
+    /// Base speed.
     pub speed: f64,
     /// Minimum and maximum speed.
     pub speed_bounds: [f64; 2],
@@ -56,12 +56,6 @@ impl CameraController {
         self
     }
 
-    /// Sets the `max_speed` parameter of the controller, and returns the modified result.
-    pub fn with_max_speed(mut self, max_speed: f64) -> Self {
-        self.speed = max_speed;
-        self
-    }
-
     /// Sets the `slow_near_objects` parameter of the controller, and returns the modified result.
     pub fn with_slowing(mut self, slow_near_objects: bool) -> Self {
         self.slow_near_objects = slow_near_objects;
@@ -71,6 +65,11 @@ impl CameraController {
     /// Sets the speed of the controller, and returns the modified result.
     pub fn with_speed(mut self, speed: f64) -> Self {
         self.speed = speed;
+        self
+    }
+    /// Sets the speed of the controller, and returns the modified result.
+    pub fn with_speed_bounds(mut self, speed_limits: [f64; 2]) -> Self {
+        self.speed_bounds = speed_limits;
         self
     }
 
