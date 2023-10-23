@@ -44,11 +44,11 @@ fn setup(
             ..default()
         },
         GridCell::<i128>::default(), // All spatial entities need this component
-        FloatingOrigin, // Important: marks this as the entity to use as the floating origin
+        FloatingOrigin, // Important: marks this as the entity to use as the floating origin when propagating transforms for rendering.
         CameraController::default() // Built-in camera controller
             .with_max_speed(10e35)
             .with_smoothness(0.95, 0.9)
-            .with_speed(1.5),
+            .with_speed(1.0),
     ));
 
     let mesh_handle = meshes.add(
@@ -143,8 +143,12 @@ fn highlight_nearest_sphere(
     objects: Query<&GlobalTransform>,
     mut gizmos: Gizmos,
 ) {
-    let Some((entity, _)) = cameras.single().nearest_object() else { return };
-    let Ok(transform) = objects.get(entity) else { return };
+    let Some((entity, _)) = cameras.single().nearest_object() else {
+        return;
+    };
+    let Ok(transform) = objects.get(entity) else {
+        return;
+    };
     let (scale, rotation, translation) = transform.to_scale_rotation_translation();
     gizmos
         .sphere(translation, rotation, scale.x * 0.505, Color::RED)

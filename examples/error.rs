@@ -73,7 +73,7 @@ fn toggle_plugin(
             .join(",") // separator
     };
 
-    text.single_mut().sections[0].value = 
+    text.single_mut().sections[0].value =
         format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nCubes distance from origin: {}", thousands(dist), thousands(DISTANCE))
 }
 
