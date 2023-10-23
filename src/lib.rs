@@ -116,7 +116,7 @@ pub struct FloatingOriginPlugin<P: GridPrecision> {
 
 impl<P: GridPrecision> Default for FloatingOriginPlugin<P> {
     fn default() -> Self {
-        Self::new(10_000f32, 100f32)
+        Self::new(2_000f32, 100f32)
     }
 }
 
