@@ -11,11 +11,11 @@ documentation = "https://docs.rs/crate/big_space/latest"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.11", default_features = false }
+bevy = { version = "0.12", default_features = false }
 
 [dev-dependencies]
-bevy = "0.11"
-bevy_framepace = { version = "0.13", default-features = false }
+bevy = "0.12"
+#bevy_framepace = { version = "0.13", default-features = false }
 
 [features]
 default = ["debug", "camera"]
