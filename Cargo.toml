@@ -16,9 +16,10 @@ bevy = { version = "0.12", default_features = false }
 [dev-dependencies]
 bevy = { version = "0.12", default-features = false, features = [
     "bevy_winit",
-    "x11",
+    "default_font",
     "bevy_ui",
     "bevy_pbr",
+    "x11",
     "tonemapping_luts",
 ] }
 bevy_framepace = { version = "0.14", default-features = false }
