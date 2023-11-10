@@ -1,6 +1,6 @@
 [package]
 name = "big_space"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "A floating origin plugin for bevy"
 license = "MIT OR Apache-2.0"
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/crate/big_space/latest"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.11", default_features = false }
+bevy = { version = "0.12", default_features = false }
 
 [dev-dependencies]
 bevy = { version = "0.12", default-features = false, features = [
@@ -25,6 +25,7 @@ bevy = { version = "0.12", default-features = false, features = [
 bevy_framepace = { version = "0.14", default-features = false }
 
 [features]
-default = ["debug", "camera"]
+default = ["debug", "camera", "bevy_render"]
 debug = ["bevy/bevy_gizmos"]
-camera = ["bevy/bevy_render"]
+bevy_render = ["bevy/bevy_render"]
+camera = ["bevy_render"]
