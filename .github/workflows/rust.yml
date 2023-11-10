@@ -11,7 +11,7 @@ jobs:
       - name: Update Packages
         run: sudo apt-get update -yq
       - name: Install dependencies
-        run: sudo apt-get install -yq --no-install-recommends libudev-dev libasound2-dev libxcb-composite0-dev libwayland-dev libxkbcommon-dev
+        run: sudo apt-get install -yq --no-install-recommends g++ pkg-config libx11-dev libasound2-dev libudev-dev libxcb-composite0-dev libwayland-dev libxkbcommon-dev
   format:
     runs-on: ubuntu-latest
     needs: [setup]
