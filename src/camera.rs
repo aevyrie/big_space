@@ -164,7 +164,7 @@ pub fn default_camera_inputs(
     keyboard
         .pressed(KeyCode::ShiftLeft)
         .then(|| cam.boost = true);
-    if let Some(total_mouse_motion) = mouse_move.iter().map(|e| e.delta).reduce(|sum, i| sum + i) {
+    if let Some(total_mouse_motion) = mouse_move.read().map(|e| e.delta).reduce(|sum, i| sum + i) {
         cam.pitch += total_mouse_motion.y as f64 * -0.1;
         cam.yaw += total_mouse_motion.x as f64 * -0.1;
     }

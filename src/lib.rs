@@ -272,9 +272,14 @@ impl FloatingOriginSettings {
 #[derive(Bundle, Default)]
 pub struct FloatingSpatialBundle<P: GridPrecision> {
     /// The visibility of the entity.
+    #[cfg(feature = "bevy_render")]
     pub visibility: Visibility,
-    /// The computed visibility of the entity.
-    pub computed: ComputedVisibility,
+    /// The inherited visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub inherited: InheritedVisibility,
+    /// The view visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub view: ViewVisibility,
     /// The transform of the entity.
     pub transform: Transform,
     /// The global transform of the entity.
@@ -296,7 +301,7 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
 ) {
     query
         .par_iter_mut()
-        .for_each_mut(|(mut grid_pos, mut transform)| {
+        .for_each(|(mut grid_pos, mut transform)| {
             if transform.as_ref().translation.abs().max_element()
                 > settings.maximum_distance_from_origin
             {
@@ -326,14 +331,14 @@ pub fn update_global_from_grid<P: GridPrecision>(
         let mut all_entities = entities.p1();
         all_entities
             .par_iter_mut()
-            .for_each_mut(|(local, global, entity_cell)| {
+            .for_each(|(local, global, entity_cell)| {
                 update_global_from_cell_local(&settings, entity_cell, &origin_cell, local, global);
             });
     } else {
         let mut moved_cell_entities = entities.p0();
         moved_cell_entities
             .par_iter_mut()
-            .for_each_mut(|(local, global, entity_cell)| {
+            .for_each(|(local, global, entity_cell)| {
                 update_global_from_cell_local(&settings, entity_cell, &origin_cell, local, global);
             });
     }
@@ -368,7 +373,7 @@ pub fn sync_simple_transforms<P: GridPrecision>(
 ) {
     query
         .par_iter_mut()
-        .for_each_mut(|(transform, mut global_transform)| {
+        .for_each(|(transform, mut global_transform)| {
             *global_transform = GlobalTransform::from(*transform);
         });
 }
