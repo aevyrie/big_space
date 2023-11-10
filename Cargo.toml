@@ -14,8 +14,15 @@ documentation = "https://docs.rs/crate/big_space/latest"
 bevy = { version = "0.11", default_features = false }
 
 [dev-dependencies]
-bevy = "0.11"
-bevy_framepace = { version = "0.13", default-features = false }
+bevy = { version = "0.12", default-features = false, features = [
+    "bevy_winit",
+    "default_font",
+    "bevy_ui",
+    "bevy_pbr",
+    "x11",
+    "tonemapping_luts",
+] }
+bevy_framepace = { version = "0.14", default-features = false }
 
 [features]
 default = ["debug", "camera"]
