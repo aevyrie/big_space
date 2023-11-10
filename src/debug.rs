@@ -20,8 +20,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
     }
 }
 
-/// Update the rendered debug bounds to only highlight occupied [`GridCell`]s. [`DebugBounds`] are
-/// spawned or hidden as needed.
+/// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.
 pub fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos,
     settings: Res<FloatingOriginSettings>,
