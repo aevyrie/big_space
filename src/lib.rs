@@ -273,8 +273,8 @@ impl FloatingOriginSettings {
 pub struct FloatingSpatialBundle<P: GridPrecision> {
     /// The visibility of the entity.
     pub visibility: Visibility,
-    /// The inhereted visibility of the entity.
-    pub inhereted: InheritedVisibility,
+    /// The inherited visibility of the entity.
+    pub inherited: InheritedVisibility,
     /// The view visibility of the entity.
     pub view: ViewVisibility,
     /// The transform of the entity.

@@ -15,7 +15,7 @@ fn main() {
             big_space::FloatingOriginPlugin::<i128>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
             big_space::camera::CameraControllerPlugin::<i128>::default(),
-            //bevy_framepace::FramepacePlugin,
+            bevy_framepace::FramepacePlugin,
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
