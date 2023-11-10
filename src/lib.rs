@@ -134,7 +134,7 @@ impl<P: GridPrecision> FloatingOriginPlugin<P> {
 impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOriginPlugin<P> {
     fn build(&self, app: &mut App) {
         #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-        struct MiddleTransformSystems;
+        struct RootGlobalTransformUpdates;
 
         app.insert_resource(FloatingOriginSettings::new(
             self.grid_edge_length,
@@ -147,18 +147,20 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
         .add_systems(
             PostStartup,
             (
-                recenter_transform_on_grid::<P>.before(MiddleTransformSystems),
-                (sync_simple_transforms::<P>, update_global_from_grid::<P>).in_set(MiddleTransformSystems),
-                propagate_transforms::<P>.after(MiddleTransformSystems),
+                recenter_transform_on_grid::<P>.before(RootGlobalTransformUpdates),
+                (sync_simple_transforms::<P>, update_global_from_grid::<P>)
+                    .in_set(RootGlobalTransformUpdates),
+                propagate_transforms::<P>.after(RootGlobalTransformUpdates),
             )
                 .in_set(TransformSystem::TransformPropagate),
         )
         .add_systems(
             PostUpdate,
             (
-                recenter_transform_on_grid::<P>.before(MiddleTransformSystems),
-                (sync_simple_transforms::<P>, update_global_from_grid::<P>).in_set(MiddleTransformSystems),
-                propagate_transforms::<P>.after(MiddleTransformSystems),
+                recenter_transform_on_grid::<P>.before(RootGlobalTransformUpdates),
+                (sync_simple_transforms::<P>, update_global_from_grid::<P>)
+                    .in_set(RootGlobalTransformUpdates),
+                propagate_transforms::<P>.after(RootGlobalTransformUpdates),
             )
                 .in_set(TransformSystem::TransformPropagate),
         );
