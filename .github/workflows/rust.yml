@@ -1,36 +1,71 @@
+name: CI
 on: 
   pull_request:
   push:
     branches:
       - main
-
-name: CI
-
 jobs:
-  ci:
-    name: CI
+  setup:
     runs-on: ubuntu-latest
+    steps:
+      - name: Update Packages
+        run: sudo apt-get update -yq
+      - name: Install dependencies
+        run: sudo apt-get install -yq --no-install-recommends libudev-dev libasound2-dev libxcb-composite0-dev
+  format:
+    runs-on: ubuntu-latest
+    needs: [setup]
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.0
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all -- --check
 
-      - name: Update Packages
-        run: sudo apt-get update -yq
-        
-      - name: Install dependencies
-        run: sudo apt-get install -yq --no-install-recommends libudev-dev libasound2-dev libxcb-composite0-dev
-          
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@ce325b60658c1b38465c06cc965b79baf32c1e72
-      
-      - name: Format
-        run: cargo fmt --all -- --check
-      
-      - name: Check
-        run: cargo check --all-targets
-      
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-      
-      - name: Test
-        run: cargo test --all-targets
+  check:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.0
+      - run: cargo check --all-features
+
+  check-no-defaults:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.0
+      - run: cargo check --no-default-features
+
+  clippy:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.0
+      - run: rustup component add clippy
+      - run: cargo clippy --all-features -- -D warnings
+
+  doc:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.0
+      - run: cargo doc --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+    
+  test:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2.7.0
+      - run: cargo test --all-features

@@ -5,14 +5,14 @@
 //! independently from the camera, which is equivalent to what would happen when moving far from the
 //! origin when not using this plugin.
 
-use bevy::prelude::*;
-use big_space::{FloatingOrigin, FloatingSpatialBundle, GridCell};
+use bevy::prelude::{shape::UVSphere, *};
+use big_space::{FloatingOrigin, FloatingOriginSettings, GridCell};
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i64>::default(),
+            big_space::FloatingOriginPlugin::<i128>::new(10.0, 1.0),
         ))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
@@ -26,47 +26,55 @@ fn main() {
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
 /// 10_000_000_000_000_000_000_000_000_000_000_000_000
-const DISTANCE: f32 = 10_000_000.0;
+const DISTANCE: i128 = 10_000_000_000_000_000_000_000_000_000_000_000_000;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
 /// disabling the plugin. Normally you would make your active camera the floating origin to avoid
 /// this issue.
 fn toggle_plugin(
     input: Res<Input<KeyCode>>,
+    settings: Res<big_space::FloatingOriginSettings>,
     mut text: Query<&mut Text>,
-    mut state: Local<bool>,
-    mut floating_origin: Query<&mut GridCell<i64>, With<FloatingOrigin>>,
+    mut disabled: Local<bool>,
+    mut floating_origin: Query<&mut GridCell<i128>, With<FloatingOrigin>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
-        *state = !*state;
+        *disabled = !*disabled;
     }
 
-    let mut cell = floating_origin.single_mut();
-    let cell_max = (DISTANCE / 10_000f32) as i64;
-    let i = cell_max / 200;
+    let mut origin_cell = floating_origin.single_mut();
+    let index_max = DISTANCE / settings.grid_edge_length() as i128;
+    let increment = index_max / 100;
 
-    let msg = if *state {
-        if 0 <= cell.x - i {
-            cell.x = 0.max(cell.x - i);
-            cell.y = 0.max(cell.y - i);
-            cell.z = 0.max(cell.z - i);
+    let msg = if *disabled {
+        if origin_cell.x > 0 {
+            origin_cell.x = 0.max(origin_cell.x - increment);
             "Disabling..."
         } else {
             "Floating Origin Disabled"
         }
-    } else if cell_max >= cell.x + i {
-        cell.x = i64::min(cell_max, cell.x + i);
-        cell.y = i64::min(cell_max, cell.y + i);
-        cell.z = i64::min(cell_max, cell.z + i);
+    } else if origin_cell.x < index_max {
+        origin_cell.x = index_max.min(origin_cell.x.saturating_add(increment));
         "Enabling..."
     } else {
         "Floating Origin Enabled"
     };
 
-    let dist = (cell_max - cell.x) * 10_000;
+    let dist = index_max.saturating_sub(origin_cell.x) * settings.grid_edge_length() as i128;
+
+    let thousands = |num: i128| {
+        num.to_string()
+            .as_bytes()
+            .rchunks(3)
+            .rev()
+            .map(std::str::from_utf8)
+            .collect::<Result<Vec<&str>, _>>()
+            .unwrap()
+            .join(",") // separator
+    };
 
     text.single_mut().sections[0].value =
-        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {dist}")
+        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nCubes distance from origin: {}", thousands(dist), thousands(DISTANCE))
 }
 
 #[derive(Component)]
@@ -74,7 +82,7 @@ struct Rotator;
 
 fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_x(3.0 * time.delta_seconds());
+        transform.rotate_x(time.delta_seconds());
     }
 }
 
@@ -105,6 +113,7 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    settings: Res<FloatingOriginSettings>,
 ) {
     let cube_handle = meshes.add(Mesh::from(shape::Cube { size: 2.0 }));
     let cube_material_handle = materials.add(StandardMaterial {
@@ -112,27 +121,34 @@ fn setup_scene(
         ..default()
     });
 
+    let d = DISTANCE / settings.grid_edge_length() as i128;
+    let distant_grid_cell = GridCell::<i128>::new(d, d, d);
+
     // Normally, we would put the floating origin on the camera. However in this example, we want to
     // show what happens as the camera is far from the origin, to emulate what happens when this
     // plugin isn't used.
     commands.spawn((
-        FloatingSpatialBundle::<i64> {
-            transform: Transform::from_translation(Vec3::splat(DISTANCE)),
+        PbrBundle {
+            mesh: meshes.add(UVSphere::default().into()),
+            material: materials.add(Color::RED.into()),
+            transform: Transform::from_scale(Vec3::splat(10000.0)),
             ..default()
         },
+        distant_grid_cell,
         FloatingOrigin,
     ));
 
     // parent cube
     commands
-        .spawn(PbrBundle {
-            mesh: cube_handle.clone(),
-            material: cube_material_handle.clone(),
-            transform: Transform::from_translation(Vec3::splat(DISTANCE)),
-            ..default()
-        })
-        .insert(GridCell::<i64>::default())
-        .insert(Rotator)
+        .spawn((
+            PbrBundle {
+                mesh: cube_handle.clone(),
+                material: cube_material_handle.clone(),
+                ..default()
+            },
+            distant_grid_cell,
+            Rotator,
+        ))
         .with_children(|parent| {
             // child cube
             parent.spawn(PbrBundle {
@@ -143,18 +159,19 @@ fn setup_scene(
             });
         });
     // light
-    commands
-        .spawn(PointLightBundle {
-            transform: Transform::from_xyz(DISTANCE + 4.0, DISTANCE - 10.0, DISTANCE - 4.0),
+    commands.spawn((
+        DirectionalLightBundle {
+            transform: Transform::from_xyz(4.0, -10.0, -4.0),
             ..default()
-        })
-        .insert(GridCell::<i64>::default());
+        },
+        distant_grid_cell,
+    ));
     // camera
-    commands
-        .spawn(Camera3dBundle {
-            transform: Transform::from_xyz(DISTANCE + 8.0, DISTANCE - 8.0, DISTANCE)
-                .looking_at(Vec3::splat(DISTANCE), Vec3::Y),
+    commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_xyz(8.0, -8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
-        })
-        .insert(GridCell::<i64>::default());
+        },
+        distant_grid_cell,
+    ));
 }

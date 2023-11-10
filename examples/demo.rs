@@ -38,17 +38,17 @@ fn setup(
             transform: Transform::from_xyz(0.0, 0.0, 8.0)
                 .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             projection: Projection::Perspective(PerspectiveProjection {
-                near: 1e-16,
+                near: 1e-18,
                 ..default()
             }),
             ..default()
         },
         GridCell::<i128>::default(), // All spatial entities need this component
-        FloatingOrigin, // Important: marks this as the entity to use as the floating origin
+        FloatingOrigin,              // Important: marks the floating origin entity for rendering.
         CameraController::default() // Built-in camera controller
-            .with_max_speed(10e35)
-            .with_smoothness(0.95, 0.9)
-            .with_speed(1.5),
+            .with_speed_bounds([10e-18, 10e35])
+            .with_smoothness(0.9, 0.8)
+            .with_speed(1.0),
     ));
 
     let mesh_handle = meshes.add(
@@ -67,7 +67,7 @@ fn setup(
     });
 
     let mut translation = Vec3::ZERO;
-    for i in -12..=27 {
+    for i in -16..=27 {
         let j = 10_f32.powf(i as f32);
         translation.x += j;
         commands.spawn((
@@ -143,8 +143,12 @@ fn highlight_nearest_sphere(
     objects: Query<&GlobalTransform>,
     mut gizmos: Gizmos,
 ) {
-    let Some((entity, _)) = cameras.single().nearest_object() else { return };
-    let Ok(transform) = objects.get(entity) else { return };
+    let Some((entity, _)) = cameras.single().nearest_object() else {
+        return;
+    };
+    let Ok(transform) = objects.get(entity) else {
+        return;
+    };
     let (scale, rotation, translation) = transform.to_scale_rotation_translation();
     gizmos
         .sphere(translation, rotation, scale.x * 0.505, Color::RED)
@@ -162,19 +166,19 @@ fn ui_text_system(
     let (cell, transform) = origin.single();
     let translation = transform.translation;
 
-    let grid_text = format!("Origin GridCell: {}x, {}y, {}z", cell.x, cell.y, cell.z);
+    let grid_text = format!("GridCell: {}x, {}y, {}z", cell.x, cell.y, cell.z);
 
     let translation_text = format!(
-        "Origin Transform: {:>8.2}x, {:>8.2}y, {:>8.2}z",
+        "Transform: {:>8.2}x, {:>8.2}y, {:>8.2}z",
         translation.x, translation.y, translation.z
     );
 
     let velocity = camera.single().velocity();
     let speed = velocity.0.length() / time.delta_seconds_f64();
     let camera_text = if speed > 3.0e8 {
-        format!("Camera Speed: {:.0e} * speed of light", speed / 3.0e8)
+        format!("Speed: {:.0e} * speed of light", speed / 3.0e8)
     } else {
-        format!("Camera Speed: {:.2e} m/s", speed)
+        format!("Speed: {:.2e} m/s", speed)
     };
 
     let (nearest_text, fact_text) = if let Some(nearest) = camera.single().nearest_object() {
@@ -228,6 +232,7 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
         (1e-10, "diameter of a carbon atom"),
         (4e-11, "diameter of a hydrogen atom"),
         (4e-12, "diameter of an electron"),
+        (1.9e-15, "diameter of a proton"),
     ];
 
     let mut min = items[0];
