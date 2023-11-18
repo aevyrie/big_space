@@ -311,7 +311,7 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
 /// Compute the `GlobalTransform` relative to the floating origin's cell.
 pub fn update_global_from_grid<P: GridPrecision>(
     settings: Res<FloatingOriginSettings>,
-    origin: Query<Ref<GridCell<P>>, With<FloatingOrigin>>,
+    origin: Query<(Ref<GridCell<P>>, Ref<FloatingOrigin>)>,
     mut entities: ParamSet<(
         Query<
             (&Transform, &mut GlobalTransform, &GridCell<P>),
@@ -320,9 +320,9 @@ pub fn update_global_from_grid<P: GridPrecision>(
         Query<(&Transform, &mut GlobalTransform, &GridCell<P>)>,
     )>,
 ) {
-    let origin_cell = origin.single();
+    let (origin_cell, floating_origin) = origin.single();
 
-    if origin_cell.is_changed() {
+    if origin_cell.is_changed() || floating_origin.is_changed() {
         let mut all_entities = entities.p1();
         all_entities
             .par_iter_mut()
@@ -371,4 +371,37 @@ pub fn sync_simple_transforms<P: GridPrecision>(
         .for_each(|(transform, mut global_transform)| {
             *global_transform = GlobalTransform::from(*transform);
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn changing_floating_origin_updates_global_transform() {
+        let mut app = App::new();
+        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        
+        let first = app.world.spawn((
+            TransformBundle::from_transform(Transform::from_translation(Vec3::new(150.0, 0.0, 0.0))),
+            GridCell::<i32>::new(5, 0, 0),
+            FloatingOrigin,
+        )).id();
+
+        let second = app.world.spawn((
+            TransformBundle::from_transform(Transform::from_translation(Vec3::new(0.0, 0.0, 300.0))),
+            GridCell::<i32>::new(0, -15, 0),
+        )).id();
+
+        app.update();
+
+        app.world.entity_mut(first).remove::<FloatingOrigin>();
+        app.world.entity_mut(second).insert(FloatingOrigin);
+
+        app.update();
+        
+        let second_global_transform = app.world.get::<GlobalTransform>(second).unwrap();
+
+        assert_eq!(second_global_transform.translation(), Vec3::new(0.0, 0.0, 300.0));
+    }
 }
