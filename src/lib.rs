@@ -381,17 +381,27 @@ mod tests {
     fn changing_floating_origin_updates_global_transform() {
         let mut app = App::new();
         app.add_plugins(FloatingOriginPlugin::<i32>::default());
-        
-        let first = app.world.spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(150.0, 0.0, 0.0))),
-            GridCell::<i32>::new(5, 0, 0),
-            FloatingOrigin,
-        )).id();
 
-        let second = app.world.spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(0.0, 0.0, 300.0))),
-            GridCell::<i32>::new(0, -15, 0),
-        )).id();
+        let first = app
+            .world
+            .spawn((
+                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
+                    150.0, 0.0, 0.0,
+                ))),
+                GridCell::<i32>::new(5, 0, 0),
+                FloatingOrigin,
+            ))
+            .id();
+
+        let second = app
+            .world
+            .spawn((
+                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
+                    0.0, 0.0, 300.0,
+                ))),
+                GridCell::<i32>::new(0, -15, 0),
+            ))
+            .id();
 
         app.update();
 
@@ -399,9 +409,12 @@ mod tests {
         app.world.entity_mut(second).insert(FloatingOrigin);
 
         app.update();
-        
+
         let second_global_transform = app.world.get::<GlobalTransform>(second).unwrap();
 
-        assert_eq!(second_global_transform.translation(), Vec3::new(0.0, 0.0, 300.0));
+        assert_eq!(
+            second_global_transform.translation(),
+            Vec3::new(0.0, 0.0, 300.0)
+        );
     }
 }
