@@ -10,7 +10,11 @@ use bevy::{
     transform::TransformSystem,
 };
 
-use crate::{precision::GridPrecision, FloatingOriginSettings, GridCell};
+use crate::{
+    precision::GridPrecision,
+    world_query::{GridTransform, GridTransformReadOnly},
+    FloatingOriginSettings,
+};
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
@@ -173,17 +177,17 @@ pub fn default_camera_inputs(
 /// Find the object nearest the camera
 pub fn nearest_objects<T: GridPrecision>(
     settings: Res<FloatingOriginSettings>,
-    objects: Query<(Entity, &GridCell<T>, &Transform, &Aabb)>,
-    mut camera: Query<(&mut CameraController, &GridCell<T>, &Transform)>,
+    objects: Query<(Entity, GridTransformReadOnly<T>, &Aabb)>,
+    mut camera: Query<(&mut CameraController, GridTransformReadOnly<T>)>,
 ) {
-    let (mut camera, cam_cell, cam_transform) = camera.single_mut();
+    let (mut camera, cam) = camera.single_mut();
     let nearest_object = objects
         .iter()
-        .map(|(entity, cell, obj_transform, aabb)| {
-            let pos = settings.grid_position_double(&(cell - cam_cell), obj_transform)
-                - cam_transform.translation.as_dvec3();
+        .map(|(entity, obj, aabb)| {
+            let pos = settings.grid_position_double(&(*obj.cell - *cam.cell), obj.transform)
+                - cam.transform.translation.as_dvec3();
             let dist = pos.length()
-                - (aabb.half_extents.as_dvec3() * obj_transform.scale.as_dvec3())
+                - (aabb.half_extents.as_dvec3() * obj.transform.scale.as_dvec3())
                     .abs()
                     .max_element();
             (entity, dist)
@@ -198,9 +202,9 @@ pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
     settings: Res<FloatingOriginSettings>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(&mut Transform, &mut CameraController, &mut GridCell<P>)>,
+    mut camera: Query<(GridTransform<P>, &mut CameraController)>,
 ) {
-    for (mut cam_transform, mut controller, mut cell) in camera.iter_mut() {
+    for (mut cam, mut controller) in camera.iter_mut() {
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
             (Some(nearest), true) => nearest.1.abs(),
             _ => controller.speed,
@@ -215,16 +219,16 @@ pub fn camera_controller<P: GridPrecision>(
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
 
-        let cam_rot = cam_transform.rotation.as_f64();
+        let cam_rot = cam.transform.rotation.as_f64();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
         let (cell_offset, new_translation) = settings.translation_to_grid(vel_t_next);
-        *cell += cell_offset;
-        cam_transform.translation += new_translation;
+        *cam.cell += cell_offset;
+        cam.transform.translation += new_translation;
 
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
-        cam_transform.rotation *= new_rotation.as_f32();
+        cam.transform.rotation *= new_rotation.as_f32();
 
         // Store the new velocity to be used in the next frame
         controller.vel_translation = vel_t_next;

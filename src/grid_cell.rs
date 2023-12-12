@@ -105,3 +105,10 @@ impl<P: GridPrecision> std::ops::AddAssign for GridCell<P> {
         *self = self.add(rhs);
     }
 }
+
+impl<P: GridPrecision> std::ops::SubAssign for GridCell<P> {
+    fn sub_assign(&mut self, rhs: Self) {
+        use std::ops::Sub;
+        *self = self.sub(rhs);
+    }
+}
