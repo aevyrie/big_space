@@ -25,7 +25,7 @@ pub fn propagate_transforms<P: GridPrecision>(
     let origin_cell_changed = !origin_moved.is_empty();
 
     for (entity, children, transform, mut global_transform, cell) in root_query.iter_mut() {
-        let cell_changed = cell.as_ref().filter(|cell| cell.is_changed()).is_some();
+        let cell_changed = cell.as_ref().is_some_and(|cell| cell.is_changed());
         let transform_changed = transform.is_changed();
 
         if transform_changed && cell.is_none() {
