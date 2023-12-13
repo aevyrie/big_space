@@ -224,7 +224,9 @@ pub fn camera_controller<P: GridPrecision>(
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
         let (cell_offset, new_translation) = settings.translation_to_grid(vel_t_next);
-        *cam.cell += cell_offset;
+        if cell_offset != crate::GridCell::ZERO {
+            *cam.cell += cell_offset;
+        }
         cam.transform.translation += new_translation;
 
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
