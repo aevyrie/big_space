@@ -239,13 +239,12 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
         (1.9e-15, "diameter of a proton"),
     ];
 
-    let mut min = items[0];
-    for item in items.iter() {
-        if (item.0 - diameter).abs() < (min.0 - diameter).abs() {
-            min = item.to_owned();
+    for &item in items.iter() {
+        if item.0 < diameter {
+            return item;
         }
     }
-    min
+    *items.last().unwrap()
 }
 
 fn cursor_grab_system(
