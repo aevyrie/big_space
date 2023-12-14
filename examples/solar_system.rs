@@ -35,14 +35,16 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     space: Res<FloatingOriginSettings>,
 ) {
-    let sphere = meshes.add(
-        shape::Icosphere {
-            radius: 1.0,
-            subdivisions: 32,
-        }
-        .try_into()
-        .unwrap(),
-    );
+    let mut sphere = |radius| {
+        meshes.add(
+            shape::Icosphere {
+                radius,
+                subdivisions: 32,
+            }
+            .try_into()
+            .unwrap(),
+        )
+    };
     let sun_mat = materials.add(StandardMaterial {
         base_color: Color::WHITE,
         emissive: Color::rgb_linear(100., 100., 100.),
@@ -68,9 +70,8 @@ fn setup(
         .with_children(|builder| {
             builder.spawn((
                 PbrBundle {
-                    mesh: sphere.clone(),
+                    mesh: sphere(sun_radius_m),
                     material: sun_mat,
-                    transform: Transform::from_scale(Vec3::splat(sun_radius_m)),
                     ..default()
                 },
                 GridCell::<i64>::ZERO,
@@ -92,10 +93,9 @@ fn setup(
 
     commands.spawn((
         PbrBundle {
-            mesh: sphere.clone(),
+            mesh: sphere(earth_radius_m),
             material: earth_mat,
-            transform: Transform::from_scale(Vec3::splat(earth_radius_m))
-                .with_translation(earth_pos),
+            transform: Transform::from_translation(earth_pos),
             ..default()
         },
         earth_cell,
@@ -116,10 +116,9 @@ fn setup(
 
     commands.spawn((
         PbrBundle {
-            mesh: sphere.clone(),
+            mesh: sphere(moon_radius_m),
             material: moon_mat,
-            transform: Transform::from_scale(Vec3::splat(moon_radius_m))
-                .with_translation(earth_pos + moon_pos),
+            transform: Transform::from_translation(earth_pos + moon_pos),
             ..default()
         },
         moon_cell + earth_cell,
