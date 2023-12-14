@@ -317,9 +317,12 @@ pub fn update_global_from_grid<P: GridPrecision>(
     mut entities: ParamSet<(
         Query<
             (GridTransformReadOnly<P>, &mut GlobalTransform),
-            Or<(Changed<GridCell<P>>, Changed<Transform>)>,
+            (
+                Or<(Changed<GridCell<P>>, Changed<Transform>)>,
+                Without<Parent>,
+            ),
         >,
-        Query<(GridTransformReadOnly<P>, &mut GlobalTransform)>,
+        Query<(GridTransformReadOnly<P>, &mut GlobalTransform), Without<Parent>>,
     )>,
 ) {
     let origin_cell = origin.single();

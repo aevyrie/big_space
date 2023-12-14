@@ -91,38 +91,40 @@ fn setup(
     let (earth_cell, earth_pos): (GridCell<i64>, _) =
         space.imprecise_translation_to_grid(Vec3::X * earth_orbit_radius_m);
 
-    commands.spawn((
-        PbrBundle {
-            mesh: sphere(earth_radius_m),
-            material: earth_mat,
-            transform: Transform::from_translation(earth_pos),
-            ..default()
-        },
-        earth_cell,
-    ));
+    commands
+        .spawn((
+            PbrBundle {
+                mesh: sphere(earth_radius_m),
+                material: earth_mat,
+                transform: Transform::from_translation(earth_pos),
+                ..default()
+            },
+            earth_cell,
+        ))
+        .with_children(|commands| {
+            let moon_orbit_radius_m = 385e6;
+            let moon_radius_m = 1.7375e6;
 
-    let moon_orbit_radius_m = 385e6;
-    let moon_radius_m = 1.7375e6;
+            let moon_mat = materials.add(StandardMaterial {
+                base_color: Color::DARK_GRAY,
+                perceptual_roughness: 1.0,
+                reflectance: 0.0,
+                ..default()
+            });
 
-    let moon_mat = materials.add(StandardMaterial {
-        base_color: Color::DARK_GRAY,
-        perceptual_roughness: 1.0,
-        reflectance: 0.0,
-        ..default()
-    });
+            let (moon_cell, moon_pos): (GridCell<i64>, _) =
+                space.imprecise_translation_to_grid(Vec3::Z * moon_orbit_radius_m);
 
-    let (moon_cell, moon_pos): (GridCell<i64>, _) =
-        space.imprecise_translation_to_grid(Vec3::Z * moon_orbit_radius_m);
-
-    commands.spawn((
-        PbrBundle {
-            mesh: sphere(moon_radius_m),
-            material: moon_mat,
-            transform: Transform::from_translation(earth_pos + moon_pos),
-            ..default()
-        },
-        moon_cell + earth_cell,
-    ));
+            commands.spawn((
+                PbrBundle {
+                    mesh: sphere(moon_radius_m),
+                    material: moon_mat,
+                    transform: Transform::from_translation(moon_pos),
+                    ..default()
+                },
+                moon_cell,
+            ));
+        });
 
     // camera
     commands.spawn((
