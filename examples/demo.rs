@@ -52,11 +52,9 @@ fn setup(
     ));
 
     let mesh_handle = meshes.add(
-        shape::Icosphere {
-            radius: 0.5,
-            subdivisions: 32,
-        }
-        .try_into()
+        Sphere::new(0.5)
+        .mesh()
+        .ico(32)
         .unwrap(),
     );
     let matl_handle = materials.add(StandardMaterial {
@@ -107,7 +105,7 @@ fn ui_setup(mut commands: Commands) {
                 ..default()
             },
         )
-        .with_text_alignment(TextAlignment::Left)
+        .with_text_justify(JustifyText::Left)
         .with_style(Style {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
@@ -133,7 +131,7 @@ fn ui_setup(mut commands: Commands) {
             left: Val::Px(10.0),
             ..default()
         })
-        .with_text_alignment(TextAlignment::Center),
+        .with_text_justify(JustifyText::Center),
         FunFactText,
     ));
 }
@@ -247,8 +245,8 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
 fn cursor_grab_system(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut cam: ResMut<CameraInput>,
-    btn: Res<Input<MouseButton>>,
-    key: Res<Input<KeyCode>>,
+    btn: Res<ButtonInput<MouseButton>>,
+    key: Res<ButtonInput<KeyCode>>,
 ) {
     let Some(mut window) = windows.get_single_mut().ok() else {
         return;

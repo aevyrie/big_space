@@ -5,7 +5,7 @@
 //! independently from the camera, which is equivalent to what would happen when moving far from the
 //! origin when not using this plugin.
 
-use bevy::prelude::{shape::UVSphere, *};
+use bevy::prelude::*;
 use big_space::{FloatingOrigin, FloatingOriginSettings, GridCell};
 
 fn main() {
@@ -32,7 +32,7 @@ const DISTANCE: i128 = 20_000_000;
 /// disabling the plugin. Normally you would make your active camera the floating origin to avoid
 /// this issue.
 fn toggle_plugin(
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     settings: Res<big_space::FloatingOriginSettings>,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
@@ -115,7 +115,7 @@ fn setup_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
     settings: Res<FloatingOriginSettings>,
 ) {
-    let cube_handle = meshes.add(Mesh::from(shape::Cube { size: 2.0 }));
+    let cube_handle = meshes.add(Cuboid::new(2.0, 2.0, 2.0).mesh());
     let cube_material_handle = materials.add(StandardMaterial {
         base_color: Color::rgb(0.8, 0.7, 0.6),
         ..default()
@@ -129,8 +129,8 @@ fn setup_scene(
     // plugin isn't used.
     commands.spawn((
         PbrBundle {
-            mesh: meshes.add(UVSphere::default().into()),
-            material: materials.add(Color::RED.into()),
+            mesh: meshes.add(Sphere::default().mesh()),
+            material: materials.add(StandardMaterial::from(Color::RED)),
             transform: Transform::from_scale(Vec3::splat(10000.0)),
             ..default()
         },

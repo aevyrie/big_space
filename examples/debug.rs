@@ -58,13 +58,9 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mesh_handle = meshes.add(
-        shape::Icosphere {
-            radius: 0.1,
-            ..default()
-        }
-        .try_into()
-        .unwrap(),
-    );
+        Sphere::new(0.1)
+        .mesh().ico(16).unwrap()
+    );    
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::YELLOW,
         ..default()
