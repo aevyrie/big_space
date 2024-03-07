@@ -1,7 +1,7 @@
 use bevy::{
     prelude::*,
     transform::TransformSystem,
-    window::{CursorGrabMode, PrimaryWindow, Window, WindowMode},
+    window::{CursorGrabMode, PrimaryWindow, WindowMode},
 };
 use big_space::{
     camera::{CameraController, CameraInput},

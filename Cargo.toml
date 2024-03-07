@@ -29,3 +29,21 @@ default = ["debug", "camera", "bevy_render"]
 debug = ["bevy/bevy_gizmos"]
 bevy_render = ["bevy/bevy_render"]
 camera = ["bevy_render"]
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "debug"
+path = "examples/debug.rs"
+required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "error"
+path = "examples/error.rs"
+required-features = ["default"]
+doc-scrape-examples = true

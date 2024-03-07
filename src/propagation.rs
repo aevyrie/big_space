@@ -8,7 +8,13 @@ use bevy::prelude::*;
 /// Update [`GlobalTransform`] component of entities based on entity hierarchy and
 /// [`Transform`] component.
 pub fn propagate_transforms<P: GridPrecision>(
-    origin_moved: Query<(), (Changed<GridCell<P>>, With<FloatingOrigin>)>,
+    origin_moved: Query<
+        (),
+        (
+            Or<(Changed<GridCell<P>>, Changed<FloatingOrigin>)>,
+            With<FloatingOrigin>,
+        ),
+    >,
     mut root_query: Query<
         (
             Entity,
