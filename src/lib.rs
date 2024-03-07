@@ -89,10 +89,12 @@
 use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
 use propagation::propagate_transforms;
 use std::marker::PhantomData;
+use world_query::{GridTransformReadOnly, GridTransformReadOnlyItem};
 
 pub mod grid_cell;
 pub mod precision;
 pub mod propagation;
+pub mod world_query;
 
 pub use grid_cell::GridCell;
 
@@ -314,41 +316,39 @@ pub fn update_global_from_grid<P: GridPrecision>(
     origin: Query<(Ref<GridCell<P>>, Ref<FloatingOrigin>)>,
     mut entities: ParamSet<(
         Query<
-            (&Transform, &mut GlobalTransform, &GridCell<P>),
+            (GridTransformReadOnly<P>, &mut GlobalTransform),
             Or<(Changed<GridCell<P>>, Changed<Transform>)>,
         >,
-        Query<(&Transform, &mut GlobalTransform, &GridCell<P>)>,
+        Query<(GridTransformReadOnly<P>, &mut GlobalTransform)>,
     )>,
 ) {
     let (origin_cell, floating_origin) = origin.single();
 
     if origin_cell.is_changed() || floating_origin.is_changed() {
         let mut all_entities = entities.p1();
-        all_entities
-            .par_iter_mut()
-            .for_each(|(local, global, entity_cell)| {
-                update_global_from_cell_local(&settings, entity_cell, &origin_cell, local, global);
-            });
+        all_entities.par_iter_mut().for_each(|(local, global)| {
+            update_global_from_cell_local(&settings, &origin_cell, local, global);
+        });
     } else {
         let mut moved_cell_entities = entities.p0();
         moved_cell_entities
             .par_iter_mut()
-            .for_each(|(local, global, entity_cell)| {
-                update_global_from_cell_local(&settings, entity_cell, &origin_cell, local, global);
+            .for_each(|(local, global)| {
+                update_global_from_cell_local(&settings, &origin_cell, local, global);
             });
     }
 }
 
 fn update_global_from_cell_local<P: GridPrecision>(
     settings: &FloatingOriginSettings,
-    entity_cell: &GridCell<P>,
     origin_cell: &GridCell<P>,
-    local: &Transform,
+    local: GridTransformReadOnlyItem<P>,
     mut global: Mut<GlobalTransform>,
 ) {
-    let grid_cell_delta = entity_cell - origin_cell;
+    let grid_cell_delta = *local.cell - *origin_cell;
     *global = local
-        .with_translation(settings.grid_position(&grid_cell_delta, local))
+        .transform
+        .with_translation(settings.grid_position(&grid_cell_delta, local.transform))
         .into();
 }
 

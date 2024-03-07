@@ -5,6 +5,7 @@ use bevy::{
 };
 use big_space::{
     camera::{CameraController, CameraInput},
+    world_query::GridTransformReadOnly,
     FloatingOrigin, GridCell,
 };
 
@@ -153,14 +154,17 @@ fn ui_text_system(
     mut debug_text: Query<&mut Text, (With<BigSpaceDebugText>, Without<FunFactText>)>,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     time: Res<Time>,
-    origin: Query<(&GridCell<i128>, &Transform), With<FloatingOrigin>>,
+    origin: Query<GridTransformReadOnly<i128>, With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Handle<Mesh>>>,
 ) {
-    let (cell, transform) = origin.single();
-    let translation = transform.translation;
+    let origin = origin.single();
+    let translation = origin.transform.translation;
 
-    let grid_text = format!("GridCell: {}x, {}y, {}z", cell.x, cell.y, cell.z);
+    let grid_text = format!(
+        "GridCell: {}x, {}y, {}z",
+        origin.cell.x, origin.cell.y, origin.cell.z
+    );
 
     let translation_text = format!(
         "Transform: {:>8.2}x, {:>8.2}y, {:>8.2}z",
