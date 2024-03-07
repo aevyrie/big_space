@@ -86,7 +86,7 @@
 #![allow(clippy::type_complexity)]
 #![deny(missing_docs)]
 
-use bevy::{math::DVec3, prelude::*, reflect::TypePath, transform::TransformSystem};
+use bevy::{math::DVec3, prelude::*, transform::TransformSystem};
 use propagation::propagate_transforms;
 use std::marker::PhantomData;
 
