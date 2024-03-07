@@ -2,7 +2,7 @@
 //!
 //! This is a slightly modified version of Bevy's own transform propagation system.
 
-use crate::{precision::GridPrecision, FloatingOrigin, GridCell};
+use crate::{precision::GridPrecision, FloatingOrigin, FloatingOriginSettings, GridCell};
 use bevy::prelude::*;
 
 /// Update [`GlobalTransform`] component of entities based on entity hierarchy and
@@ -25,13 +25,22 @@ pub fn propagate_transforms<P: GridPrecision>(
         ),
         Without<Parent>,
     >,
-    transform_query: Query<(Ref<Transform>, &mut GlobalTransform, Option<&Children>), With<Parent>>,
+    transform_query: Query<
+        (
+            Ref<Transform>,
+            &mut GlobalTransform,
+            Option<&Children>,
+            Option<Ref<GridCell<P>>>,
+        ),
+        With<Parent>,
+    >,
     parent_query: Query<(Entity, Ref<Parent>)>,
+    settings: Res<FloatingOriginSettings>,
 ) {
     let origin_cell_changed = !origin_moved.is_empty();
 
     for (entity, children, transform, mut global_transform, cell) in root_query.iter_mut() {
-        let cell_changed = cell.as_ref().filter(|cell| cell.is_changed()).is_some();
+        let cell_changed = cell.as_ref().is_some_and(|cell| cell.is_changed());
         let transform_changed = transform.is_changed();
 
         if transform_changed && cell.is_none() {
@@ -60,13 +69,14 @@ pub fn propagate_transforms<P: GridPrecision>(
                     &parent_query,
                     child,
                     changed || actual_parent.is_changed(),
+                    &settings,
                 );
             }
         }
     }
 }
 
-/// COPIED EXACTLY FROM BEVY
+/// COPIED EXACTLY FROM BEVY (and adjusted for accumulating GridCells through children)
 ///
 /// Recursively propagates the transforms for `entity` and all of its descendants.
 ///
@@ -81,18 +91,24 @@ pub fn propagate_transforms<P: GridPrecision>(
 /// nor any of its descendants.
 /// - The caller must ensure that the hierarchy leading to `entity`
 /// is well-formed and must remain as a tree or a forest. Each entity must have at most one parent.
-unsafe fn propagate_recursive(
+unsafe fn propagate_recursive<P: GridPrecision>(
     parent: &GlobalTransform,
     transform_query: &Query<
-        (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
+        (
+            Ref<Transform>,
+            &mut GlobalTransform,
+            Option<&Children>,
+            Option<Ref<GridCell<P>>>,
+        ),
         With<Parent>,
     >,
     parent_query: &Query<(Entity, Ref<Parent>)>,
     entity: Entity,
     mut changed: bool,
+    settings: &FloatingOriginSettings,
 ) {
     let (global_matrix, children) = {
-        let Ok((transform, mut global_transform, children)) =
+        let Ok((transform, mut global_transform, children, cell)) =
             // SAFETY: This call cannot create aliased mutable references.
             //   - The top level iteration parallelizes on the roots of the hierarchy.
             //   - The caller ensures that each child has one and only one unique parent throughout the entire
@@ -123,9 +139,16 @@ unsafe fn propagate_recursive(
                 return;
             };
 
-        changed |= transform.is_changed();
+        let cell_changed = cell.as_ref().is_some_and(|cell| cell.is_changed());
+
+        changed |= transform.is_changed() | cell_changed;
         if changed {
-            *global_transform = parent.mul_transform(*transform);
+            if let Some(cell) = &cell {
+                let offset = settings.grid_position(cell, &transform);
+                *global_transform = parent.mul_transform(transform.with_translation(offset));
+            } else {
+                *global_transform = parent.mul_transform(*transform);
+            }
         }
         (*global_transform, children)
     };
@@ -148,6 +171,7 @@ unsafe fn propagate_recursive(
                 parent_query,
                 child,
                 changed || actual_parent.is_changed(),
+                settings,
             );
         }
     }

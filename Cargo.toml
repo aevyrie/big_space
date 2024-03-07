@@ -47,3 +47,9 @@ name = "error"
 path = "examples/error.rs"
 required-features = ["default"]
 doc-scrape-examples = true
+
+[[example]]
+name = "solar_system"
+path = "examples/solar_system.rs"
+required-features = ["default"]
+doc-scrape-examples = true
