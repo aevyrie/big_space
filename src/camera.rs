@@ -180,17 +180,18 @@ pub fn nearest_objects<T: GridPrecision>(
     objects: Query<(Entity, GridTransformReadOnly<T>, &Aabb)>,
     mut camera: Query<(&mut CameraController, GridTransformReadOnly<T>)>,
 ) {
-    let (mut camera, cam) = camera.single_mut();
+    let (mut camera, cam_pos) = camera.single_mut();
     let nearest_object = objects
         .iter()
-        .map(|(entity, obj, aabb)| {
-            let pos = settings.grid_position_double(&(*obj.cell - *cam.cell), obj.transform)
-                - cam.transform.translation.as_dvec3();
-            let dist = pos.length()
-                - (aabb.half_extents.as_dvec3() * obj.transform.scale.as_dvec3())
+        .map(|(entity, obj_pos, aabb)| {
+            let center_distance = settings
+                .grid_position_double(&(*obj_pos.cell - *cam_pos.cell), obj_pos.transform)
+                - cam_pos.transform.translation.as_dvec3();
+            let nearest_distance = center_distance.length()
+                - (aabb.half_extents.as_dvec3() * obj_pos.transform.scale.as_dvec3())
                     .abs()
                     .max_element();
-            (entity, dist)
+            (entity, nearest_distance)
         })
         .filter(|v| v.1.is_finite())
         .reduce(|nearest, this| if this.1 < nearest.1 { this } else { nearest });
@@ -204,7 +205,7 @@ pub fn camera_controller<P: GridPrecision>(
     mut input: ResMut<CameraInput>,
     mut camera: Query<(GridTransform<P>, &mut CameraController)>,
 ) {
-    for (mut cam, mut controller) in camera.iter_mut() {
+    for (mut position, mut controller) in camera.iter_mut() {
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
             (Some(nearest), true) => nearest.1.abs(),
             _ => controller.speed,
@@ -219,16 +220,16 @@ pub fn camera_controller<P: GridPrecision>(
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
 
-        let cam_rot = cam_transform.rotation.as_dquat();
+        let cam_rot = position.transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
         let (cell_offset, new_translation) = settings.translation_to_grid(vel_t_next);
-        *cam.cell += cell_offset;
-        cam.transform.translation += new_translation;
+        *position.cell += cell_offset;
+        position.transform.translation += new_translation;
 
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
-        cam_transform.rotation *= new_rotation.as_quat();
+        position.transform.rotation *= new_rotation.as_quat();
 
         // Store the new velocity to be used in the next frame
         controller.vel_translation = vel_t_next;

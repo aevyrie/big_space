@@ -1,15 +1,15 @@
 //! A helper query argument that ensures you don't forget to handle
-//! the [´GridCell`] when you work with a [`Transform`].
+//! the [`GridCell`] when you work with a [`Transform`].
 
-use bevy::ecs::query::WorldQuery;
+use bevy::ecs::query::QueryData;
 use bevy::math::DVec3;
 use bevy::prelude::*;
 
 use crate::precision::GridPrecision;
 use crate::{FloatingOriginSettings, GridCell};
 
-#[derive(WorldQuery)]
-#[world_query(mutable)]
+#[derive(QueryData)]
+#[query_data(mutable)]
 /// A convenience query argument that groups a [`Transform`] with its [`GridCell`].
 /// If you only want to read from the position, use [`GridTransformReadOnly`] instead,
 /// as this will allow the bevy ECS to run multiple queries using [`GridTransformReadOnly`]
@@ -23,13 +23,13 @@ pub struct GridTransform<P: GridPrecision> {
 
 impl<'w, P: GridPrecision> GridTransformItem<'w, P> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, space: &FloatingOriginSettings) -> DVec3 {
-        space.grid_position_double(&self.cell, &self.transform)
+    pub fn position_double(&self, settings: &FloatingOriginSettings) -> DVec3 {
+        settings.grid_position_double(&self.cell, &self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, space: &FloatingOriginSettings) -> Vec3 {
-        space.grid_position(&self.cell, &self.transform)
+    pub fn position(&self, settings: &FloatingOriginSettings) -> Vec3 {
+        settings.grid_position(&self.cell, &self.transform)
     }
 
     /// Get a copy of the fields to work with.
@@ -43,13 +43,13 @@ impl<'w, P: GridPrecision> GridTransformItem<'w, P> {
 
 impl<'w, P: GridPrecision> GridTransformReadOnlyItem<'w, P> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, space: &FloatingOriginSettings) -> DVec3 {
-        space.grid_position_double(self.cell, self.transform)
+    pub fn position_double(&self, settings: &FloatingOriginSettings) -> DVec3 {
+        settings.grid_position_double(self.cell, self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, space: &FloatingOriginSettings) -> Vec3 {
-        space.grid_position(self.cell, self.transform)
+    pub fn position(&self, settings: &FloatingOriginSettings) -> Vec3 {
+        settings.grid_position(self.cell, self.transform)
     }
 
     /// Get a copy of the fields to work with.
