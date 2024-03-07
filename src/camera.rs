@@ -103,7 +103,7 @@ impl Default for CameraController {
     }
 }
 
-/// Input state used to command camera motion. Reset every time the values are read to update the
+/// ButtonInput state used to command camera motion. Reset every time the values are read to update the
 /// camera. Allows you to map any input to camera motions. Uses aircraft principle axes conventions.
 #[derive(Clone, Debug, Default, Reflect, Resource)]
 pub struct CameraInput {
@@ -151,20 +151,20 @@ impl CameraInput {
 
 /// Provides sensible keyboard and mouse input defaults
 pub fn default_camera_inputs(
-    keyboard: Res<Input<KeyCode>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     mut mouse_move: EventReader<MouseMotion>,
     mut cam: ResMut<CameraInput>,
 ) {
-    keyboard.pressed(KeyCode::W).then(|| cam.forward -= 1.0);
-    keyboard.pressed(KeyCode::S).then(|| cam.forward += 1.0);
-    keyboard.pressed(KeyCode::A).then(|| cam.right -= 1.0);
-    keyboard.pressed(KeyCode::D).then(|| cam.right += 1.0);
+    keyboard.pressed(KeyCode::KeyW).then(|| cam.forward -= 1.0);
+    keyboard.pressed(KeyCode::KeyS).then(|| cam.forward += 1.0);
+    keyboard.pressed(KeyCode::KeyA).then(|| cam.right -= 1.0);
+    keyboard.pressed(KeyCode::KeyD).then(|| cam.right += 1.0);
     keyboard.pressed(KeyCode::Space).then(|| cam.up += 1.0);
     keyboard
         .pressed(KeyCode::ControlLeft)
         .then(|| cam.up -= 1.0);
-    keyboard.pressed(KeyCode::Q).then(|| cam.roll += 1.0);
-    keyboard.pressed(KeyCode::E).then(|| cam.roll -= 1.0);
+    keyboard.pressed(KeyCode::KeyQ).then(|| cam.roll += 1.0);
+    keyboard.pressed(KeyCode::KeyE).then(|| cam.roll -= 1.0);
     keyboard
         .pressed(KeyCode::ShiftLeft)
         .then(|| cam.boost = true);
@@ -219,7 +219,7 @@ pub fn camera_controller<P: GridPrecision>(
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
 
-        let cam_rot = cam.transform.rotation.as_f64();
+        let cam_rot = cam_transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
@@ -228,7 +228,7 @@ pub fn camera_controller<P: GridPrecision>(
         cam.transform.translation += new_translation;
 
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
-        cam.transform.rotation *= new_rotation.as_f32();
+        cam_transform.rotation *= new_rotation.as_quat();
 
         // Store the new velocity to be used in the next frame
         controller.vel_translation = vel_t_next;

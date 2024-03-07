@@ -57,14 +57,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh_handle = meshes.add(
-        shape::Icosphere {
-            radius: 0.1,
-            ..default()
-        }
-        .try_into()
-        .unwrap(),
-    );
+    let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::YELLOW,
         ..default()
@@ -115,10 +108,6 @@ fn setup(
     commands.spawn((
         PointLightBundle {
             transform: Transform::from_xyz(4.0, 8.0, 4.0),
-            point_light: PointLight {
-                intensity: 10_000f32,
-                ..default()
-            },
             ..default()
         },
         GridCell::<i64>::default(),
