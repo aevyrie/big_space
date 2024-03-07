@@ -57,10 +57,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh_handle = meshes.add(
-        Sphere::new(0.1)
-        .mesh().ico(16).unwrap()
-    );    
+    let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::YELLOW,
         ..default()

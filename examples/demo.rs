@@ -51,12 +51,7 @@ fn setup(
             .with_speed(1.0),
     ));
 
-    let mesh_handle = meshes.add(
-        Sphere::new(0.5)
-        .mesh()
-        .ico(32)
-        .unwrap(),
-    );
+    let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::BLUE,
         perceptual_roughness: 0.8,
