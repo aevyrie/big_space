@@ -51,14 +51,7 @@ fn setup(
             .with_speed(1.0),
     ));
 
-    let mesh_handle = meshes.add(
-        shape::Icosphere {
-            radius: 0.5,
-            subdivisions: 32,
-        }
-        .try_into()
-        .unwrap(),
-    );
+    let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::BLUE,
         perceptual_roughness: 0.8,
@@ -107,7 +100,7 @@ fn ui_setup(mut commands: Commands) {
                 ..default()
             },
         )
-        .with_text_alignment(TextAlignment::Left)
+        .with_text_justify(JustifyText::Left)
         .with_style(Style {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
@@ -133,7 +126,7 @@ fn ui_setup(mut commands: Commands) {
             left: Val::Px(10.0),
             ..default()
         })
-        .with_text_alignment(TextAlignment::Center),
+        .with_text_justify(JustifyText::Center),
         FunFactText,
     ));
 }
@@ -149,9 +142,10 @@ fn highlight_nearest_sphere(
     let Ok(transform) = objects.get(entity) else {
         return;
     };
-    let (scale, rotation, translation) = transform.to_scale_rotation_translation();
+    // Ignore rotation due to panicking in gizmos, as of bevy 0.13
+    let (scale, _, translation) = transform.to_scale_rotation_translation();
     gizmos
-        .sphere(translation, rotation, scale.x * 0.505, Color::RED)
+        .sphere(translation, Quat::IDENTITY, scale.x * 0.505, Color::RED)
         .circle_segments(128);
 }
 
@@ -247,8 +241,8 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
 fn cursor_grab_system(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut cam: ResMut<CameraInput>,
-    btn: Res<Input<MouseButton>>,
-    key: Res<Input<KeyCode>>,
+    btn: Res<ButtonInput<MouseButton>>,
+    key: Res<ButtonInput<KeyCode>>,
 ) {
     let Some(mut window) = windows.get_single_mut().ok() else {
         return;
