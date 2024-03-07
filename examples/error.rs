@@ -5,7 +5,7 @@
 //! independently from the camera, which is equivalent to what would happen when moving far from the
 //! origin when not using this plugin.
 
-use bevy::prelude::{shape::UVSphere, *};
+use bevy::prelude::*;
 use big_space::{FloatingOrigin, FloatingOriginSettings, GridCell};
 
 fn main() {
@@ -20,19 +20,19 @@ fn main() {
 }
 
 /// You can put things really, really far away from the origin. The distance we use here is actually
-/// quite small, because we want the cubes to still be visible when the floating origin is far from
-/// the camera. If you go much further than this, the cubes will simply disappear in a *POOF* of
+/// quite small, because we want the mesh to still be visible when the floating origin is far from
+/// the camera. If you go much further than this, the mesh will simply disappear in a *POOF* of
 /// floating point error.
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
 /// 10_000_000_000_000_000_000_000_000_000_000_000_000
-const DISTANCE: i128 = 20_000_000;
+const DISTANCE: i128 = 21_000_000;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
 /// disabling the plugin. Normally you would make your active camera the floating origin to avoid
 /// this issue.
 fn toggle_plugin(
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     settings: Res<big_space::FloatingOriginSettings>,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
@@ -74,7 +74,7 @@ fn toggle_plugin(
     };
 
     text.single_mut().sections[0].value =
-        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nCubes distance from origin: {}", thousands(dist), thousands(DISTANCE))
+        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nMesh distance from origin: {}", thousands(dist), thousands(DISTANCE))
 }
 
 #[derive(Component)]
@@ -108,15 +108,14 @@ fn setup_ui(mut commands: Commands) {
     });
 }
 
-/// set up a simple scene with a "parent" cube and a "child" cube
 fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     settings: Res<FloatingOriginSettings>,
 ) {
-    let cube_handle = meshes.add(Mesh::from(shape::Cube { size: 2.0 }));
-    let cube_material_handle = materials.add(StandardMaterial {
+    let mesh_handle = meshes.add(Sphere::new(1.5).mesh());
+    let matl_handle = materials.add(StandardMaterial {
         base_color: Color::rgb(0.8, 0.7, 0.6),
         ..default()
     });
@@ -129,8 +128,8 @@ fn setup_scene(
     // plugin isn't used.
     commands.spawn((
         PbrBundle {
-            mesh: meshes.add(UVSphere::default().into()),
-            material: materials.add(Color::RED.into()),
+            mesh: meshes.add(Sphere::default().mesh()),
+            material: materials.add(StandardMaterial::from(Color::RED)),
             transform: Transform::from_scale(Vec3::splat(10000.0)),
             ..default()
         },
@@ -138,23 +137,21 @@ fn setup_scene(
         FloatingOrigin,
     ));
 
-    // parent cube
     commands
         .spawn((
             PbrBundle {
-                mesh: cube_handle.clone(),
-                material: cube_material_handle.clone(),
+                mesh: mesh_handle.clone(),
+                material: matl_handle.clone(),
                 ..default()
             },
             distant_grid_cell,
             Rotator,
         ))
         .with_children(|parent| {
-            // child cube
             parent.spawn(PbrBundle {
-                mesh: cube_handle,
-                material: cube_material_handle,
-                transform: Transform::from_xyz(0.0, 0.0, 3.0),
+                mesh: mesh_handle,
+                material: matl_handle,
+                transform: Transform::from_xyz(0.0, 0.0, 4.0),
                 ..default()
             });
         });

@@ -35,19 +35,10 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     space: Res<FloatingOriginSettings>,
 ) {
-    let mut sphere = |radius| {
-        meshes.add(
-            shape::Icosphere {
-                radius,
-                subdivisions: 32,
-            }
-            .try_into()
-            .unwrap(),
-        )
-    };
+    let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
     let sun_mat = materials.add(StandardMaterial {
         base_color: Color::WHITE,
-        emissive: Color::rgb_linear(100., 100., 100.),
+        emissive: Color::rgb_linear(100000., 100000., 100000.),
         ..default()
     });
 
@@ -58,7 +49,7 @@ fn setup(
             GridCell::<i64>::ZERO,
             PointLightBundle {
                 point_light: PointLight {
-                    intensity: 35.73e24,
+                    intensity: 35.73e27,
                     range: 1e20,
                     radius: sun_radius_m,
                     shadows_enabled: true,
@@ -165,7 +156,7 @@ fn ui_setup(mut commands: Commands) {
                 ..default()
             },
         )
-        .with_text_alignment(TextAlignment::Left)
+        .with_text_justify(JustifyText::Left)
         .with_style(Style {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
@@ -236,8 +227,8 @@ fn ui_text_system(
 fn cursor_grab_system(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
     mut cam: ResMut<CameraInput>,
-    btn: Res<Input<MouseButton>>,
-    key: Res<Input<KeyCode>>,
+    btn: Res<ButtonInput<MouseButton>>,
+    key: Res<ButtonInput<KeyCode>>,
 ) {
     let Some(mut window) = windows.get_single_mut().ok() else {
         return;
