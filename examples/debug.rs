@@ -108,10 +108,6 @@ fn setup(
     commands.spawn((
         PointLightBundle {
             transform: Transform::from_xyz(4.0, 8.0, 4.0),
-            point_light: PointLight {
-                intensity: 10_000f32,
-                ..default()
-            },
             ..default()
         },
         GridCell::<i64>::default(),

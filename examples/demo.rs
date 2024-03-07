@@ -142,9 +142,10 @@ fn highlight_nearest_sphere(
     let Ok(transform) = objects.get(entity) else {
         return;
     };
-    let (scale, rotation, translation) = transform.to_scale_rotation_translation();
+    // Ignore rotation due to panicking in gizmos, as of bevy 0.13
+    let (scale, _, translation) = transform.to_scale_rotation_translation();
     gizmos
-        .sphere(translation, rotation, scale.x * 0.505, Color::RED)
+        .sphere(translation, Quat::IDENTITY, scale.x * 0.505, Color::RED)
         .circle_segments(128);
 }
 
