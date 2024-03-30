@@ -503,9 +503,8 @@ mod tests {
                 ReferenceFrame {
                     origin_transform: LocalFloatingOrigin {
                         translation_grid: GridCell::<i32>::new(0, 3_000, 0), // rough earth radius
-                        translation_float: Vec3::ZERO,
+                        translation_float: Vec3::new(5.0, 5.0, 0.0),
                         rotation_float: DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
-                        ..default()
                     },
                     ..default()
                 },
@@ -532,8 +531,8 @@ mod tests {
 
         // This is the error of the position of the floating origin if the origin was a person standing on earth, and their position was resampled with respect to the sun. This is 0.3 meters, but recall that this will be the error when positioning the other planets in the solar system when rendering.
         let computed_trans = root_frame.origin_transform.translation_float;
-        let correct_trans = Vec3::new(1.0, 1.0, 0.0);
-        let trans_error = dbg!(computed_trans).distance(correct_trans);
+        let correct_trans = Vec3::new(-4.0, 6.0, 0.0);
+        let trans_error = computed_trans.distance(correct_trans);
         assert!(trans_error < 0.3);
     }
 }
