@@ -124,6 +124,50 @@ impl ReferenceFrameHandle {
             child_frame.origin_transform.rotation_float = origin_child_rotation;
         })
     }
+
+    fn propagate_origin_to_parent<P: GridPrecision>(
+        self,
+        reference_frames: &mut ReferenceFrameParam<P>,
+        parent: ReferenceFrameHandle,
+    ) {
+        let (this_frame, this_cell, this_transform) = reference_frames.get(self);
+        let (parent_frame, _parent_cell, _parent_transform) = reference_frames.get(parent);
+
+        // Get this frame's double precision transform, relative to its cell. We ignore the grid
+        // cell here because we don't want to lose precision - we can do these calcs relative to
+        // this cell, then add the grid cell offset at the end.
+        let this_transform = DAffine3::from_rotation_translation(
+            this_transform.rotation.as_dquat(),
+            this_transform.translation.as_dvec3(),
+        );
+
+        // Get the origin's double position in this reference frame
+        let origin_translation = this_frame.grid_position_double(
+            &this_frame.origin_transform.translation_grid,
+            &Transform::from_translation(this_frame.origin_transform.translation_float),
+        );
+        let origin_local_transform = DAffine3::from_rotation_translation(
+            this_frame.origin_transform.rotation_float,
+            origin_translation,
+        );
+
+        // Multiply to move the origin into the parent's reference frame
+        let origin_affine = this_transform * origin_local_transform;
+
+        let (_, origin_rot, origin_trans) = origin_affine.to_scale_rotation_translation();
+        let (origin_cell_relative_to_this_cell, origin_translation_remainder) =
+            parent_frame.translation_to_grid(origin_trans);
+
+        // Up until now we have been computing as if this cell is located at the origin, to maximize
+        // precision. Now that we are done with floats, we can add the cell offset.
+        let parent_origin_cell = origin_cell_relative_to_this_cell + this_cell;
+
+        reference_frames.update(parent, |parent_frame, _, _| {
+            parent_frame.origin_transform.translation_grid = parent_origin_cell;
+            parent_frame.origin_transform.translation_float = origin_translation_remainder;
+            parent_frame.origin_transform.rotation_float = origin_rot;
+        });
+    }
 }
 
 impl<'w, 's, P: GridPrecision> ReferenceFrameParam<'w, 's, P> {
@@ -256,10 +300,6 @@ impl<'w, 's, P: GridPrecision> ReferenceFrameParam<'w, 's, P> {
 }
 
 impl<P: GridPrecision> LocalFloatingOrigin<P> {
-    /// The maximum reference frame tree depth, defensively prevents infinite looping in case there
-    /// is a degenerate hierarchy. It might take a long time, but at least it's not forever?
-    const MAX_REFERENCE_FRAME_DEPTH: usize = usize::MAX;
-
     /// Update the [`LocalFloatingOrigin`] of every [`ReferenceFrame`] in the world. This does not
     /// update any entity transforms, instead this is a preceding step that updates every reference
     /// frame, so it knows where the floating origin is located with respect to that reference
@@ -271,6 +311,10 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         mut reference_frames: ReferenceFrameParam<P>,
         mut frame_stack: Local<Vec<ReferenceFrameHandle>>,
     ) {
+        /// The maximum reference frame tree depth, defensively prevents infinite looping in case
+        /// there is a degenerate hierarchy. It might take a while, but at least it's not forever?
+        const MAX_REFERENCE_FRAME_DEPTH: usize = usize::MAX;
+
         let (origin_entity, origin_cell) = origin
             .get_single()
             .expect("There can only be one entity with the `FloatingOrigin` component.");
@@ -295,7 +339,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         frame_stack.push(this_frame);
 
         // Recurse up and across the tree, updating siblings and their children.
-        for _ in 0..Self::MAX_REFERENCE_FRAME_DEPTH {
+        for _ in 0..MAX_REFERENCE_FRAME_DEPTH {
             // Compute sibling origins in higher precision by using their relative distance to their
             // sibling that contains the floating origin. This saves some precision that could be
             // lost if you instead used their position relative to their parent, which is generally
@@ -321,14 +365,14 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
             // only need to process the siblings.
             match reference_frames.parent(this_frame) {
                 Some(parent_frame) => {
-                    let parent_origin = todo!("update parent origin_transform using this_frame");
+                    this_frame.propagate_origin_to_parent(&mut reference_frames, parent_frame);
                     this_frame = parent_frame;
                 }
                 None => return, // We have reached the root of the tree, and can exit.
             }
         }
 
-        error!("Reached the maximum reference frame depth of {}, and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.", Self::MAX_REFERENCE_FRAME_DEPTH)
+        error!("Reached the maximum reference frame depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
     }
 }
 
@@ -395,7 +439,7 @@ mod tests {
         let root = ReferenceFrameHandle::Root;
         app.insert_resource(RootReferenceFrame(ReferenceFrame {
             origin_transform: LocalFloatingOrigin {
-                translation_grid: GridCell::<i32>::new(999, -1, -1),
+                translation_grid: GridCell::<i32>::new(1_000_000, -1, -1),
                 translation_float: Vec3::ZERO,
                 rotation_float: DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
             },
@@ -407,7 +451,7 @@ mod tests {
             .spawn((
                 Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
-                GridCell::<i32>::new(1000, 0, 0),
+                GridCell::<i32>::new(1_000_000, 0, 0),
                 ReferenceFrame::<i32>::default(),
             ))
             .id();
@@ -422,17 +466,74 @@ mod tests {
         let (child_frame, ..) = reference_frames.get(child);
 
         let computed_grid = child_frame.origin_transform.translation_grid;
-        let correct_grid = GridCell::new(-1, 1, -1);
+        let correct_grid = GridCell::new(-1, 0, -1);
         assert_eq!(computed_grid, correct_grid);
 
         let computed_rot = child_frame.origin_transform.rotation_float;
         let correct_rot = DQuat::from_rotation_z(std::f64::consts::PI);
         let rot_error = computed_rot.angle_between(correct_rot);
-        assert!(rot_error < 0.001);
+        assert!(rot_error < 1e-10);
 
+        // Even though we are 2 billion units from the origin, our precision is still pretty good.
+        // The loss of precision is coming from the affine multiplication that moves the origin into
+        // the child's reference frame. The good news is that precision loss only scales with the
+        // distance of the origin to the child (in the child's reference frame). In this test we are
+        // saying that the floating origin is - with respect to the root - pretty near the child.
+        // Even though the child and floating origin are very far from the origin, we only lose
+        // precision based on how for the origin is from the child.
         let computed_trans = child_frame.origin_transform.translation_float;
         let correct_trans = Vec3::new(-1.0, 1.0, 0.0);
         let trans_error = computed_trans.distance(correct_trans);
-        assert!(dbg!(trans_error) < 0.001);
+        assert!(trans_error < 1e-4);
+    }
+
+    #[test]
+    fn test_parent_propagation() {
+        let mut app = App::new();
+        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+
+        let root = ReferenceFrameHandle::Root;
+
+        let child = app
+            .world
+            .spawn((
+                Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
+                    .with_translation(Vec3::new(1.0, 1.0, 0.0)),
+                GridCell::<i32>::new(15_003_000, 0, 0), // roughly radius of earth orbit
+                ReferenceFrame {
+                    origin_transform: LocalFloatingOrigin {
+                        translation_grid: GridCell::<i32>::new(0, 3_000, 0), // rough earth radius
+                        translation_float: Vec3::ZERO,
+                        rotation_float: DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
+                        ..default()
+                    },
+                    ..default()
+                },
+            ))
+            .id();
+        let child = ReferenceFrameHandle::Node(child);
+
+        let mut state = SystemState::<ReferenceFrameParam<i32>>::new(&mut app.world);
+        let mut reference_frames = state.get_mut(&mut app.world);
+
+        // The function we are testing
+        child.propagate_origin_to_parent(&mut reference_frames, root);
+
+        let (root_frame, ..) = reference_frames.get(root);
+
+        let computed_grid = root_frame.origin_transform.translation_grid;
+        let correct_grid = GridCell::new(15_000_000, 0, 0);
+        assert_eq!(computed_grid, correct_grid);
+
+        let computed_rot = root_frame.origin_transform.rotation_float;
+        let correct_rot = DQuat::IDENTITY;
+        let rot_error = computed_rot.angle_between(correct_rot);
+        assert!(rot_error < 1e-7);
+
+        // This is the error of the position of the floating origin if the origin was a person standing on earth, and their position was resampled with respect to the sun. This is 0.3 meters, but recall that this will be the error when positioning the other planets in the solar system when rendering.
+        let computed_trans = root_frame.origin_transform.translation_float;
+        let correct_trans = Vec3::new(1.0, 1.0, 0.0);
+        let trans_error = dbg!(computed_trans).distance(correct_trans);
+        assert!(trans_error < 0.3);
     }
 }
