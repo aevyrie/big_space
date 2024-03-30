@@ -490,7 +490,7 @@ mod tests {
     #[test]
     fn test_parent_propagation() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(FloatingOriginPlugin::<i64>::default());
 
         let root = ReferenceFrameHandle::Root;
 
@@ -499,10 +499,10 @@ mod tests {
             .spawn((
                 Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
-                GridCell::<i32>::new(15_003_000, 0, 0), // roughly radius of earth orbit
+                GridCell::<i64>::new(150_000_003_000, 0, 0), // roughly radius of earth orbit
                 ReferenceFrame {
                     origin_transform: LocalFloatingOrigin {
-                        translation_grid: GridCell::<i32>::new(0, 3_000, 0), // rough earth radius
+                        translation_grid: GridCell::<i64>::new(0, 3_000, 0), // rough earth radius
                         translation_float: Vec3::new(5.0, 5.0, 0.0),
                         rotation_float: DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
                     },
@@ -512,7 +512,7 @@ mod tests {
             .id();
         let child = ReferenceFrameHandle::Node(child);
 
-        let mut state = SystemState::<ReferenceFrameParam<i32>>::new(&mut app.world);
+        let mut state = SystemState::<ReferenceFrameParam<i64>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
         // The function we are testing
@@ -521,7 +521,7 @@ mod tests {
         let (root_frame, ..) = reference_frames.get(root);
 
         let computed_grid = root_frame.origin_transform.translation_grid;
-        let correct_grid = GridCell::new(15_000_000, 0, 0);
+        let correct_grid = GridCell::new(150_000_000_000, 0, 0);
         assert_eq!(computed_grid, correct_grid);
 
         let computed_rot = root_frame.origin_transform.rotation_float;
