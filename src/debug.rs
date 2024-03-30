@@ -27,7 +27,9 @@ pub fn update_debug_bounds<P: GridPrecision>(
     occupied_cells: Query<&GridCell<P>, Without<FloatingOrigin>>,
     origin_cells: Query<&GridCell<P>, With<FloatingOrigin>>,
 ) {
-    let origin_cell = origin_cells.single();
+    let Ok(origin_cell) = origin_cells.get_single() else {
+        return;
+    };
     for cell in occupied_cells.iter() {
         let cell = cell - origin_cell;
         let scale = Vec3::splat(settings.grid_edge_length * 0.999);
