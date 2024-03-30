@@ -28,8 +28,8 @@ fn movement(
     )>,
 ) {
     let delta_translation = |offset: f32| -> Vec3 {
-        let t_1 = time.elapsed_seconds() + offset;
-        let dt = time.delta_seconds();
+        let t_1 = time.elapsed_seconds() * 0.1 + offset;
+        let dt = time.delta_seconds() * 0.1;
         let t_0 = t_1 - dt;
         let pos =
             |t: f32| -> Vec3 { Vec3::new(t.cos() * 2.0, t.sin() * 2.0, (t * 1.3).sin() * 2.0) };
@@ -48,7 +48,7 @@ struct Rotator;
 
 fn rotation(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_x(3.0 * time.delta_seconds());
+        transform.rotate_z(3.0 * time.delta_seconds() * 0.2);
     }
 }
 
@@ -99,7 +99,7 @@ fn setup(
             parent.spawn(PbrBundle {
                 mesh: mesh_handle,
                 material: matl_handle,
-                transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                transform: Transform::from_xyz(0.0, 0.5, 0.0),
                 ..default()
             });
         });

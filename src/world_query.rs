@@ -5,8 +5,8 @@ use bevy::ecs::query::QueryData;
 use bevy::math::DVec3;
 use bevy::prelude::*;
 
-use crate::precision::GridPrecision;
-use crate::{FloatingOriginSettings, GridCell};
+use crate::GridCell;
+use crate::{precision::GridPrecision, reference_frame::ReferenceFrame};
 
 #[derive(QueryData)]
 #[query_data(mutable)]
@@ -23,13 +23,13 @@ pub struct GridTransform<P: GridPrecision> {
 
 impl<'w, P: GridPrecision> GridTransformItem<'w, P> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, settings: &FloatingOriginSettings) -> DVec3 {
-        settings.grid_position_double(&self.cell, &self.transform)
+    pub fn position_double(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
+        reference_frame.grid_position_double(&self.cell, &self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, settings: &FloatingOriginSettings) -> Vec3 {
-        settings.grid_position(&self.cell, &self.transform)
+    pub fn position(&self, reference_frame: &ReferenceFrame<P>) -> Vec3 {
+        reference_frame.grid_position(&self.cell, &self.transform)
     }
 
     /// Get a copy of the fields to work with.
@@ -43,13 +43,13 @@ impl<'w, P: GridPrecision> GridTransformItem<'w, P> {
 
 impl<'w, P: GridPrecision> GridTransformReadOnlyItem<'w, P> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, settings: &FloatingOriginSettings) -> DVec3 {
-        settings.grid_position_double(self.cell, self.transform)
+    pub fn position_double(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
+        reference_frame.grid_position_double(self.cell, self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, settings: &FloatingOriginSettings) -> Vec3 {
-        settings.grid_position(self.cell, self.transform)
+    pub fn position(&self, reference_frame: &ReferenceFrame<P>) -> Vec3 {
+        reference_frame.grid_position(self.cell, self.transform)
     }
 
     /// Get a copy of the fields to work with.
@@ -98,12 +98,12 @@ impl<P: GridPrecision> std::ops::Add for GridTransformOwned<P> {
 
 impl<P: GridPrecision> GridTransformOwned<P> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, space: &FloatingOriginSettings) -> DVec3 {
-        space.grid_position_double(&self.cell, &self.transform)
+    pub fn position_double(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
+        reference_frame.grid_position_double(&self.cell, &self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, space: &FloatingOriginSettings) -> Vec3 {
-        space.grid_position(&self.cell, &self.transform)
+    pub fn position(&self, reference_frame: &ReferenceFrame<P>) -> Vec3 {
+        reference_frame.grid_position(&self.cell, &self.transform)
     }
 }

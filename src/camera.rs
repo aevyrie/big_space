@@ -12,8 +12,8 @@ use bevy::{
 
 use crate::{
     precision::GridPrecision,
+    reference_frame::RootReferenceFrame,
     world_query::{GridTransform, GridTransformReadOnly},
-    FloatingOriginSettings,
 };
 
 /// Adds the `big_space` camera controller
@@ -175,10 +175,10 @@ pub fn default_camera_inputs(
 }
 
 /// Find the object nearest the camera
-pub fn nearest_objects<T: GridPrecision>(
-    settings: Res<FloatingOriginSettings>,
-    objects: Query<(Entity, GridTransformReadOnly<T>, &Aabb)>,
-    mut camera: Query<(&mut CameraController, GridTransformReadOnly<T>)>,
+pub fn nearest_objects<P: GridPrecision>(
+    settings: Res<RootReferenceFrame<P>>,
+    objects: Query<(Entity, GridTransformReadOnly<P>, &Aabb)>,
+    mut camera: Query<(&mut CameraController, GridTransformReadOnly<P>)>,
 ) {
     let (mut camera, cam_pos) = camera.single_mut();
     let nearest_object = objects
@@ -201,7 +201,7 @@ pub fn nearest_objects<T: GridPrecision>(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
-    settings: Res<FloatingOriginSettings>,
+    settings: Res<RootReferenceFrame<P>>,
     mut input: ResMut<CameraInput>,
     mut camera: Query<(GridTransform<P>, &mut CameraController)>,
 ) {
