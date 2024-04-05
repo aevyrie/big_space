@@ -5,7 +5,8 @@ use bevy::{
 };
 use big_space::{
     camera::{CameraController, CameraInput},
-    FloatingOrigin, FloatingOriginSettings, GridCell,
+    reference_frame::RootReferenceFrame,
+    FloatingOrigin, GridCell,
 };
 
 fn main() {
@@ -31,7 +32,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    space: Res<FloatingOriginSettings>,
+    space: Res<RootReferenceFrame<i64>>,
 ) {
     let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
     let sun_mat = materials.add(StandardMaterial {

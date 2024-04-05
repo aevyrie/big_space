@@ -6,7 +6,7 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::{FloatingOrigin, FloatingOriginSettings, GridCell};
+use big_space::{reference_frame::RootReferenceFrame, FloatingOrigin, GridCell};
 
 fn main() {
     App::new()
@@ -33,7 +33,7 @@ const DISTANCE: i128 = 21_000_000;
 /// this issue.
 fn toggle_plugin(
     input: Res<ButtonInput<KeyCode>>,
-    settings: Res<big_space::FloatingOriginSettings>,
+    settings: Res<RootReferenceFrame<i128>>,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
     mut floating_origin: Query<&mut GridCell<i128>, With<FloatingOrigin>>,
@@ -43,7 +43,7 @@ fn toggle_plugin(
     }
 
     let mut origin_cell = floating_origin.single_mut();
-    let index_max = DISTANCE / settings.grid_edge_length() as i128;
+    let index_max = DISTANCE / settings.cell_edge_length() as i128;
     let increment = index_max / 100;
 
     let msg = if *disabled {
@@ -60,7 +60,7 @@ fn toggle_plugin(
         "Floating Origin Enabled"
     };
 
-    let dist = index_max.saturating_sub(origin_cell.x) * settings.grid_edge_length() as i128;
+    let dist = index_max.saturating_sub(origin_cell.x) * settings.cell_edge_length() as i128;
 
     let thousands = |num: i128| {
         num.to_string()
@@ -112,7 +112,7 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    settings: Res<FloatingOriginSettings>,
+    reference_frame: Res<RootReferenceFrame<i128>>,
 ) {
     let mesh_handle = meshes.add(Sphere::new(1.5).mesh());
     let matl_handle = materials.add(StandardMaterial {
@@ -120,7 +120,7 @@ fn setup_scene(
         ..default()
     });
 
-    let d = DISTANCE / settings.grid_edge_length() as i128;
+    let d = DISTANCE / reference_frame.cell_edge_length() as i128;
     let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
     // Normally, we would put the floating origin on the camera. However in this example, we want to

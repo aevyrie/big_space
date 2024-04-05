@@ -19,7 +19,8 @@ pub mod local_origin;
 /// All entities that have no parent are implicitly in the root [`ReferenceFrame`].
 ///
 /// Because this relationship is implicit, it lives outside of the entity/component hierarchy, and
-/// is a singleton; this is why the root reference frame is a resource.
+/// is a singleton; this is why the root reference frame is a resource unlike all other
+/// [`ReferenceFrame`]s which are components.
 #[derive(Debug, Clone, Resource, Reflect, Deref, DerefMut)]
 pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
 
@@ -41,8 +42,9 @@ pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
 /// worse, around the center of the galaxy.
 #[derive(Debug, Clone, Reflect, Component)]
 pub struct ReferenceFrame<P: GridPrecision> {
-    /// The high-precision position of the floating origin grid cell within this reference frame.
-    origin_transform: LocalFloatingOrigin<P>,
+    /// The high-precision position of the floating origin's current grid cell local to this
+    /// reference frame.
+    local_floating_origin: LocalFloatingOrigin<P>,
     /// Defines the uniform scale of the grid by the length of the edge of a grid cell.
     cell_edge_length: f32,
     /// How far an entity can move from the origin before its grid cell is recomputed.
@@ -58,17 +60,17 @@ impl<P: GridPrecision> Default for ReferenceFrame<P> {
 impl<P: GridPrecision> ReferenceFrame<P> {
     /// Construct a new [`ReferenceFrame`]. The properties of a reference frame cannot be changed
     /// after construction.
-    pub fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
+    pub fn new(cell_edge_length: f32, switching_threshold: f32) -> Self {
         Self {
-            origin_transform: LocalFloatingOrigin::default(),
-            cell_edge_length: grid_edge_length,
-            maximum_distance_from_origin: grid_edge_length / 2.0 + switching_threshold,
+            local_floating_origin: LocalFloatingOrigin::default(),
+            cell_edge_length,
+            maximum_distance_from_origin: cell_edge_length / 2.0 + switching_threshold,
         }
     }
 
     /// Get the position of the floating origin relative to the current reference frame.
     pub fn origin_transform(&self) -> &LocalFloatingOrigin<P> {
-        &self.origin_transform
+        &self.local_floating_origin
     }
 
     /// Get the size of each cell this reference frame's grid.

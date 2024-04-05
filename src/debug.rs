@@ -17,7 +17,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
             PostUpdate,
             update_debug_bounds::<P>
                 .after(crate::recenter_transform_on_grid::<P>)
-                .before(crate::update_global_from_grid::<P>),
+                .before(crate::update_grid_cell_global_transforms::<P>),
         );
     }
 }
