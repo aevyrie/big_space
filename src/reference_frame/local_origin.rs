@@ -153,7 +153,7 @@ impl ReferenceFrameHandle {
     /// swapping the position of arguments.
     fn propagate_origin_to_child<P: GridPrecision>(
         self,
-        reference_frames: &mut ReferenceFrameParam<P>,
+        reference_frames: &mut ReferenceFrameMutParam<P>,
         child: ReferenceFrameHandle,
     ) {
         let (this_frame, _this_cell, _this_transform) = reference_frames.get(self);
@@ -198,7 +198,7 @@ impl ReferenceFrameHandle {
 
     fn propagate_origin_to_parent<P: GridPrecision>(
         self,
-        reference_frames: &mut ReferenceFrameParam<P>,
+        reference_frames: &mut ReferenceFrameMutParam<P>,
         parent: ReferenceFrameHandle,
     ) {
         let (this_frame, this_cell, this_transform) = reference_frames.get(self);
@@ -246,7 +246,46 @@ impl ReferenceFrameHandle {
 /// Used to access a reference frame. Needed because the reference frame could either be a
 /// component, or a resource if at the root of the hierarchy.
 #[derive(SystemParam)]
-pub struct ReferenceFrameParam<'w, 's, P: GridPrecision> {
+pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
+    parent: Query<'w, 's, Read<Parent>>,
+    frame_root: ResMut<'w, RootReferenceFrame<P>>,
+    frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>)>,
+}
+
+impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
+    /// Get the reference frame from a handle.
+    pub fn resolve_handle(&self, handle: ReferenceFrameHandle) -> &ReferenceFrame<P> {
+        match handle {
+            ReferenceFrameHandle::Node(frame_entity) => self
+                .frame_query
+                .get(frame_entity)
+                .map(|(_entity, frame)| frame)
+                .unwrap_or_else(|e| {
+                    panic!("{} {handle:?} failed to resolve.\n\tEnsure all GridPrecision components are using the <{}> generic, and all required components are present.\n\tQuery Error: {e}", std::any::type_name::<ReferenceFrameHandle>(), std::any::type_name::<P>())
+                }),
+            ReferenceFrameHandle::Root => {
+                &self.frame_root
+            }
+        }
+    }
+
+    /// Get a handle to this entity's reference frame, if it exists.
+    #[inline]
+    pub fn reference_frame(&self, this: Entity) -> Option<ReferenceFrameHandle> {
+        match self.parent.get(this).map(|parent| **parent) {
+            Err(_) => Some(ReferenceFrameHandle::Root),
+            Ok(parent) => match self.frame_query.contains(parent) {
+                true => Some(ReferenceFrameHandle::Node(parent)),
+                false => None,
+            },
+        }
+    }
+}
+
+/// Used to access a reference frame. Needed because the reference frame could either be a
+/// component, or a resource if at the root of the hierarchy.
+#[derive(SystemParam)]
+pub struct ReferenceFrameMutParam<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
     children: Query<'w, 's, Read<Children>>,
     frame_root: ResMut<'w, RootReferenceFrame<P>>,
@@ -263,7 +302,7 @@ pub struct ReferenceFrameParam<'w, 's, P: GridPrecision> {
     >,
 }
 
-impl<'w, 's, P: GridPrecision> ReferenceFrameParam<'w, 's, P> {
+impl<'w, 's, P: GridPrecision> ReferenceFrameMutParam<'w, 's, P> {
     /// Get mutable access to the [`ReferenceFrame`], and run the provided function or closure,
     /// optionally returning data.
     ///
@@ -403,7 +442,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// [`Transform`]) are the source of truth and never mutated.
     pub fn update(
         origin: Query<(Entity, &GridCell<P>), With<FloatingOrigin>>,
-        mut reference_frames: ReferenceFrameParam<P>,
+        mut reference_frames: ReferenceFrameMutParam<P>,
         mut frame_stack: Local<Vec<ReferenceFrameHandle>>,
     ) {
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
@@ -452,7 +491,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
             while let Some(this_frame) = frame_stack.pop() {
                 for child_frame in reference_frames.children(this_frame) {
                     this_frame.propagate_origin_to_child(&mut reference_frames, child_frame);
-                    frame_stack.push(child_frame) // Push processed child onto the stack. Recursion, baby!
+                    frame_stack.push(child_frame) // Push processed child onto the stack
                 }
             }
 
@@ -496,7 +535,7 @@ mod tests {
             .entity_mut(parent)
             .push_children(&[child_1, child_2]);
 
-        let mut state = SystemState::<ReferenceFrameParam<i32>>::new(&mut app.world);
+        let mut state = SystemState::<ReferenceFrameMutParam<i32>>::new(&mut app.world);
         let mut ref_frame = state.get_mut(&mut app.world);
 
         // Children
@@ -552,7 +591,7 @@ mod tests {
             .id();
         let child = ReferenceFrameHandle::Node(child);
 
-        let mut state = SystemState::<ReferenceFrameParam<i32>>::new(&mut app.world);
+        let mut state = SystemState::<ReferenceFrameMutParam<i32>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
         // The function we are testing
@@ -607,7 +646,7 @@ mod tests {
             .id();
         let child = ReferenceFrameHandle::Node(child);
 
-        let mut state = SystemState::<ReferenceFrameParam<i64>>::new(&mut app.world);
+        let mut state = SystemState::<ReferenceFrameMutParam<i64>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
         // The function we are testing
@@ -665,7 +704,7 @@ mod tests {
             .id();
         let child = ReferenceFrameHandle::Node(child);
 
-        let mut state = SystemState::<ReferenceFrameParam<i32>>::new(&mut app.world);
+        let mut state = SystemState::<ReferenceFrameMutParam<i32>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
         root.propagate_origin_to_child(&mut reference_frames, child);

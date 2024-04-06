@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use bevy::prelude::*;
 
 use crate::{
-    precision::GridPrecision, reference_frame::local_origin::ReferenceFrameParam, FloatingOrigin,
+    precision::GridPrecision, reference_frame::local_origin::ReferenceFrames, FloatingOrigin,
     GridCell,
 };
 
@@ -24,13 +24,13 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
 /// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.
 pub fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos,
-    reference_frames: ReferenceFrameParam<P>,
+    reference_frames: ReferenceFrames<P>,
     occupied_cells: Query<(Entity, &GridCell<P>), Without<FloatingOrigin>>,
 ) {
     for (cell_entity, cell) in occupied_cells.iter() {
-        let Some((frame, ..)) = reference_frames
+        let Some(frame) = reference_frames
             .reference_frame(cell_entity)
-            .map(|frame| reference_frames.get(frame))
+            .map(|handle| reference_frames.resolve_handle(handle))
         else {
             continue;
         };

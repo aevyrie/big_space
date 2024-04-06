@@ -88,6 +88,7 @@
 
 use bevy::{prelude::*, transform::TransformSystem};
 use propagation::{propagate_transforms, sync_simple_transforms};
+use reference_frame::local_origin::ReferenceFrames;
 use std::marker::PhantomData;
 use world_query::GridTransformReadOnly;
 
@@ -212,17 +213,23 @@ pub struct FloatingOrigin;
 /// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
 /// grid cell to reduce the size of the transform.
 pub fn recenter_transform_on_grid<P: GridPrecision>(
-    settings: Res<RootReferenceFrame<P>>,
-    mut query: Query<(&mut GridCell<P>, &mut Transform), (Changed<Transform>, Without<Parent>)>,
+    reference_frames: ReferenceFrames<P>,
+    mut changed_transform: Query<(Entity, &mut GridCell<P>, &mut Transform), Changed<Transform>>,
 ) {
-    query
+    changed_transform
         .par_iter_mut()
-        .for_each(|(mut grid_pos, mut transform)| {
+        .for_each(|(entity, mut grid_pos, mut transform)| {
+            let Some(frame) = reference_frames
+                .reference_frame(entity)
+                .map(|handle| reference_frames.resolve_handle(handle))
+            else {
+                return;
+            };
             if transform.as_ref().translation.abs().max_element()
-                > settings.maximum_distance_from_origin()
+                > frame.maximum_distance_from_origin()
             {
                 let (grid_cell_delta, translation) =
-                    settings.imprecise_translation_to_grid(transform.as_ref().translation);
+                    frame.imprecise_translation_to_grid(transform.as_ref().translation);
                 *grid_pos += grid_cell_delta;
                 transform.translation = translation;
             }
@@ -250,9 +257,9 @@ pub fn update_grid_cell_global_transforms<P: GridPrecision>(
 
     // Update the GlobalTransform of GridCell entities that are children of a ReferenceFrame
     for (frame, children) in &reference_frames {
-        while let Some((grid_transform, mut global_transform)) =
-            entities.p0().iter_many_mut(children.iter()).fetch_next()
-        {
+        let mut with_parent_query = entities.p0();
+        let mut frame_children = with_parent_query.iter_many_mut(children);
+        while let Some((grid_transform, mut global_transform)) = frame_children.fetch_next() {
             *global_transform =
                 frame.global_transform(grid_transform.cell, grid_transform.transform);
         }

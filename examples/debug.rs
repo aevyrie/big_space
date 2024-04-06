@@ -1,7 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use big_space::{FloatingOrigin, GridCell};
+use big_space::{reference_frame::ReferenceFrame, FloatingOrigin, GridCell};
 
 fn main() {
     App::new()
@@ -25,6 +25,7 @@ fn movement(
         Query<&mut Transform, With<Mover<1>>>,
         Query<&mut Transform, With<Mover<2>>>,
         Query<&mut Transform, With<Mover<3>>>,
+        Query<&mut Transform, With<Mover<4>>>,
     )>,
 ) {
     let delta_translation = |offset: f32| -> Vec3 {
@@ -41,6 +42,7 @@ fn movement(
     q.p0().single_mut().translation += delta_translation(20.0);
     q.p1().single_mut().translation += delta_translation(251.0);
     q.p2().single_mut().translation += delta_translation(812.0);
+    q.p3().single_mut().translation += delta_translation(863.0);
 }
 
 #[derive(Component)]
@@ -92,16 +94,21 @@ fn setup(
                 ..default()
             },
             GridCell::<i64>::default(),
+            ReferenceFrame::<i64>::new(0.5, 0.01),
             Rotator,
             Mover::<3>,
         ))
         .with_children(|parent| {
-            parent.spawn(PbrBundle {
-                mesh: mesh_handle,
-                material: matl_handle,
-                transform: Transform::from_xyz(0.0, 0.5, 0.0),
-                ..default()
-            });
+            parent.spawn((
+                PbrBundle {
+                    mesh: mesh_handle,
+                    material: matl_handle,
+                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
+                    ..default()
+                },
+                GridCell::<i64>::default(),
+                Mover::<4>,
+            ));
         });
 
     // light
