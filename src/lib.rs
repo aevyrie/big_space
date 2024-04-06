@@ -89,7 +89,7 @@
 use bevy::{prelude::*, transform::TransformSystem};
 use propagation::{propagate_transforms, sync_simple_transforms};
 use std::marker::PhantomData;
-use world_query::{GridTransformReadOnly, GridTransformReadOnlyItem};
+use world_query::GridTransformReadOnly;
 
 pub mod grid_cell;
 pub mod precision;
@@ -233,38 +233,30 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
 /// entity belongs to.
 pub fn update_grid_cell_global_transforms<P: GridPrecision>(
     root: Res<RootReferenceFrame<P>>,
-    origin: Query<(Ref<GridCell<P>>, Ref<FloatingOrigin>)>,
     reference_frames: Query<(&ReferenceFrame<P>, &Children)>,
     mut entities: ParamSet<(
         Query<(GridTransformReadOnly<P>, &mut GlobalTransform), With<Parent>>, // Node entities
         Query<(GridTransformReadOnly<P>, &mut GlobalTransform), Without<Parent>>, // Root entities
     )>,
 ) {
-    let root_view_transform = root.origin_transform().transform();
+    // Update the GlobalTransform of GridCell entities at the root of the hierarchy
     entities
         .p1()
         .par_iter_mut()
         .for_each(|(grid_transform, mut global_transform)| {
-            update_global_from_cell_local(
-                &root,
-                root.origin_transform().cell(),
-                grid_transform,
-                global_transform,
-            )
+            *global_transform =
+                root.global_transform(grid_transform.cell, grid_transform.transform);
         });
-}
 
-fn update_global_from_cell_local<P: GridPrecision>(
-    frame: &ReferenceFrame<P>,
-    origin_cell: GridCell<P>,
-    local: GridTransformReadOnlyItem<P>,
-    mut global: Mut<GlobalTransform>,
-) {
-    let grid_cell_delta = *local.cell - origin_cell;
-    *global = local
-        .transform
-        .with_translation(frame.grid_position(&grid_cell_delta, local.transform))
-        .into();
+    // Update the GlobalTransform of GridCell entities that are children of a ReferenceFrame
+    for (frame, children) in &reference_frames {
+        while let Some((grid_transform, mut global_transform)) =
+            entities.p0().iter_many_mut(children.iter()).fetch_next()
+        {
+            *global_transform =
+                frame.global_transform(grid_transform.cell, grid_transform.transform);
+        }
+    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,8 @@ use std::marker::PhantomData;
 use bevy::prelude::*;
 
 use crate::{
-    precision::GridPrecision, reference_frame::RootReferenceFrame, FloatingOrigin, GridCell,
+    precision::GridPrecision, reference_frame::local_origin::ReferenceFrameParam, FloatingOrigin,
+    GridCell,
 };
 
 /// This plugin will render the bounds of occupied grid cells.
@@ -15,9 +16,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            update_debug_bounds::<P>
-                .after(crate::recenter_transform_on_grid::<P>)
-                .before(crate::update_grid_cell_global_transforms::<P>),
+            update_debug_bounds::<P>.after(bevy::transform::TransformSystem::TransformPropagate),
         );
     }
 }
@@ -25,18 +24,20 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
 /// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.
 pub fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos,
-    settings: Res<RootReferenceFrame<P>>,
-    occupied_cells: Query<&GridCell<P>, Without<FloatingOrigin>>,
-    origin_cells: Query<&GridCell<P>, With<FloatingOrigin>>,
+    reference_frames: ReferenceFrameParam<P>,
+    occupied_cells: Query<(Entity, &GridCell<P>), Without<FloatingOrigin>>,
 ) {
-    let origin_cell = origin_cells.single();
-    for cell in occupied_cells.iter() {
-        let cell = cell - origin_cell;
-        let scale = Vec3::splat(settings.cell_edge_length() * 0.999);
-        let translation = settings.grid_position(&cell, &Transform::IDENTITY);
-        gizmos.cuboid(
-            Transform::from_translation(translation).with_scale(scale),
-            Color::GREEN,
-        )
+    for (cell_entity, cell) in occupied_cells.iter() {
+        let Some((frame, ..)) = reference_frames
+            .reference_frame(cell_entity)
+            .map(|frame| reference_frames.get(frame))
+        else {
+            continue;
+        };
+        let transform = frame.global_transform(
+            cell,
+            &Transform::from_scale(Vec3::splat(frame.cell_edge_length() * 0.999)),
+        );
+        gizmos.cuboid(transform, Color::GREEN)
     }
 }

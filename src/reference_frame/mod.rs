@@ -4,10 +4,10 @@
 
 use bevy::{
     ecs::{component::Component, system::Resource},
-    math::{DVec3, Vec3},
+    math::{Affine3A, DAffine3, DVec3, Vec3},
     prelude::{Deref, DerefMut},
     reflect::Reflect,
-    transform::components::Transform,
+    transform::components::{GlobalTransform, Transform},
 };
 
 use crate::{GridCell, GridPrecision};
@@ -69,7 +69,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Get the position of the floating origin relative to the current reference frame.
-    pub fn origin_transform(&self) -> &LocalFloatingOrigin<P> {
+    pub fn local_floating_origin(&self) -> &LocalFloatingOrigin<P> {
         &self.local_floating_origin
     }
 
@@ -103,6 +103,15 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         }
     }
 
+    /// Returns the floating point position of a [`GridCell`].
+    pub fn grid_to_float(&self, pos: &GridCell<P>) -> DVec3 {
+        DVec3 {
+            x: pos.x.as_f64() * self.cell_edge_length as f64,
+            y: pos.y.as_f64() * self.cell_edge_length as f64,
+            z: pos.z.as_f64() * self.cell_edge_length as f64,
+        }
+    }
+
     /// Convert a large translation into a small translation relative to a grid cell.
     pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell<P>, Vec3) {
         let l = self.cell_edge_length as f64;
@@ -133,5 +142,32 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     /// Convert a large translation into a small translation relative to a grid cell.
     pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell<P>, Vec3) {
         self.translation_to_grid(input.as_dvec3())
+    }
+
+    /// Compute the [`GlobalTransform`] of an entity in this reference frame.
+    pub fn global_transform(
+        &self,
+        local_cell: &GridCell<P>,
+        local_transform: &Transform,
+    ) -> GlobalTransform {
+        // The reference frame transform from the floating origin's reference frame, to the local
+        // reference frame.
+        let transform_origin = self.local_floating_origin().reference_frame_transform();
+        // The grid cell offset of this entity relative to the floating origin's cell in this local
+        // reference frame.
+        let cell_origin_relative = *local_cell - self.local_floating_origin().cell();
+        let grid_offset = self.grid_to_float(&cell_origin_relative);
+        let local_transform = DAffine3::from_scale_rotation_translation(
+            local_transform.scale.as_dvec3(),
+            local_transform.rotation.as_dquat(),
+            local_transform.translation.as_dvec3() + grid_offset,
+        );
+        let global_64 = transform_origin * local_transform;
+
+        Affine3A {
+            matrix3: global_64.matrix3.as_mat3().into(),
+            translation: global_64.translation.as_vec3a(),
+        }
+        .into()
     }
 }

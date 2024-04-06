@@ -57,6 +57,11 @@ mod inner {
         /// [`LocalFloatingOrigin::cell`]. This is used to compute the [`GlobalTransform`] of all
         /// entities in this reference frame.
         ///
+        /// Imagine you have the local reference frame and the floating origin's reference frame
+        /// overlapping in space, misaligned. This transform is the smallest possible that will
+        /// align the two reference frame grids, going from the local frame, to the floating
+        /// origin's frame.
+        ///
         /// This is like a camera's "view transform", but instead of transforming an object into a
         /// camera's view space, this will transform an object into the floating origin's reference
         /// frame.
@@ -67,13 +72,14 @@ mod inner {
         ///
         /// The above requirements help to ensure this transform has a small magnitude, maximizing
         /// precision, and minimizing floating point error.
-        origin_transform: DAffine3,
+        reference_frame_transform: DAffine3,
     }
 
     impl<P: GridPrecision> LocalFloatingOrigin<P> {
-        /// The "view" transform of the reference frame's transform within its grid cell.
-        pub fn transform(&self) -> DAffine3 {
-            self.origin_transform
+        /// The reference frame transform from the local reference frame, to the floating origin's
+        /// reference frame. See [Self::reference_frame_transform].
+        pub fn reference_frame_transform(&self) -> DAffine3 {
+            self.reference_frame_transform
         }
 
         /// Gets [`Self::cell`].
@@ -102,7 +108,7 @@ mod inner {
             self.translation = translation_float;
             self.rotation = rotation_float;
 
-            self.origin_transform = DAffine3 {
+            self.reference_frame_transform = DAffine3 {
                 matrix3: DMat3::from_quat(self.rotation),
                 translation: self.translation.as_dvec3(),
             }
@@ -121,30 +127,10 @@ mod inner {
                 cell,
                 translation,
                 rotation,
-                origin_transform,
+                reference_frame_transform: origin_transform,
             }
         }
     }
-}
-
-/// Used to access a reference frame. Needed because the reference frame could either be a
-/// component, or a resource if at the root of the hierarchy.
-#[derive(SystemParam)]
-pub struct ReferenceFrameParam<'w, 's, P: GridPrecision> {
-    parent: Query<'w, 's, Read<Parent>>,
-    children: Query<'w, 's, Read<Children>>,
-    frame_root: ResMut<'w, RootReferenceFrame<P>>,
-    frame_query: Query<
-        'w,
-        's,
-        (
-            Entity,
-            Read<GridCell<P>>,
-            Read<Transform>,
-            Write<ReferenceFrame<P>>,
-            Option<Read<Parent>>,
-        ),
-    >,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash)]
@@ -257,6 +243,26 @@ impl ReferenceFrameHandle {
     }
 }
 
+/// Used to access a reference frame. Needed because the reference frame could either be a
+/// component, or a resource if at the root of the hierarchy.
+#[derive(SystemParam)]
+pub struct ReferenceFrameParam<'w, 's, P: GridPrecision> {
+    parent: Query<'w, 's, Read<Parent>>,
+    children: Query<'w, 's, Read<Children>>,
+    frame_root: ResMut<'w, RootReferenceFrame<P>>,
+    frame_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            Read<GridCell<P>>,
+            Read<Transform>,
+            Write<ReferenceFrame<P>>,
+            Option<Read<Parent>>,
+        ),
+    >,
+}
+
 impl<'w, 's, P: GridPrecision> ReferenceFrameParam<'w, 's, P> {
     /// Get mutable access to the [`ReferenceFrame`], and run the provided function or closure,
     /// optionally returning data.
@@ -319,7 +325,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFrameParam<'w, 's, P> {
 
     /// Get a handle to this entity's reference frame, if it exists.
     #[inline]
-    pub fn reference_frame(&mut self, this: Entity) -> Option<ReferenceFrameHandle> {
+    pub fn reference_frame(&self, this: Entity) -> Option<ReferenceFrameHandle> {
         match self.parent.get(this).map(|parent| **parent) {
             Err(_) => Some(ReferenceFrameHandle::Root),
             Ok(parent) => match self.frame_query.contains(parent) {
@@ -667,7 +673,9 @@ mod tests {
         let (child_frame, ..) = reference_frames.get(child);
         let child_local_point = DVec3::new(5.0, 5.0, 0.0);
 
-        let computed_transform = child_frame.local_floating_origin.transform();
+        let computed_transform = child_frame
+            .local_floating_origin
+            .reference_frame_transform();
         let computed_pos = computed_transform.transform_point3(child_local_point);
 
         let correct_transform = DAffine3::from_rotation_translation(
@@ -676,7 +684,6 @@ mod tests {
         );
         let correct_pos = correct_transform.transform_point3(child_local_point);
 
-        // assert_eq!(computed_transform, correct_transform);
         assert!((computed_pos - correct_pos).length() < 1e-6);
         assert!((computed_pos - DVec3::new(7.0, -3.0, 0.0)).length() < 1e-6);
     }
