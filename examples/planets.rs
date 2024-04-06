@@ -5,7 +5,7 @@ use bevy::{
 };
 use big_space::{
     camera::{CameraController, CameraInput},
-    reference_frame::RootReferenceFrame,
+    reference_frame::{ReferenceFrame, RootReferenceFrame},
     FloatingOrigin, GridCell,
 };
 
@@ -58,14 +58,11 @@ fn setup(
             },
         ))
         .with_children(|builder| {
-            builder.spawn((
-                PbrBundle {
-                    mesh: sphere(sun_radius_m),
-                    material: sun_mat,
-                    ..default()
-                },
-                GridCell::<i64>::ZERO,
-            ));
+            builder.spawn((PbrBundle {
+                mesh: sphere(sun_radius_m),
+                material: sun_mat,
+                ..default()
+            },));
         });
 
     let earth_orbit_radius_m = 149.60e9;
@@ -90,6 +87,7 @@ fn setup(
                 ..default()
             },
             earth_cell,
+            ReferenceFrame::<i64>::default(),
         ))
         .with_children(|commands| {
             let moon_orbit_radius_m = 385e6;
@@ -114,27 +112,29 @@ fn setup(
                 },
                 moon_cell,
             ));
-        });
 
-    // camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(686., -181., 80.)
-                .looking_to(-Vec3::Z * 0.6 - Vec3::X - Vec3::Y * 0.1, Vec3::Y),
-            camera: Camera {
-                hdr: true,
-                ..default()
-            },
-            ..default()
-        },
-        BloomSettings::default(),
-        GridCell::<i64>::new(74899712, 45839, 232106),
-        FloatingOrigin, // Important: marks the floating origin entity for rendering.
-        CameraController::default() // Built-in camera controller
-            .with_speed_bounds([10e-18, 10e35])
-            .with_smoothness(0.9, 0.8)
-            .with_speed(1.0),
-    ));
+            let (cam_cell, cam_pos): (GridCell<i64>, _) =
+                space.imprecise_translation_to_grid(Vec3::NEG_Z * earth_radius_m);
+
+            // camera
+            commands.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_translation(cam_pos),
+                    camera: Camera {
+                        hdr: true,
+                        ..default()
+                    },
+                    ..default()
+                },
+                BloomSettings::default(),
+                cam_cell,
+                FloatingOrigin, // Important: marks the floating origin entity for rendering.
+                CameraController::default() // Built-in camera controller
+                    .with_speed_bounds([10e-18, 10e35])
+                    .with_smoothness(0.9, 0.8)
+                    .with_speed(1.0),
+            ));
+        });
 }
 
 fn cursor_grab_system(

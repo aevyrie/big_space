@@ -63,7 +63,8 @@ fn setup(
     let mut translation = Vec3::ZERO;
     for i in -16..=27 {
         let j = 10_f32.powf(i as f32);
-        translation.x += j;
+        let k = 10_f32.powf((i - 1) as f32);
+        translation.x += j / 2.0 + k;
         commands.spawn((
             PbrBundle {
                 mesh: mesh_handle.clone(),

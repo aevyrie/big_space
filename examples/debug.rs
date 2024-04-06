@@ -94,7 +94,7 @@ fn setup(
                 ..default()
             },
             GridCell::<i64>::default(),
-            ReferenceFrame::<i64>::new(0.5, 0.01),
+            ReferenceFrame::<i64>::new(0.2, 0.01),
             Rotator,
             Mover::<3>,
         ))
