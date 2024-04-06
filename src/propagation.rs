@@ -51,10 +51,15 @@ pub fn sync_simple_transforms<P: GridPrecision>(
 /// [`GridCell`]s.
 pub fn propagate_transforms<P: GridPrecision>(
     frames: Query<&Children, With<ReferenceFrame<P>>>,
-    frame_roots: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
-    root_frame_roots: Query<
+    frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
+    root_frame_query: Query<
         (Entity, &Children, &GlobalTransform),
         (With<GridCell<P>>, Without<Parent>),
+    >,
+    root_frame: Res<RootReferenceFrame<P>>,
+    mut root_frame_gridless_query: Query<
+        (Entity, &Children, &Transform, &mut GlobalTransform),
+        (Without<GridCell<P>>, Without<Parent>),
     >,
     transform_query: Query<
         (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
@@ -84,18 +89,26 @@ pub fn propagate_transforms<P: GridPrecision>(
             // - Since this is the only place where `transform_query` gets used, there will be no
             //   conflicting fetches elsewhere.
             unsafe {
-                propagate_recursive(global_transform, &transform_query, &parent_query, child);
+                propagate_recursive(&global_transform, &transform_query, &parent_query, child);
             }
         }
     };
 
-    frames.par_iter().for_each(|frame_children| {
-        frame_children
+    frames.par_iter().for_each(|children| {
+        children
             .iter()
-            .filter_map(|child| frame_roots.get(*child).ok())
-            .for_each(update_transforms)
+            .filter_map(|child| frame_child_query.get(*child).ok())
+            .for_each(|(e, c, g)| update_transforms((e, c, *g)))
     });
-    root_frame_roots.par_iter().for_each(update_transforms);
+    root_frame_query
+        .par_iter()
+        .for_each(|(e, c, g)| update_transforms((e, c, *g)));
+    root_frame_gridless_query
+        .par_iter_mut()
+        .for_each(|(entity, children, local, mut global)| {
+            *global = root_frame.global_transform(&GridCell::ZERO, local);
+            update_transforms((entity, children, *global))
+        });
 }
 
 /// COPIED FROM BEVY
