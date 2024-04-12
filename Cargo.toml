@@ -23,6 +23,7 @@ bevy = { version = "0.13", default-features = false, features = [
     "tonemapping_luts",
 ] }
 bevy_framepace = { version = "0.15", default-features = false }
+rand = "0.8.5"
 
 [features]
 default = ["debug", "camera", "bevy_render"]
