@@ -48,3 +48,15 @@ name = "error"
 path = "examples/error.rs"
 required-features = ["default"]
 doc-scrape-examples = true
+
+[[example]]
+name = "error_child"
+path = "examples/error_child.rs"
+required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "planets"
+path = "examples/planets.rs"
+required-features = ["default"]
+doc-scrape-examples = true

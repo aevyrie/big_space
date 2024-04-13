@@ -28,21 +28,21 @@ fn movement(
         Query<&mut Transform, With<Mover<4>>>,
     )>,
 ) {
-    let delta_translation = |offset: f32| -> Vec3 {
+    let delta_translation = |offset: f32, scale: f32| -> Vec3 {
         let t_1 = time.elapsed_seconds() * 0.1 + offset;
         let dt = time.delta_seconds() * 0.1;
         let t_0 = t_1 - dt;
         let pos =
             |t: f32| -> Vec3 { Vec3::new(t.cos() * 2.0, t.sin() * 2.0, (t * 1.3).sin() * 2.0) };
-        let p0 = pos(t_0);
-        let p1 = pos(t_1);
+        let p0 = pos(t_0) * scale;
+        let p1 = pos(t_1) * scale;
         p1 - p0
     };
 
-    q.p0().single_mut().translation += delta_translation(20.0);
-    q.p1().single_mut().translation += delta_translation(251.0);
-    q.p2().single_mut().translation += delta_translation(812.0);
-    q.p3().single_mut().translation += delta_translation(863.0);
+    q.p0().single_mut().translation += delta_translation(20.0, 1.0);
+    q.p1().single_mut().translation += delta_translation(251.0, 1.0);
+    q.p2().single_mut().translation += delta_translation(812.0, 1.0);
+    q.p3().single_mut().translation += delta_translation(863.0, 0.4);
 }
 
 #[derive(Component)]

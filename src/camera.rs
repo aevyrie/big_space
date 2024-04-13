@@ -209,7 +209,7 @@ pub fn camera_controller<P: GridPrecision>(
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
         let Some(frame) = frames
-            .reference_frame(camera)
+            .get_handle(camera)
             .map(|handle| frames.resolve_handle(handle))
         else {
             continue;

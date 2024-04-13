@@ -1,5 +1,5 @@
-//! This [`bevy`] plugin makes it easy to build high-precision worlds that exceed the size of the
-//! observable universe, with no added dependencies, while remaining largely compatible with the
+//! This [`bevy`] plugin makes it possible to build high-precision worlds that exceed the size of
+//! the observable universe, with no added dependencies, while remaining largely compatible with the
 //! rest of the Bevy ecosystem.
 //!
 //! ### Problem
@@ -14,15 +14,25 @@
 //!
 //! ### Solution
 //!
-//! While using the [`FloatingOriginPlugin`], entities are placed into a [`GridCell`] in a large
-//! fixed precision grid. Inside a `GridCell`, an entity's `Transform` is relative to the center of
-//! that grid cell. If an entity moves into a neighboring cell, its transform will be recomputed
-//! relative to the center of that new cell. This prevents `Transforms` from ever becoming larger
-//! than a single grid cell, and thus prevents floating point precision artifacts.
+//! While using the [`FloatingOriginPlugin`], the position of entities is now defined with the
+//! [`ReferenceFrame`], [`GridCell`], and [`Transform`] components. The `ReferenceFrame` is a large
+//! integer grid of cells; entities are located within this grid using the `GridCell` component.
+//! Finally, the `Transform` is used to position the entity relative to the center of its
+//! `GridCell`. If an entity moves into a neighboring cell, its transform will be automatically
+//! recomputed relative to the center of that new cell. This prevents `Transforms` from ever
+//! becoming larger than a single grid cell, and thus prevents floating point precision artifacts.
 //!
-//! The same thing happens to the entity marked with the [`FloatingOrigin`] component. The only
-//! difference is that the `GridCell` of the floating origin is used when computing the
-//! `GlobalTransform` of all other entities. To an outside observer, as the floating origin camera
+//! `ReferenceFrame`s can also be nested. This allows you to define moving reference frames, which
+//! can make certain use cases much simpler. For example, if you have a planet rotating, and
+//! orbiting around its star, it would be very annoying if you had to compute this orbit and
+//! rotation for all object on the surface in high precision. Instead, you can place the planet and
+//! all objects on its surface in the same reference frame. The motion of the planet will be
+//! inherited by all children in that reference frame, in high precision. Entities at the root of
+//! the hierarchy will be implicitly placed in the [`RootReferenceFrame`].
+//!
+//! The above steps are also applied to the entity marked with the [`FloatingOrigin`] component. The
+//! only difference is that the `GridCell` of the floating origin is used when computing the
+//! [`GlobalTransform`] of all other entities. To an outside observer, as the floating origin camera
 //! moves through space and reaches the limits of its `GridCell`, it would appear to teleport to the
 //! opposite side of the cell, similar to the spaceship in the game *Asteroids*.
 //!
@@ -31,17 +41,20 @@
 //! However, this is always relative to the camera (floating origin), so these artifacts will always
 //! be too far away to be seen, no matter where the camera moves. Because this only affects the
 //! `GlobalTransform` and not the `Transform`, this also means that entities will never permanently
-//! lose precision just because they were far from the origin at some point.
+//! lose precision just because they were far from the origin at some point. The lossy calculation
+//! only occurs when computing the `GlobalTransform` of entities, the high precision `GridCell` and
+//! `Transform` are unaffected.
 //!
 //! # Getting Started
 //!
-//! All that's needed to start using this plugin:
+//! To start using this plugin:
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
 //! 2. Add the [`FloatingOriginPlugin`] to your `App`
 //! 3. Add the [`GridCell`] component to all spatial entities
 //! 4. Add the [`FloatingOrigin`] component to the active camera
+//! 5. Add the [`IgnoreFloatingOrigin`] component
 //!
-//! Take a look at [`FloatingOriginSettings`] resource for some useful helper methods.
+//! Take a look at [`ReferenceFrame`] component for some useful helper methods.
 //!
 //! # Moving Entities
 //!
@@ -78,7 +91,7 @@
 //! However, if you have something that must not accumulate error, like the orbit of a planet, you
 //! can instead do the orbital calculation (position as a function of time) to compute the absolute
 //! position of the planet with high precision, then directly compute the [`GridCell`] and
-//! [`Transform`] of that entity using [`FloatingOriginSettings::translation_to_grid`]. If the star
+//! [`Transform`] of that entity using [`ReferenceFrame::translation_to_grid`]. If the star
 //! this planet is orbiting around is also moving through space, note that you can add/subtract grid
 //! cells. This means you can do each calculation in the reference frame of the moving body, and sum
 //! up the computed translations and grid cell offsets to get a more precise result.
@@ -99,6 +112,7 @@ pub mod reference_frame;
 pub mod world_query;
 
 pub use grid_cell::GridCell;
+pub use propagation::IgnoreFloatingOrigin;
 
 #[cfg(feature = "debug")]
 pub mod debug;
@@ -220,7 +234,7 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
         .par_iter_mut()
         .for_each(|(entity, mut grid_pos, mut transform)| {
             let Some(frame) = reference_frames
-                .reference_frame(entity)
+                .get_handle(entity)
                 .map(|handle| reference_frames.resolve_handle(handle))
             else {
                 return;
