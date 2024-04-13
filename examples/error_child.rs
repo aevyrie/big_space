@@ -1,12 +1,9 @@
-//! This example demonstrates what floating point error in rendering looks like. You can press
-//! spacebar to smoothly switch between enabling and disabling the floating origin.
-//!
-//! Instead of disabling the plugin outright, this example simply moves the floating origin
-//! independently from the camera, which is equivalent to what would happen when moving far from the
-//! origin when not using this plugin.
-
-use bevy::prelude::*;
-use big_space::{FloatingOrigin, GridCell};
+//! This example demonstrates error accumulating from parent to children in nested reference frames.
+use bevy::{math::DVec3, prelude::*};
+use big_space::{
+    reference_frame::{ReferenceFrame, RootReferenceFrame},
+    FloatingOrigin, GridCell,
+};
 
 fn main() {
     App::new()
@@ -17,58 +14,66 @@ fn main() {
             big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
         ))
         .add_systems(Startup, setup_scene)
-        .add_systems(Update, cursor_grab_system)
         .run()
 }
 
-/// You can put things really, really far away from the origin. The distance we use here is actually
-/// quite small, because we want the mesh to still be visible when the floating origin is far from
-/// the camera. If you go much further than this, the mesh will simply disappear in a *POOF* of
-/// floating point error.
-///
-/// This plugin can function much further from the origin without any issues. Try setting this to:
-/// 10_000_000_000_000_000_000_000_000_000_000_000_000
-const DISTANCE: f32 = 200_000_000f32;
-const ORIGIN: f32 = 200.0;
+// The distance being used to test precision. A sphere is placed at this position, and a child is
+// added in the opposite direction. This should sum to zero if we had infinite precision.
+const DISTANT: DVec3 = DVec3::new(1e17, 0.0, 0.0);
+const ORIGIN: DVec3 = DVec3::new(200.0, 0.0, 0.0);
 
 fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    root: Res<RootReferenceFrame<i128>>,
 ) {
-    let mesh_handle = meshes.add(Sphere::new(1.5).mesh());
+    let mesh_handle = meshes.add(Sphere::new(0.5).mesh());
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::rgb(0.8, 0.7, 0.6),
         ..default()
     });
 
+    // A red sphere located at the origin
     commands.spawn((
         PbrBundle {
             mesh: mesh_handle.clone(),
             material: materials.add(Color::RED),
-            transform: Transform::from_xyz(0.0, 0.0, ORIGIN),
+            transform: Transform::from_translation(ORIGIN.as_vec3()),
             ..default()
         },
         GridCell::<i128>::default(),
     ));
 
+    let parent = root.translation_to_grid(DISTANT);
+    let child = root.translation_to_grid(-DISTANT + ORIGIN);
     commands
         .spawn((
+            // A sphere very far from the origin
             PbrBundle {
                 mesh: mesh_handle.clone(),
                 material: matl_handle.clone(),
-                transform: Transform::from_xyz(0.0, 0.0, DISTANCE),
+                transform: Transform::from_translation(parent.1),
                 ..default()
             },
-            GridCell::<i128>::default(),
+            parent.0,
+            ReferenceFrame::<i128>::default(),
         ))
         .with_children(|parent| {
-            parent.spawn(PbrBundle {
-                mesh: mesh_handle,
-                material: materials.add(Color::GREEN),
-                transform: Transform::from_xyz(0.0, 0.0, -DISTANCE + ORIGIN),
-                ..default()
-            });
+            // A green sphere that is a child of the sphere very far from the origin. This child is
+            // very far from its parent, and should be located exactly at the origin (if there was
+            // no floating point error). The distance from the green sphere to the red sphere is the
+            // error caused by float imprecision. Note that the sphere does not have any rendering
+            // artifacts, its position just has a fixed error.
+            parent.spawn((
+                PbrBundle {
+                    mesh: mesh_handle,
+                    material: materials.add(Color::GREEN),
+                    transform: Transform::from_translation(child.1),
+                    ..default()
+                },
+                child.0,
+            ));
         });
     // light
     commands.spawn((
@@ -81,7 +86,8 @@ fn setup_scene(
     // camera
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(8.0, 0.0, ORIGIN).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_translation(ORIGIN.as_vec3() + Vec3::new(0.0, 0.0, 8.0))
+                .looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         },
         GridCell::<i128>::default(),
@@ -91,29 +97,4 @@ fn setup_scene(
             .with_smoothness(0.9, 0.8)
             .with_speed(1.0),
     ));
-}
-
-fn cursor_grab_system(
-    mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
-    mut cam: ResMut<big_space::camera::CameraInput>,
-    btn: Res<ButtonInput<MouseButton>>,
-    key: Res<ButtonInput<KeyCode>>,
-) {
-    let Some(mut window) = windows.get_single_mut().ok() else {
-        return;
-    };
-
-    if btn.just_pressed(MouseButton::Left) {
-        window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
-        window.cursor.visible = false;
-        window.mode = bevy::window::WindowMode::BorderlessFullscreen;
-        cam.defaults_disabled = false;
-    }
-
-    if key.just_pressed(KeyCode::Escape) {
-        window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
-        window.cursor.visible = true;
-        window.mode = bevy::window::WindowMode::Windowed;
-        cam.defaults_disabled = true;
-    }
 }
