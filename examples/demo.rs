@@ -1,10 +1,11 @@
 use bevy::{
     prelude::*,
     transform::TransformSystem,
-    window::{CursorGrabMode, PrimaryWindow, WindowMode},
+    window::{CursorGrabMode, PrimaryWindow},
 };
 use big_space::{
     camera::{CameraController, CameraInput},
+    propagation::IgnoreFloatingOrigin,
     world_query::GridTransformReadOnly,
     FloatingOrigin, GridCell,
 };
@@ -110,6 +111,7 @@ fn ui_setup(mut commands: Commands) {
             ..default()
         }),
         BigSpaceDebugText,
+        IgnoreFloatingOrigin,
     ));
 
     commands.spawn((
@@ -130,6 +132,7 @@ fn ui_setup(mut commands: Commands) {
         })
         .with_text_justify(JustifyText::Center),
         FunFactText,
+        IgnoreFloatingOrigin,
     ));
 }
 
@@ -151,8 +154,12 @@ fn highlight_nearest_sphere(
         .circle_segments(128);
 }
 
+#[allow(clippy::type_complexity)]
 fn ui_text_system(
-    mut debug_text: Query<&mut Text, (With<BigSpaceDebugText>, Without<FunFactText>)>,
+    mut debug_text: Query<
+        (&mut Text, &GlobalTransform),
+        (With<BigSpaceDebugText>, Without<FunFactText>),
+    >,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     time: Res<Time>,
     origin: Query<GridTransformReadOnly<i128>, With<FloatingOrigin>>,
@@ -195,7 +202,9 @@ fn ui_text_system(
         ("".into(), "".into())
     };
 
-    debug_text.single_mut().sections[0].value =
+    let mut debug_text = debug_text.single_mut();
+
+    debug_text.0.sections[0].value =
         format!("{grid_text}\n{translation_text}\n{camera_text}\n{nearest_text}");
 
     fun_text.single_mut().sections[0].value = fact_text
@@ -256,14 +265,14 @@ fn cursor_grab_system(
     if btn.just_pressed(MouseButton::Left) {
         window.cursor.grab_mode = CursorGrabMode::Locked;
         window.cursor.visible = false;
-        window.mode = WindowMode::BorderlessFullscreen;
+        // window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
     }
 
     if key.just_pressed(KeyCode::Escape) {
         window.cursor.grab_mode = CursorGrabMode::None;
         window.cursor.visible = true;
-        window.mode = WindowMode::Windowed;
+        // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }
 }

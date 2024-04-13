@@ -183,27 +183,27 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
     }
 }
 
-// /// Minimal bundle needed to position an entity in floating origin space.
-// ///
-// /// This is the floating origin equivalent of the [`SpatialBundle`].
-// #[derive(Bundle, Default)]
-// pub struct FloatingSpatialBundle<P: GridPrecision> {
-//     /// The visibility of the entity.
-//     #[cfg(feature = "bevy_render")]
-//     pub visibility: Visibility,
-//     /// The inherited visibility of the entity.
-//     #[cfg(feature = "bevy_render")]
-//     pub inherited: InheritedVisibility,
-//     /// The view visibility of the entity.
-//     #[cfg(feature = "bevy_render")]
-//     pub view: ViewVisibility,
-//     /// The transform of the entity.
-//     pub transform: Transform,
-//     /// The global transform of the entity.
-//     pub global_transform: GlobalTransform,
-//     /// The grid position of the entity
-//     pub grid_position: GridCell<P>,
-// }
+/// Minimal bundle needed to position an entity in floating origin space.
+///
+/// This is the floating origin equivalent of the [`SpatialBundle`].
+#[derive(Bundle, Default)]
+pub struct FloatingSpatialBundle<P: GridPrecision> {
+    /// The visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub visibility: Visibility,
+    /// The inherited visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub inherited: InheritedVisibility,
+    /// The view visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub view: ViewVisibility,
+    /// The transform of the entity.
+    pub transform: Transform,
+    /// The global transform of the entity.
+    pub global_transform: GlobalTransform,
+    /// The grid position of the entity
+    pub grid_position: GridCell<P>,
+}
 
 /// Marks the entity to use as the floating origin. All other entities will be positioned relative
 /// to this entity's [`GridCell`].
