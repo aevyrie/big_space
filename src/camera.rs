@@ -12,8 +12,8 @@ use bevy::{
 
 use crate::{
     precision::GridPrecision,
+    reference_frame::{local_origin::ReferenceFrames, RootReferenceFrame},
     world_query::{GridTransform, GridTransformReadOnly},
-    FloatingOriginSettings,
 };
 
 /// Adds the `big_space` camera controller
@@ -175,12 +175,14 @@ pub fn default_camera_inputs(
 }
 
 /// Find the object nearest the camera
-pub fn nearest_objects<T: GridPrecision>(
-    settings: Res<FloatingOriginSettings>,
-    objects: Query<(Entity, GridTransformReadOnly<T>, &Aabb)>,
-    mut camera: Query<(&mut CameraController, GridTransformReadOnly<T>)>,
+pub fn nearest_objects<P: GridPrecision>(
+    settings: Res<RootReferenceFrame<P>>,
+    objects: Query<(Entity, GridTransformReadOnly<P>, &Aabb)>,
+    mut camera: Query<(&mut CameraController, GridTransformReadOnly<P>)>,
 ) {
-    let (mut camera, cam_pos) = camera.single_mut();
+    let Ok((mut camera, cam_pos)) = camera.get_single_mut() else {
+        return;
+    };
     let nearest_object = objects
         .iter()
         .map(|(entity, obj_pos, aabb)| {
@@ -201,11 +203,17 @@ pub fn nearest_objects<T: GridPrecision>(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
-    settings: Res<FloatingOriginSettings>,
+    frames: ReferenceFrames<P>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(GridTransform<P>, &mut CameraController)>,
+    mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
 ) {
-    for (mut position, mut controller) in camera.iter_mut() {
+    for (camera, mut position, mut controller) in camera.iter_mut() {
+        let Some(frame) = frames
+            .get_handle(camera)
+            .map(|handle| frames.resolve_handle(handle))
+        else {
+            continue;
+        };
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
             (Some(nearest), true) => nearest.1.abs(),
             _ => controller.speed,
@@ -224,7 +232,7 @@ pub fn camera_controller<P: GridPrecision>(
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
-        let (cell_offset, new_translation) = settings.translation_to_grid(vel_t_next);
+        let (cell_offset, new_translation) = frame.translation_to_grid(vel_t_next);
         *position.cell += cell_offset;
         position.transform.translation += new_translation;
 

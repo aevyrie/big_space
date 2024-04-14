@@ -23,6 +23,7 @@ bevy = { version = "0.13", default-features = false, features = [
     "tonemapping_luts",
 ] }
 bevy_framepace = { version = "0.15", default-features = false }
+rand = "0.8.5"
 
 [features]
 default = ["debug", "camera", "bevy_render"]
@@ -45,5 +46,17 @@ doc-scrape-examples = true
 [[example]]
 name = "error"
 path = "examples/error.rs"
+required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "error_child"
+path = "examples/error_child.rs"
+required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "planets"
+path = "examples/planets.rs"
 required-features = ["default"]
 doc-scrape-examples = true

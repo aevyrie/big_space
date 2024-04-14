@@ -1,7 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use big_space::{FloatingOrigin, GridCell};
+use big_space::{reference_frame::ReferenceFrame, FloatingOrigin, GridCell};
 
 fn main() {
     App::new()
@@ -25,22 +25,24 @@ fn movement(
         Query<&mut Transform, With<Mover<1>>>,
         Query<&mut Transform, With<Mover<2>>>,
         Query<&mut Transform, With<Mover<3>>>,
+        Query<&mut Transform, With<Mover<4>>>,
     )>,
 ) {
-    let delta_translation = |offset: f32| -> Vec3 {
-        let t_1 = time.elapsed_seconds() + offset;
-        let dt = time.delta_seconds();
+    let delta_translation = |offset: f32, scale: f32| -> Vec3 {
+        let t_1 = time.elapsed_seconds() * 0.1 + offset;
+        let dt = time.delta_seconds() * 0.1;
         let t_0 = t_1 - dt;
         let pos =
             |t: f32| -> Vec3 { Vec3::new(t.cos() * 2.0, t.sin() * 2.0, (t * 1.3).sin() * 2.0) };
-        let p0 = pos(t_0);
-        let p1 = pos(t_1);
+        let p0 = pos(t_0) * scale;
+        let p1 = pos(t_1) * scale;
         p1 - p0
     };
 
-    q.p0().single_mut().translation += delta_translation(20.0);
-    q.p1().single_mut().translation += delta_translation(251.0);
-    q.p2().single_mut().translation += delta_translation(812.0);
+    q.p0().single_mut().translation += delta_translation(20.0, 1.0);
+    q.p1().single_mut().translation += delta_translation(251.0, 1.0);
+    q.p2().single_mut().translation += delta_translation(812.0, 1.0);
+    q.p3().single_mut().translation += delta_translation(863.0, 0.4);
 }
 
 #[derive(Component)]
@@ -48,7 +50,7 @@ struct Rotator;
 
 fn rotation(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_x(3.0 * time.delta_seconds());
+        transform.rotate_z(3.0 * time.delta_seconds() * 0.2);
     }
 }
 
@@ -92,16 +94,21 @@ fn setup(
                 ..default()
             },
             GridCell::<i64>::default(),
+            ReferenceFrame::<i64>::new(0.2, 0.01),
             Rotator,
             Mover::<3>,
         ))
         .with_children(|parent| {
-            parent.spawn(PbrBundle {
-                mesh: mesh_handle,
-                material: matl_handle,
-                transform: Transform::from_xyz(0.0, 0.0, 1.0),
-                ..default()
-            });
+            parent.spawn((
+                PbrBundle {
+                    mesh: mesh_handle,
+                    material: matl_handle,
+                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
+                    ..default()
+                },
+                GridCell::<i64>::default(),
+                Mover::<4>,
+            ));
         });
 
     // light
