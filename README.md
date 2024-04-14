@@ -19,7 +19,9 @@ https://user-images.githubusercontent.com/2632925/215318129-5bab3095-a7dd-455b-a
 
 Lots of space to play in.
 
-This is a simple floating origin plugin, useful if you want to work with very, very large scales. It works with bevy's existing `f32`-based `Transform`s, which means it's largely compatible with the bevy ecosystem.
+This is a simple floating origin plugin, useful if you want to work with very, very large scales. It works with bevy's existing `f32`-based `Transform`s, which means it's largely compatible with the bevy ecosystem. The plugin positions entities within large fixed precision grids, effectively adding precision to the location of objects.
+
+Additionally, you can use reference frames to nest high precision coordinate systems. For example you might want to put all entities on a planet into the same reference frame. You can then rotate this reference frame with the planet, and orbit that planet around a star.
 
 The plugin is generic over a few integer types, to trade off scale and precision for memory use. Some fun numbers with a worst case precision of 0.5mm:
   - `i8`: 2,560 km = 74% of the diameter of the Moon
@@ -36,7 +38,7 @@ I intend to track the `main` branch of Bevy. PRs supporting this are welcome!
 
 | bevy | big_space |
 | ---- | --------- |
-| 0.13 | 0.5       |
+| 0.13 | 0.5, 0.6  |
 | 0.12 | 0.4       |
 | 0.11 | 0.3       |
 | 0.10 | 0.2       |
