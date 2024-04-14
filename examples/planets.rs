@@ -1,3 +1,6 @@
+/// Example with spheres at the scale and distance of the earth and moon around the sun, at 1:1
+/// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
+/// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
 use big_space::{
     camera::CameraController,

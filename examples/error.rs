@@ -6,7 +6,9 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::{reference_frame::RootReferenceFrame, FloatingOrigin, GridCell};
+use big_space::{
+    reference_frame::RootReferenceFrame, FloatingOrigin, GridCell, IgnoreFloatingOrigin,
+};
 
 fn main() {
     App::new()
@@ -87,25 +89,28 @@ fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator
 }
 
 fn setup_ui(mut commands: Commands) {
-    commands.spawn(TextBundle {
-        style: Style {
-            align_self: AlignSelf::FlexStart,
-            flex_direction: FlexDirection::Column,
+    commands.spawn((
+        TextBundle {
+            style: Style {
+                align_self: AlignSelf::FlexStart,
+                flex_direction: FlexDirection::Column,
+                ..Default::default()
+            },
+            text: Text {
+                sections: vec![TextSection {
+                    value: "hello: ".to_string(),
+                    style: TextStyle {
+                        font_size: 30.0,
+                        color: Color::WHITE,
+                        ..default()
+                    },
+                }],
+                ..Default::default()
+            },
             ..Default::default()
         },
-        text: Text {
-            sections: vec![TextSection {
-                value: "hello: ".to_string(),
-                style: TextStyle {
-                    font_size: 30.0,
-                    color: Color::WHITE,
-                    ..default()
-                },
-            }],
-            ..Default::default()
-        },
-        ..Default::default()
-    });
+        IgnoreFloatingOrigin,
+    ));
 }
 
 fn setup_scene(

@@ -26,7 +26,7 @@ pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
 
 /// A component that defines a reference frame for children of this entity with [`GridCell`]s.
 ///
-/// Entities without a parent are implicitly in the root reference frame.
+/// Entities without a parent are implicitly in the [`RootReferenceFrame`].
 ///
 /// ## Motivation
 ///

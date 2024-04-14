@@ -1,6 +1,6 @@
 //! Propagates transforms through the entity hierarchy.
 //!
-//! This is a slightly modified version of Bevy's own transform propagation system.
+//! This is a modified version of Bevy's own transform propagation system.
 
 use crate::{
     precision::GridPrecision,

@@ -29,33 +29,32 @@ mod inner {
 
     use crate::{GridCell, GridPrecision};
 
-    /// An isometry that describes the location of the floating origin's grid cell, relative to the
-    /// local reference frame. Additionally, this contains the
+    /// An isometry that describes the location of the floating origin's grid cell's origin, in the
+    /// local reference frame.
     ///
     /// Used to compute the [`GlobalTransform`](bevy::transform::components::GlobalTransform) of
-    /// every entity within a reference frame. We can compute it once, then use it to transform
-    /// every entity relative to the floating origin.
-    ///
-    /// More precisely, this tells us the position of the origin of the *grid cell* the floating
-    /// origin is located in, relative to the local reference frame.
+    /// every entity within a reference frame. Because this tells us where the floating origin cell
+    /// is located in the local frame, we can compute the inverse transform once, then use it to
+    /// transform every entity relative to the floating origin.
     ///
     /// If the floating origin is in this local reference frame, the `float` fields will be
     /// identity. The `float` fields` will be non-identity when the floating origin is in a
     /// different reference frame that does not perfectly align with this one. Different reference
     /// frames can be rotated and offset from each other - consider the reference frame of a planet,
-    /// spinning about its axis and orbiting about a star, it will not align with the inertial
-    /// reference frame of the star system!
+    /// spinning about its axis and orbiting about a star, it will not align with the reference
+    /// frame of the star system!
     #[derive(Default, Debug, Clone, PartialEq, Reflect)]
     pub struct LocalFloatingOrigin<P: GridPrecision> {
-        /// The cell that the origin of the floating origin's grid cell falls into.
+        /// The local cell that the floating origin's grid cell origin falls into.
         cell: GridCell<P>,
-        /// The translation of floating origin's grid cell relative the specified cell.
+        /// The translation of floating origin's grid cell relative to the origin of
+        /// [`LocalFloatingOrigin::cell`].
         translation: Vec3,
-        /// The rotation of the floating origin's grid cell relative to the specified cell.
+        /// The rotation of the floating origin's grid cell relative to the origin of
+        /// [`LocalFloatingOrigin::cell`].
         rotation: DQuat,
-        /// Transform from the floating origin's grid cell's reference frame to the local
-        /// [`LocalFloatingOrigin::cell`]. This is used to compute the [`GlobalTransform`] of all
-        /// entities in this reference frame.
+        /// Transform from the local reference frame to the floating origin's grid cell. This is
+        /// used to compute the `GlobalTransform` of all entities in this reference frame.
         ///
         /// Imagine you have the local reference frame and the floating origin's reference frame
         /// overlapping in space, misaligned. This transform is the smallest possible that will
@@ -65,10 +64,10 @@ mod inner {
         /// This is like a camera's "view transform", but instead of transforming an object into a
         /// camera's view space, this will transform an object into the floating origin's reference
         /// frame.
-        ///   - That object must be positioned in the same [`ReferenceFrame`] that this
+        ///   - That object must be positioned in the same [`super::ReferenceFrame`] that this
         ///     [`LocalFloatingOrigin`] is part of.
         ///   - That object's position must be relative to the same grid cell as defined by
-        ///     [`LocalFloatingOrigin::translation`].
+        ///     [`Self::cell`].
         ///
         /// The above requirements help to ensure this transform has a small magnitude, maximizing
         /// precision, and minimizing floating point error.
@@ -117,7 +116,7 @@ mod inner {
 
         /// Create a new [`LocalFloatingOrigin`].
         pub fn new(cell: GridCell<P>, translation: Vec3, rotation: DQuat) -> Self {
-            let origin_transform = DAffine3 {
+            let reference_frame_transform = DAffine3 {
                 matrix3: DMat3::from_quat(rotation),
                 translation: translation.as_dvec3(),
             }
@@ -127,7 +126,7 @@ mod inner {
                 cell,
                 translation,
                 rotation,
-                reference_frame_transform: origin_transform,
+                reference_frame_transform,
             }
         }
     }
@@ -243,8 +242,8 @@ impl ReferenceFrameHandle {
     }
 }
 
-/// Used to access a reference frame. Needed because the reference frame could either be a
-/// component, or a resource if at the root of the hierarchy.
+/// Used to access a reference frame using a single system param. Needed because the reference frame
+/// could either be a component or a resource (if at the root of the hierarchy).
 #[derive(SystemParam)]
 pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
