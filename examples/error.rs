@@ -109,7 +109,7 @@ fn setup_ui(mut commands: Commands) {
             },
             ..Default::default()
         },
-        IgnoreFloatingOrigin,
+        IgnoreFloatingOrigin::<0>,
     ));
 }
 
@@ -139,7 +139,7 @@ fn setup_scene(
             ..default()
         },
         distant_grid_cell,
-        FloatingOrigin,
+        FloatingOrigin::<0>,
     ));
 
     commands

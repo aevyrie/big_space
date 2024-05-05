@@ -18,17 +18,17 @@ use crate::{
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
-pub struct CameraControllerPlugin<P: GridPrecision>(PhantomData<P>);
-impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
+pub struct CameraControllerPlugin<P: GridPrecision, const L: u8=0>(PhantomData<P>);
+impl<P: GridPrecision, const L: u8> Plugin for CameraControllerPlugin<P,L> {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraInput>().add_systems(
             PostUpdate,
             (
                 default_camera_inputs
-                    .before(camera_controller::<P>)
+                    .before(camera_controller::<P,L>)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects::<P>.before(camera_controller::<P>),
-                camera_controller::<P>.before(TransformSystem::TransformPropagate),
+                nearest_objects::<P,L>.before(camera_controller::<P,L>),
+                camera_controller::<P,L>.before(TransformSystem::TransformPropagate),
             ),
         );
     }
@@ -175,10 +175,10 @@ pub fn default_camera_inputs(
 }
 
 /// Find the object nearest the camera
-pub fn nearest_objects<P: GridPrecision>(
-    settings: Res<RootReferenceFrame<P>>,
-    objects: Query<(Entity, GridTransformReadOnly<P>, &Aabb)>,
-    mut camera: Query<(&mut CameraController, GridTransformReadOnly<P>)>,
+pub fn nearest_objects<P: GridPrecision, const L: u8>(
+    settings: Res<RootReferenceFrame<P,L>>,
+    objects: Query<(Entity, GridTransformReadOnly<P,L>, &Aabb)>,
+    mut camera: Query<(&mut CameraController, GridTransformReadOnly<P,L>)>,
 ) {
     let Ok((mut camera, cam_pos)) = camera.get_single_mut() else {
         return;
@@ -201,11 +201,11 @@ pub fn nearest_objects<P: GridPrecision>(
 }
 
 /// Uses [`CameraInput`] state to update the camera position.
-pub fn camera_controller<P: GridPrecision>(
+pub fn camera_controller<P: GridPrecision, const L: u8>(
     time: Res<Time>,
-    frames: ReferenceFrames<P>,
+    frames: ReferenceFrames<P,L>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
+    mut camera: Query<(Entity, GridTransform<P,L>, &mut CameraController)>,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
         let Some(frame) = frames

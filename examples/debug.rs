@@ -128,6 +128,6 @@ fn setup(
             ..default()
         },
         GridCell::<i64>::default(),
-        FloatingOrigin,
+        FloatingOrigin::<0>,
     ));
 }

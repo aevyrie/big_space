@@ -33,7 +33,7 @@ use crate::precision::GridPrecision;
 ///
 #[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
-pub struct GridCell<P: GridPrecision> {
+pub struct GridCell<P: GridPrecision, const L: u8=0> {
     /// The x-index of the cell.
     pub x: P,
     /// The y-index of the cell.
@@ -42,7 +42,7 @@ pub struct GridCell<P: GridPrecision> {
     pub z: P,
 }
 
-impl<P: GridPrecision> GridCell<P> {
+impl<P: GridPrecision, const L: u8> GridCell<P, L> {
     /// Construct a new [`GridCell`].
     pub fn new(x: P, y: P, z: P) -> Self {
         Self { x, y, z }
@@ -62,8 +62,8 @@ impl<P: GridPrecision> GridCell<P> {
         z: P::ONE,
     };
 }
-impl<P: GridPrecision> std::ops::Add for GridCell<P> {
-    type Output = GridCell<P>;
+impl<P: GridPrecision, const L: u8> std::ops::Add for GridCell<P, L> {
+    type Output = GridCell<P, L>;
 
     fn add(self, rhs: Self) -> Self::Output {
         GridCell {
@@ -73,8 +73,8 @@ impl<P: GridPrecision> std::ops::Add for GridCell<P> {
         }
     }
 }
-impl<P: GridPrecision> std::ops::Sub for GridCell<P> {
-    type Output = GridCell<P>;
+impl<P: GridPrecision, const L: u8> std::ops::Sub for GridCell<P, L> {
+    type Output = GridCell<P, L>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         GridCell {
@@ -84,29 +84,29 @@ impl<P: GridPrecision> std::ops::Sub for GridCell<P> {
         }
     }
 }
-impl<P: GridPrecision> std::ops::Add for &GridCell<P> {
-    type Output = GridCell<P>;
+impl<P: GridPrecision, const L: u8> std::ops::Add for &GridCell<P, L> {
+    type Output = GridCell<P, L>;
 
     fn add(self, rhs: Self) -> Self::Output {
         (*self).add(*rhs)
     }
 }
-impl<P: GridPrecision> std::ops::Sub for &GridCell<P> {
-    type Output = GridCell<P>;
+impl<P: GridPrecision, const L: u8> std::ops::Sub for &GridCell<P, L> {
+    type Output = GridCell<P, L>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         (*self).sub(*rhs)
     }
 }
 
-impl<P: GridPrecision> std::ops::AddAssign for GridCell<P> {
+impl<P: GridPrecision, const L: u8> std::ops::AddAssign for GridCell<P, L> {
     fn add_assign(&mut self, rhs: Self) {
         use std::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl<P: GridPrecision> std::ops::SubAssign for GridCell<P> {
+impl<P: GridPrecision, const L: u8> std::ops::SubAssign for GridCell<P, L> {
     fn sub_assign(&mut self, rhs: Self) {
         use std::ops::Sub;
         *self = self.sub(rhs);

@@ -127,7 +127,7 @@ use crate::reference_frame::{
 };
 
 /// Add this plugin to your [`App`] for floating origin functionality.
-pub struct FloatingOriginPlugin<P: GridPrecision> {
+pub struct FloatingOriginPlugin<P: GridPrecision, const L: u8=0> {
     /// The edge length of a single cell.
     pub grid_edge_length: f32,
     /// How far past the extents of a cell an entity must travel before a grid recentering occurs.
@@ -136,13 +136,13 @@ pub struct FloatingOriginPlugin<P: GridPrecision> {
     phantom: PhantomData<P>,
 }
 
-impl<P: GridPrecision> Default for FloatingOriginPlugin<P> {
+impl<P: GridPrecision, const L: u8> Default for FloatingOriginPlugin<P, L> {
     fn default() -> Self {
         Self::new(2_000f32, 100f32)
     }
 }
 
-impl<P: GridPrecision> FloatingOriginPlugin<P> {
+impl<P: GridPrecision, const L: u8> FloatingOriginPlugin<P, L> {
     /// Construct a new plugin with the following settings.
     pub fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
         FloatingOriginPlugin {
@@ -153,7 +153,7 @@ impl<P: GridPrecision> FloatingOriginPlugin<P> {
     }
 }
 
-impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOriginPlugin<P> {
+impl<P: GridPrecision + Reflect + FromReflect + TypePath, const L: u8> Plugin for FloatingOriginPlugin<P, L> {
     fn build(&self, app: &mut App) {
         #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
         enum FloatingOriginSet {
@@ -165,32 +165,32 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
 
         let system_set_config = || {
             (
-                recenter_transform_on_grid::<P>.in_set(FloatingOriginSet::RecenterLargeTransforms),
-                LocalFloatingOrigin::<P>::update
+                recenter_transform_on_grid::<P,L>.in_set(FloatingOriginSet::RecenterLargeTransforms),
+                LocalFloatingOrigin::<P,L>::update
                     .in_set(FloatingOriginSet::LocalFloatingOrigins)
                     .after(FloatingOriginSet::RecenterLargeTransforms),
                 (
-                    sync_simple_transforms::<P>,
-                    update_grid_cell_global_transforms::<P>,
+                    sync_simple_transforms::<P,L>,
+                    update_grid_cell_global_transforms::<P,L>,
                 )
                     .in_set(FloatingOriginSet::RootGlobalTransforms)
                     .after(FloatingOriginSet::LocalFloatingOrigins),
-                propagate_transforms::<P>
+                propagate_transforms::<P,L>
                     .in_set(FloatingOriginSet::PropagateTransforms)
                     .after(FloatingOriginSet::RootGlobalTransforms),
             )
                 .in_set(TransformSystem::TransformPropagate)
         };
 
-        app.insert_resource(RootReferenceFrame::<P>(ReferenceFrame::new(
+        app.insert_resource(RootReferenceFrame::<P,L>(ReferenceFrame::new(
             self.grid_edge_length,
             self.switching_threshold,
         )))
         .register_type::<Transform>()
         .register_type::<GlobalTransform>()
-        .register_type::<GridCell<P>>()
-        .register_type::<ReferenceFrame<P>>()
-        .register_type::<RootReferenceFrame<P>>()
+        .register_type::<GridCell<P,L>>()
+        .register_type::<ReferenceFrame<P,L>>()
+        .register_type::<RootReferenceFrame<P,L>>()
         .add_plugins(ValidParentCheckPlugin::<GlobalTransform>::default())
         .add_systems(PostStartup, system_set_config())
         .add_systems(PostUpdate, system_set_config());
@@ -201,7 +201,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
 ///
 /// This is the floating origin equivalent of the [`SpatialBundle`].
 #[derive(Bundle, Default)]
-pub struct FloatingSpatialBundle<P: GridPrecision> {
+pub struct FloatingSpatialBundle<P: GridPrecision, const L: u8> {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: Visibility,
@@ -216,19 +216,19 @@ pub struct FloatingSpatialBundle<P: GridPrecision> {
     /// The global transform of the entity.
     pub global_transform: GlobalTransform,
     /// The grid position of the entity
-    pub grid_position: GridCell<P>,
+    pub grid_position: GridCell<P,L>,
 }
 
 /// Marks the entity to use as the floating origin. All other entities will be positioned relative
 /// to this entity's [`GridCell`].
 #[derive(Component, Reflect)]
-pub struct FloatingOrigin;
+pub struct FloatingOrigin<const L: u8=0>;
 
 /// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
 /// grid cell to reduce the size of the transform.
-pub fn recenter_transform_on_grid<P: GridPrecision>(
-    reference_frames: ReferenceFrames<P>,
-    mut changed_transform: Query<(Entity, &mut GridCell<P>, &mut Transform), Changed<Transform>>,
+pub fn recenter_transform_on_grid<P: GridPrecision, const L: u8>(
+    reference_frames: ReferenceFrames<P,L>,
+    mut changed_transform: Query<(Entity, &mut GridCell<P, L>, &mut Transform), Changed<Transform>>,
 ) {
     changed_transform
         .par_iter_mut()
@@ -252,12 +252,12 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
 
 /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`] the
 /// entity belongs to.
-pub fn update_grid_cell_global_transforms<P: GridPrecision>(
-    root: Res<RootReferenceFrame<P>>,
-    reference_frames: Query<(&ReferenceFrame<P>, &Children)>,
+pub fn update_grid_cell_global_transforms<P: GridPrecision, const L: u8>(
+    root: Res<RootReferenceFrame<P,L>>,
+    reference_frames: Query<(&ReferenceFrame<P,L>, &Children)>,
     mut entities: ParamSet<(
-        Query<(GridTransformReadOnly<P>, &mut GlobalTransform), With<Parent>>, // Node entities
-        Query<(GridTransformReadOnly<P>, &mut GlobalTransform), Without<Parent>>, // Root entities
+        Query<(GridTransformReadOnly<P,L>, &mut GlobalTransform), With<Parent>>, // Node entities
+        Query<(GridTransformReadOnly<P,L>, &mut GlobalTransform), Without<Parent>>, // Root entities
     )>,
 ) {
     // Update the GlobalTransform of GridCell entities at the root of the hierarchy
@@ -296,7 +296,7 @@ mod tests {
                     150.0, 0.0, 0.0,
                 ))),
                 GridCell::<i32>::new(5, 0, 0),
-                FloatingOrigin,
+                FloatingOrigin::<0>,
             ))
             .id();
 
@@ -313,7 +313,7 @@ mod tests {
         app.update();
 
         app.world.entity_mut(first).remove::<FloatingOrigin>();
-        app.world.entity_mut(second).insert(FloatingOrigin);
+        app.world.entity_mut(second).insert(FloatingOrigin::<0>);
 
         app.update();
 
@@ -337,7 +337,7 @@ mod tests {
                     150.0, 0.0, 0.0,
                 ))),
                 GridCell::<i32>::new(5, 0, 0),
-                FloatingOrigin,
+                FloatingOrigin::<0>,
             ))
             .id();
 
@@ -359,7 +359,7 @@ mod tests {
         app.update();
 
         app.world.entity_mut(first).remove::<FloatingOrigin>();
-        app.world.entity_mut(second).insert(FloatingOrigin);
+        app.world.entity_mut(second).insert(FloatingOrigin::<0>);
 
         app.update();
 

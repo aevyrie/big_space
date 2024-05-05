@@ -46,7 +46,7 @@ fn setup(
             ..default()
         },
         GridCell::<i128>::default(), // All spatial entities need this component
-        FloatingOrigin,              // Important: marks the floating origin entity for rendering.
+        FloatingOrigin::<0>,              // Important: marks the floating origin entity for rendering.
         CameraController::default() // Built-in camera controller
             .with_speed_bounds([10e-18, 10e35])
             .with_smoothness(0.9, 0.8)
@@ -111,7 +111,7 @@ fn ui_setup(mut commands: Commands) {
             ..default()
         }),
         BigSpaceDebugText,
-        IgnoreFloatingOrigin,
+        IgnoreFloatingOrigin::<0>,
     ));
 
     commands.spawn((
@@ -132,7 +132,7 @@ fn ui_setup(mut commands: Commands) {
         })
         .with_text_justify(JustifyText::Center),
         FunFactText,
-        IgnoreFloatingOrigin,
+        IgnoreFloatingOrigin::<0>,
     ));
 }
 
@@ -162,7 +162,7 @@ fn ui_text_system(
     >,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     time: Res<Time>,
-    origin: Query<GridTransformReadOnly<i128>, With<FloatingOrigin>>,
+    origin: Query<GridTransformReadOnly<i128, 0>, With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Handle<Mesh>>>,
 ) {

@@ -44,9 +44,9 @@ mod inner {
     /// spinning about its axis and orbiting about a star, it will not align with the reference
     /// frame of the star system!
     #[derive(Default, Debug, Clone, PartialEq, Reflect)]
-    pub struct LocalFloatingOrigin<P: GridPrecision> {
+    pub struct LocalFloatingOrigin<P: GridPrecision, const L: u8> {
         /// The local cell that the floating origin's grid cell origin falls into.
-        cell: GridCell<P>,
+        cell: GridCell<P,L>,
         /// The translation of floating origin's grid cell relative to the origin of
         /// [`LocalFloatingOrigin::cell`].
         translation: Vec3,
@@ -74,7 +74,7 @@ mod inner {
         reference_frame_transform: DAffine3,
     }
 
-    impl<P: GridPrecision> LocalFloatingOrigin<P> {
+    impl<P: GridPrecision, const L: u8> LocalFloatingOrigin<P,L> {
         /// The reference frame transform from the local reference frame, to the floating origin's
         /// reference frame. See [Self::reference_frame_transform].
         pub fn reference_frame_transform(&self) -> DAffine3 {
@@ -82,7 +82,7 @@ mod inner {
         }
 
         /// Gets [`Self::cell`].
-        pub fn cell(&self) -> GridCell<P> {
+        pub fn cell(&self) -> GridCell<P,L> {
             self.cell
         }
 
@@ -99,7 +99,7 @@ mod inner {
         /// Update this local floating origin, and compute the new inverse transform.
         pub fn set(
             &mut self,
-            translation_grid: GridCell<P>,
+            translation_grid: GridCell<P,L>,
             translation_float: Vec3,
             rotation_float: DQuat,
         ) {
@@ -115,7 +115,7 @@ mod inner {
         }
 
         /// Create a new [`LocalFloatingOrigin`].
-        pub fn new(cell: GridCell<P>, translation: Vec3, rotation: DQuat) -> Self {
+        pub fn new(cell: GridCell<P,L>, translation: Vec3, rotation: DQuat) -> Self {
             let reference_frame_transform = DAffine3 {
                 matrix3: DMat3::from_quat(rotation),
                 translation: translation.as_dvec3(),
@@ -150,9 +150,9 @@ impl ReferenceFrameHandle {
     ///
     /// This is not a method on `References` to help prevent misuse when accidentally
     /// swapping the position of arguments.
-    fn propagate_origin_to_child<P: GridPrecision>(
+    fn propagate_origin_to_child<P: GridPrecision, const L: u8>(
         self,
-        reference_frames: &mut ReferenceFramesMut<P>,
+        reference_frames: &mut ReferenceFramesMut<P,L>,
         child: ReferenceFrameHandle,
     ) {
         let (this_frame, _this_cell, _this_transform) = reference_frames.get(self);
@@ -195,9 +195,9 @@ impl ReferenceFrameHandle {
         })
     }
 
-    fn propagate_origin_to_parent<P: GridPrecision>(
+    fn propagate_origin_to_parent<P: GridPrecision, const L: u8>(
         self,
-        reference_frames: &mut ReferenceFramesMut<P>,
+        reference_frames: &mut ReferenceFramesMut<P,L>,
         parent: ReferenceFrameHandle,
     ) {
         let (this_frame, this_cell, this_transform) = reference_frames.get(self);
@@ -245,15 +245,15 @@ impl ReferenceFrameHandle {
 /// Used to access a reference frame using a single system param. Needed because the reference frame
 /// could either be a component or a resource (if at the root of the hierarchy).
 #[derive(SystemParam)]
-pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
+pub struct ReferenceFrames<'w, 's, P: GridPrecision, const L: u8> {
     parent: Query<'w, 's, Read<Parent>>,
-    frame_root: Res<'w, RootReferenceFrame<P>>,
-    frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>)>,
+    frame_root: Res<'w, RootReferenceFrame<P,L>>,
+    frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P,L>>)>,
 }
 
-impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
+impl<'w, 's, P: GridPrecision, const L: u8> ReferenceFrames<'w, 's, P,L> {
     /// Get the reference frame from a handle.
-    pub fn resolve_handle(&self, handle: ReferenceFrameHandle) -> &ReferenceFrame<P> {
+    pub fn resolve_handle(&self, handle: ReferenceFrameHandle) -> &ReferenceFrame<P,L> {
         match handle {
             ReferenceFrameHandle::Node(frame_entity) => self
                 .frame_query
@@ -282,7 +282,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
 
     /// Get a reference to this entity's reference frame, if it exists.
     #[inline]
-    pub fn get(&self, this: Entity) -> Option<&ReferenceFrame<P>> {
+    pub fn get(&self, this: Entity) -> Option<&ReferenceFrame<P,L>> {
         self.get_handle(this)
             .map(|handle| self.resolve_handle(handle))
     }
@@ -291,24 +291,24 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
 /// Used to access a reference frame. Needed because the reference frame could either be a
 /// component, or a resource if at the root of the hierarchy.
 #[derive(SystemParam)]
-pub struct ReferenceFramesMut<'w, 's, P: GridPrecision> {
+pub struct ReferenceFramesMut<'w, 's, P: GridPrecision, const L: u8=0> {
     parent: Query<'w, 's, Read<Parent>>,
     children: Query<'w, 's, Read<Children>>,
-    frame_root: ResMut<'w, RootReferenceFrame<P>>,
+    frame_root: ResMut<'w, RootReferenceFrame<P,L>>,
     frame_query: Query<
         'w,
         's,
         (
             Entity,
-            Read<GridCell<P>>,
+            Read<GridCell<P,L>>,
             Read<Transform>,
-            Write<ReferenceFrame<P>>,
+            Write<ReferenceFrame<P,L>>,
             Option<Read<Parent>>,
         ),
     >,
 }
 
-impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
+impl<'w, 's, P: GridPrecision, const L: u8> ReferenceFramesMut<'w, 's, P,L> {
     /// Get mutable access to the [`ReferenceFrame`], and run the provided function or closure,
     /// optionally returning data.
     ///
@@ -331,7 +331,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
     pub fn update<T>(
         &mut self,
         handle: ReferenceFrameHandle,
-        mut func: impl FnMut(&mut ReferenceFrame<P>, &GridCell<P>, &Transform) -> T,
+        mut func: impl FnMut(&mut ReferenceFrame<P,L>, &GridCell<P,L>, &Transform) -> T,
     ) -> T {
         match handle {
             ReferenceFrameHandle::Node(frame_entity) => self
@@ -353,7 +353,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
     pub fn get(
         &self,
         handle: ReferenceFrameHandle,
-    ) -> (&ReferenceFrame<P>, GridCell<P>, Transform) {
+    ) -> (&ReferenceFrame<P,L>, GridCell<P,L>, Transform) {
         match handle {
             ReferenceFrameHandle::Node(frame_entity) => self
                 .frame_query
@@ -439,7 +439,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
     }
 }
 
-impl<P: GridPrecision> LocalFloatingOrigin<P> {
+impl<P: GridPrecision, const L: u8> LocalFloatingOrigin<P,L> {
     /// Update the [`LocalFloatingOrigin`] of every [`ReferenceFrame`] in the world. This does not
     /// update any entity transforms, instead this is a preceding step that updates every reference
     /// frame, so it knows where the floating origin is located with respect to that reference
@@ -447,8 +447,8 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// only affect the rendering precision. The high precision coordinates ([`GridCell`] and
     /// [`Transform`]) are the source of truth and never mutated.
     pub fn update(
-        origin: Query<(Entity, &GridCell<P>), With<FloatingOrigin>>,
-        mut reference_frames: ReferenceFramesMut<P>,
+        origin: Query<(Entity, &GridCell<P,L>), With<FloatingOrigin<L>>>,
+        mut reference_frames: ReferenceFramesMut<P,L>,
         mut frame_stack: Local<Vec<ReferenceFrameHandle>>,
     ) {
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case

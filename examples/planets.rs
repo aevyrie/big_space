@@ -162,7 +162,7 @@ fn setup(
                 },
                 BloomSettings::default(),
                 cam_cell,
-                FloatingOrigin, // Important: marks the floating origin entity for rendering.
+                FloatingOrigin::<0>, // Important: marks the floating origin entity for rendering.
                 CameraController::default() // Built-in camera controller
                     .with_speed_bounds([10e-18, 10e35])
                     .with_smoothness(0.9, 0.8)

@@ -22,7 +22,7 @@ pub mod local_origin;
 /// is a singleton; this is why the root reference frame is a resource unlike all other
 /// [`ReferenceFrame`]s which are components.
 #[derive(Debug, Clone, Resource, Reflect, Deref, DerefMut)]
-pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
+pub struct RootReferenceFrame<P: GridPrecision, const L: u8=0>(pub(crate) ReferenceFrame<P,L>);
 
 /// A component that defines a reference frame for children of this entity with [`GridCell`]s.
 ///
@@ -41,23 +41,23 @@ pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
 /// the same rotating reference frame, instead of moving rapidly through space around a star, or
 /// worse, around the center of the galaxy.
 #[derive(Debug, Clone, Reflect, Component)]
-pub struct ReferenceFrame<P: GridPrecision> {
+pub struct ReferenceFrame<P: GridPrecision, const L: u8=0> {
     /// The high-precision position of the floating origin's current grid cell local to this
     /// reference frame.
-    local_floating_origin: LocalFloatingOrigin<P>,
+    local_floating_origin: LocalFloatingOrigin<P,L>,
     /// Defines the uniform scale of the grid by the length of the edge of a grid cell.
     cell_edge_length: f32,
     /// How far an entity can move from the origin before its grid cell is recomputed.
     maximum_distance_from_origin: f32,
 }
 
-impl<P: GridPrecision> Default for ReferenceFrame<P> {
+impl<P: GridPrecision, const L: u8> Default for ReferenceFrame<P,L> {
     fn default() -> Self {
         Self::new(2_000f32, 100f32)
     }
 }
 
-impl<P: GridPrecision> ReferenceFrame<P> {
+impl<P: GridPrecision, const L: u8> ReferenceFrame<P,L> {
     /// Construct a new [`ReferenceFrame`]. The properties of a reference frame cannot be changed
     /// after construction.
     pub fn new(cell_edge_length: f32, switching_threshold: f32) -> Self {
@@ -69,7 +69,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Get the position of the floating origin relative to the current reference frame.
-    pub fn local_floating_origin(&self) -> &LocalFloatingOrigin<P> {
+    pub fn local_floating_origin(&self) -> &LocalFloatingOrigin<P,L> {
         &self.local_floating_origin
     }
 
@@ -85,7 +85,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
     /// Compute the double precision position of an entity's [`Transform`] with respect to the given
     /// [`GridCell`] within this reference frame.
-    pub fn grid_position_double(&self, pos: &GridCell<P>, transform: &Transform) -> DVec3 {
+    pub fn grid_position_double(&self, pos: &GridCell<P,L>, transform: &Transform) -> DVec3 {
         DVec3 {
             x: pos.x.as_f64() * self.cell_edge_length as f64 + transform.translation.x as f64,
             y: pos.y.as_f64() * self.cell_edge_length as f64 + transform.translation.y as f64,
@@ -95,7 +95,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
     /// Compute the single precision position of an entity's [`Transform`] with respect to the given
     /// [`GridCell`].
-    pub fn grid_position(&self, pos: &GridCell<P>, transform: &Transform) -> Vec3 {
+    pub fn grid_position(&self, pos: &GridCell<P,L>, transform: &Transform) -> Vec3 {
         Vec3 {
             x: pos.x.as_f64() as f32 * self.cell_edge_length + transform.translation.x,
             y: pos.y.as_f64() as f32 * self.cell_edge_length + transform.translation.y,
@@ -104,7 +104,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Returns the floating point position of a [`GridCell`].
-    pub fn grid_to_float(&self, pos: &GridCell<P>) -> DVec3 {
+    pub fn grid_to_float(&self, pos: &GridCell<P,L>) -> DVec3 {
         DVec3 {
             x: pos.x.as_f64() * self.cell_edge_length as f64,
             y: pos.y.as_f64() * self.cell_edge_length as f64,
@@ -113,7 +113,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Convert a large translation into a small translation relative to a grid cell.
-    pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell<P>, Vec3) {
+    pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell<P,L>, Vec3) {
         let l = self.cell_edge_length as f64;
         let input = input.into();
         let DVec3 { x, y, z } = input;
@@ -140,14 +140,14 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Convert a large translation into a small translation relative to a grid cell.
-    pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell<P>, Vec3) {
+    pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell<P,L>, Vec3) {
         self.translation_to_grid(input.as_dvec3())
     }
 
     /// Compute the [`GlobalTransform`] of an entity in this reference frame.
     pub fn global_transform(
         &self,
-        local_cell: &GridCell<P>,
+        local_cell: &GridCell<P,L>,
         local_transform: &Transform,
     ) -> GlobalTransform {
         // The reference frame transform from the floating origin's reference frame, to the local

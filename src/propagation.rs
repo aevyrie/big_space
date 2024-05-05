@@ -12,28 +12,28 @@ use bevy::prelude::*;
 /// Entities with this component will ignore the floating origin, and will instead propagate
 /// transforms normally.
 #[derive(Component, Debug, Reflect)]
-pub struct IgnoreFloatingOrigin;
+pub struct IgnoreFloatingOrigin<const L: u8=0>;
 
 /// Update [`GlobalTransform`] component of entities that aren't in the hierarchy.
-pub fn sync_simple_transforms<P: GridPrecision>(
-    root: Res<RootReferenceFrame<P>>,
+pub fn sync_simple_transforms<P: GridPrecision, const L: u8>(
+    root: Res<RootReferenceFrame<P,L>>,
     mut query: ParamSet<(
         Query<
-            (&Transform, &mut GlobalTransform, Has<IgnoreFloatingOrigin>),
+            (&Transform, &mut GlobalTransform, Has<IgnoreFloatingOrigin::<L>>),
             (
                 Or<(Changed<Transform>, Added<GlobalTransform>)>,
                 Without<Parent>,
                 Without<Children>,
-                Without<GridCell<P>>,
+                Without<GridCell<P,L>>,
             ),
         >,
         Query<
             (
                 Ref<Transform>,
                 &mut GlobalTransform,
-                Has<IgnoreFloatingOrigin>,
+                Has<IgnoreFloatingOrigin::<L>>,
             ),
-            (Without<Parent>, Without<Children>, Without<GridCell<P>>),
+            (Without<Parent>, Without<Children>, Without<GridCell<P,L>>),
         >,
     )>,
     mut orphaned: RemovedComponents<Parent>,
@@ -65,30 +65,30 @@ pub fn sync_simple_transforms<P: GridPrecision>(
 /// Update the [`GlobalTransform`] of entities with a [`Transform`] that are children of a
 /// [`ReferenceFrame`] and do not have a [`GridCell`] component, or that are children of
 /// [`GridCell`]s.
-pub fn propagate_transforms<P: GridPrecision>(
-    frames: Query<&Children, With<ReferenceFrame<P>>>,
-    frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
+pub fn propagate_transforms<P: GridPrecision, const L: u8>(
+    frames: Query<&Children, With<ReferenceFrame<P,L>>>,
+    frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P,L>>>,
     root_frame_query: Query<
         (Entity, &Children, &GlobalTransform),
-        (With<GridCell<P>>, Without<Parent>),
+        (With<GridCell<P,L>>, Without<Parent>),
     >,
-    root_frame: Res<RootReferenceFrame<P>>,
+    root_frame: Res<RootReferenceFrame<P,L>>,
     mut root_frame_gridless_query: Query<
         (
             Entity,
             &Children,
             &Transform,
             &mut GlobalTransform,
-            Has<IgnoreFloatingOrigin>,
+            Has<IgnoreFloatingOrigin::<L>>,
         ),
-        (Without<GridCell<P>>, Without<Parent>),
+        (Without<GridCell<P,L>>, Without<Parent>),
     >,
     transform_query: Query<
         (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
         (
             With<Parent>,
-            Without<GridCell<P>>,
-            Without<ReferenceFrame<P>>,
+            Without<GridCell<P,L>>,
+            Without<ReferenceFrame<P,L>>,
         ),
     >,
     parent_query: Query<(Entity, Ref<Parent>)>,
@@ -152,14 +152,14 @@ pub fn propagate_transforms<P: GridPrecision>(
 /// any of its descendants.
 /// - The caller must ensure that the hierarchy leading to `entity` is well-formed and must remain
 /// as a tree or a forest. Each entity must have at most one parent.
-unsafe fn propagate_recursive<P: GridPrecision>(
+unsafe fn propagate_recursive<P: GridPrecision, const L: u8>(
     parent: &GlobalTransform,
     transform_query: &Query<
         (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
         (
             With<Parent>,
-            Without<GridCell<P>>,
-            Without<ReferenceFrame<P>>,
+            Without<GridCell<P,L>>,
+            Without<ReferenceFrame<P,L>>,
         ),
     >,
     parent_query: &Query<(Entity, Ref<Parent>)>,

@@ -91,7 +91,7 @@ fn setup_scene(
             ..default()
         },
         GridCell::<i128>::default(),
-        FloatingOrigin,
+        FloatingOrigin::<0>,
         big_space::camera::CameraController::default() // Built-in camera controller
             .with_speed_bounds([10e-18, 10e35])
             .with_smoothness(0.9, 0.8)
