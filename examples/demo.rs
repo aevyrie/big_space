@@ -6,6 +6,7 @@ use bevy::{
 use big_space::{
     camera::{CameraController, CameraInput},
     propagation::IgnoreFloatingOrigin,
+    reference_frame::RootReferenceFrame,
     world_query::GridTransformReadOnly,
     FloatingOrigin, GridCell,
 };
@@ -21,10 +22,10 @@ fn main() {
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
-        .add_systems(Update, (cursor_grab_system, ui_text_system))
+        .add_systems(PreUpdate, cursor_grab_system)
         .add_systems(
             PostUpdate,
-            highlight_nearest_sphere.after(TransformSystem::TransformPropagate),
+            (highlight_nearest_sphere, ui_text_system).after(TransformSystem::TransformPropagate),
         )
         .run()
 }
@@ -98,7 +99,7 @@ fn ui_setup(mut commands: Commands) {
         TextBundle::from_section(
             "",
             TextStyle {
-                font_size: 28.0,
+                font_size: 18.0,
                 color: Color::WHITE,
                 ..default()
             },
@@ -148,9 +149,9 @@ fn highlight_nearest_sphere(
         return;
     };
     // Ignore rotation due to panicking in gizmos, as of bevy 0.13
-    let (scale, _, translation) = transform.to_scale_rotation_translation();
+    let (scale, rotation, translation) = transform.to_scale_rotation_translation();
     gizmos
-        .sphere(translation, Quat::IDENTITY, scale.x * 0.505, Color::RED)
+        .sphere(translation, rotation, scale.x * 0.505, Color::RED)
         .circle_segments(128);
 }
 
@@ -165,6 +166,7 @@ fn ui_text_system(
     origin: Query<GridTransformReadOnly<i128>, With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Handle<Mesh>>>,
+    reference_frame: Res<RootReferenceFrame<i128>>,
 ) {
     let origin = origin.single();
     let translation = origin.transform.translation;
@@ -175,8 +177,18 @@ fn ui_text_system(
     );
 
     let translation_text = format!(
-        "Transform: {:>8.2}x, {:>8.2}y, {:>8.2}z",
+        "Transform: {}x, {}y, {}z",
         translation.x, translation.y, translation.z
+    );
+
+    let real_position = reference_frame.grid_position_double(origin.cell, origin.transform);
+    let real_position_f64_text = format!(
+        "Combined (f64): {}x, {}y, {}z",
+        real_position.x, real_position.y, real_position.z
+    );
+    let real_position_f32_text = format!(
+        "Combined (f32): {}x, {}y, {}z",
+        real_position.x as f32, real_position.y as f32, real_position.z as f32
     );
 
     let velocity = camera.single().velocity();
@@ -204,8 +216,9 @@ fn ui_text_system(
 
     let mut debug_text = debug_text.single_mut();
 
-    debug_text.0.sections[0].value =
-        format!("{grid_text}\n{translation_text}\n{camera_text}\n{nearest_text}");
+    debug_text.0.sections[0].value = format!(
+        "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
+    );
 
     fun_text.single_mut().sections[0].value = fact_text
 }

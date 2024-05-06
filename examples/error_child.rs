@@ -17,10 +17,12 @@ fn main() {
         .run()
 }
 
-// The distance being used to test precision. A sphere is placed at this position, and a child is
-// added in the opposite direction. This should sum to zero if we had infinite precision.
-const DISTANT: DVec3 = DVec3::new(1e17, 0.0, 0.0);
-const ORIGIN: DVec3 = DVec3::new(200.0, 0.0, 0.0);
+// The nearby object is 200 meters away from us. The distance object is 100 quadrillion meters away
+// from us, and has a child that is 100 quadrillion meters toward us (relative its parent) minus 200
+// meters. If we had infinite precision, the child of the distant object would be at the same
+// position as the nearby object, only 200 meters away.
+const DISTANT: DVec3 = DVec3::new(1e17, 1e17, 0.0);
+const NEARBY: DVec3 = DVec3::new(200.0, 200.0, 0.0);
 
 fn setup_scene(
     mut commands: Commands,
@@ -34,19 +36,22 @@ fn setup_scene(
         ..default()
     });
 
-    // A red sphere located at the origin
+    // A red sphere located nearby
     commands.spawn((
         PbrBundle {
             mesh: mesh_handle.clone(),
             material: materials.add(Color::RED),
-            transform: Transform::from_translation(ORIGIN.as_vec3()),
+            transform: Transform::from_translation(NEARBY.as_vec3()),
             ..default()
         },
         GridCell::<i128>::default(),
     ));
 
     let parent = root.translation_to_grid(DISTANT);
-    let child = root.translation_to_grid(-DISTANT + ORIGIN);
+    // This function introduces a small amount of error, because it can only work up to double
+    // precision floats. (f64).
+    let child = root.translation_to_grid(-DISTANT + NEARBY);
+
     commands
         .spawn((
             // A sphere very far from the origin
@@ -86,8 +91,8 @@ fn setup_scene(
     // camera
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_translation(ORIGIN.as_vec3() + Vec3::new(0.0, 0.0, 8.0))
-                .looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_translation(NEARBY.as_vec3() + Vec3::new(0.0, 0.0, 20.0))
+                .looking_at(NEARBY.as_vec3(), Vec3::Y),
             ..default()
         },
         GridCell::<i128>::default(),
