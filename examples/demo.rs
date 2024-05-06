@@ -259,7 +259,7 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
     let mut min = items[0];
     for item in items.iter() {
         if (item.0 - diameter).abs() < (min.0 - diameter).abs() {
-            min = item.to_owned();
+            item.clone_into(&mut min);
         }
     }
     min
