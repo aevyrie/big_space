@@ -95,6 +95,17 @@
 //! this planet is orbiting around is also moving through space, note that you can add/subtract grid
 //! cells. This means you can do each calculation in the reference frame of the moving body, and sum
 //! up the computed translations and grid cell offsets to get a more precise result.
+//!
+//!
+//! # System Ordering
+//!
+//! The `GlobalTransform` computation happens in the [`TransformSystem::TransformPropagate`] system
+//! set, both in the [`PostUpdate`] and the [`PostStartup`] schedules.
+//!
+//! To run your own systems before/after this (for example, for adding
+//!  [`IgnoreFloatingOrigin`] components, or for reacting to [`GlobalTransform`] changes),
+//! order them around [`TransformSystem::TransformPropagate`].
+//!
 
 #![allow(clippy::type_complexity)]
 #![deny(missing_docs)]
