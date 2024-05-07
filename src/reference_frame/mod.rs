@@ -3,9 +3,8 @@
 //! orbiting a star.
 
 use bevy::{
-    ecs::{component::Component, system::Resource},
+    ecs::{component::Component, entity::Entity},
     math::{Affine3A, DAffine3, DVec3, Vec3},
-    prelude::{Deref, DerefMut},
     reflect::Reflect,
     transform::components::{GlobalTransform, Transform},
 };
@@ -16,13 +15,10 @@ use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
 
-/// All entities that have no parent are implicitly in the root [`ReferenceFrame`].
-///
-/// Because this relationship is implicit, it lives outside of the entity/component hierarchy, and
-/// is a singleton; this is why the root reference frame is a resource unlike all other
-/// [`ReferenceFrame`]s which are components.
-#[derive(Debug, Clone, Resource, Reflect, Deref, DerefMut)]
-pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
+#[derive(Debug, Component, Reflect)]
+pub struct FloatingOriginRoot {
+    floating_origin: Option<Entity>,
+}
 
 /// A component that defines a reference frame for children of this entity with [`GridCell`]s.
 ///

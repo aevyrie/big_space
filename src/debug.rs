@@ -31,7 +31,10 @@ pub fn update_debug_bounds<P: GridPrecision>(
     occupied_cells: Query<(Entity, &GridCell<P>), Without<FloatingOrigin>>,
 ) {
     for (cell_entity, cell) in occupied_cells.iter() {
-        let Some(frame) = reference_frames.get(cell_entity) else {
+        let Some((frame, ..)) = reference_frames
+            .get_parent_frame_id(cell_entity)
+            .map(|frame_entity| reference_frames.reference_frame(frame_entity))
+        else {
             continue;
         };
         let transform = frame.global_transform(

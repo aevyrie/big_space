@@ -100,8 +100,7 @@
 #![deny(missing_docs)]
 
 use bevy::{prelude::*, transform::TransformSystem};
-use propagation::{propagate_transforms, sync_simple_transforms};
-use reference_frame::local_origin::ReferenceFrames;
+use propagation::propagate_transforms;
 use std::marker::PhantomData;
 use world_query::GridTransformReadOnly;
 
@@ -123,7 +122,7 @@ pub mod camera;
 use precision::*;
 
 use crate::reference_frame::{
-    local_origin::LocalFloatingOrigin, ReferenceFrame, RootReferenceFrame,
+    local_origin::LocalFloatingOrigin, FloatingOriginRoot, ReferenceFrame,
 };
 
 /// Add this plugin to your [`App`] for floating origin functionality.
@@ -169,10 +168,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
                 LocalFloatingOrigin::<P>::update
                     .in_set(FloatingOriginSet::LocalFloatingOrigins)
                     .after(FloatingOriginSet::RecenterLargeTransforms),
-                (
-                    sync_simple_transforms::<P>,
-                    update_grid_cell_global_transforms::<P>,
-                )
+                update_grid_cell_global_transforms::<P>
                     .in_set(FloatingOriginSet::RootGlobalTransforms)
                     .after(FloatingOriginSet::LocalFloatingOrigins),
                 propagate_transforms::<P>
@@ -182,18 +178,14 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
                 .in_set(TransformSystem::TransformPropagate)
         };
 
-        app.insert_resource(RootReferenceFrame::<P>(ReferenceFrame::new(
-            self.grid_edge_length,
-            self.switching_threshold,
-        )))
-        .register_type::<Transform>()
-        .register_type::<GlobalTransform>()
-        .register_type::<GridCell<P>>()
-        .register_type::<ReferenceFrame<P>>()
-        .register_type::<RootReferenceFrame<P>>()
-        .add_plugins(ValidParentCheckPlugin::<GlobalTransform>::default())
-        .add_systems(PostStartup, system_set_config())
-        .add_systems(PostUpdate, system_set_config());
+        app.register_type::<Transform>()
+            .register_type::<GlobalTransform>()
+            .register_type::<GridCell<P>>()
+            .register_type::<ReferenceFrame<P>>()
+            .register_type::<FloatingOriginRoot>()
+            .add_plugins(ValidParentCheckPlugin::<GlobalTransform>::default())
+            .add_systems(PostStartup, system_set_config())
+            .add_systems(PostUpdate, system_set_config());
     }
 }
 
@@ -227,23 +219,20 @@ pub struct FloatingOrigin;
 /// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
 /// grid cell to reduce the size of the transform.
 pub fn recenter_transform_on_grid<P: GridPrecision>(
-    reference_frames: ReferenceFrames<P>,
-    mut changed_transform: Query<(Entity, &mut GridCell<P>, &mut Transform), Changed<Transform>>,
+    reference_frames: Query<&ReferenceFrame<P>>,
+    mut changed_transform: Query<(&mut GridCell<P>, &mut Transform, &Parent), Changed<Transform>>,
 ) {
     changed_transform
         .par_iter_mut()
-        .for_each(|(entity, mut grid_pos, mut transform)| {
-            let Some(frame) = reference_frames
-                .get_handle(entity)
-                .map(|handle| reference_frames.resolve_handle(handle))
-            else {
+        .for_each(|(mut grid_pos, mut transform, parent)| {
+            let Ok(reference_frame) = reference_frames.get(parent.get()) else {
                 return;
             };
             if transform.as_ref().translation.abs().max_element()
-                > frame.maximum_distance_from_origin()
+                > reference_frame.maximum_distance_from_origin()
             {
                 let (grid_cell_delta, translation) =
-                    frame.imprecise_translation_to_grid(transform.as_ref().translation);
+                    reference_frame.imprecise_translation_to_grid(transform.as_ref().translation);
                 *grid_pos += grid_cell_delta;
                 transform.translation = translation;
             }
@@ -253,26 +242,12 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
 /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`] the
 /// entity belongs to.
 pub fn update_grid_cell_global_transforms<P: GridPrecision>(
-    root: Res<RootReferenceFrame<P>>,
     reference_frames: Query<(&ReferenceFrame<P>, &Children)>,
-    mut entities: ParamSet<(
-        Query<(GridTransformReadOnly<P>, &mut GlobalTransform), With<Parent>>, // Node entities
-        Query<(GridTransformReadOnly<P>, &mut GlobalTransform), Without<Parent>>, // Root entities
-    )>,
+    mut entities: Query<(GridTransformReadOnly<P>, &mut GlobalTransform), With<Parent>>,
 ) {
-    // Update the GlobalTransform of GridCell entities at the root of the hierarchy
-    entities
-        .p1()
-        .par_iter_mut()
-        .for_each(|(grid_transform, mut global_transform)| {
-            *global_transform =
-                root.global_transform(grid_transform.cell, grid_transform.transform);
-        });
-
     // Update the GlobalTransform of GridCell entities that are children of a ReferenceFrame
     for (frame, children) in &reference_frames {
-        let mut with_parent_query = entities.p0();
-        let mut frame_children = with_parent_query.iter_many_mut(children);
+        let mut frame_children = entities.iter_many_mut(children);
         while let Some((grid_transform, mut global_transform)) = frame_children.fetch_next() {
             *global_transform =
                 frame.global_transform(grid_transform.cell, grid_transform.transform);

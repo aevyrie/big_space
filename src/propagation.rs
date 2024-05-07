@@ -2,11 +2,7 @@
 //!
 //! This is a modified version of Bevy's own transform propagation system.
 
-use crate::{
-    precision::GridPrecision,
-    reference_frame::{ReferenceFrame, RootReferenceFrame},
-    GridCell,
-};
+use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
 use bevy::prelude::*;
 
 /// Entities with this component will ignore the floating origin, and will instead propagate
@@ -14,75 +10,12 @@ use bevy::prelude::*;
 #[derive(Component, Debug, Reflect)]
 pub struct IgnoreFloatingOrigin;
 
-/// Update [`GlobalTransform`] component of entities that aren't in the hierarchy.
-pub fn sync_simple_transforms<P: GridPrecision>(
-    root: Res<RootReferenceFrame<P>>,
-    mut query: ParamSet<(
-        Query<
-            (&Transform, &mut GlobalTransform, Has<IgnoreFloatingOrigin>),
-            (
-                Or<(Changed<Transform>, Added<GlobalTransform>)>,
-                Without<Parent>,
-                Without<Children>,
-                Without<GridCell<P>>,
-            ),
-        >,
-        Query<
-            (
-                Ref<Transform>,
-                &mut GlobalTransform,
-                Has<IgnoreFloatingOrigin>,
-            ),
-            (Without<Parent>, Without<Children>, Without<GridCell<P>>),
-        >,
-    )>,
-    mut orphaned: RemovedComponents<Parent>,
-) {
-    // Update changed entities.
-    query.p0().par_iter_mut().for_each(
-        |(transform, mut global_transform, ignore_floating_origin)| {
-            if ignore_floating_origin {
-                *global_transform = GlobalTransform::from(*transform);
-            } else {
-                *global_transform = root.global_transform(&GridCell::ZERO, transform);
-            }
-        },
-    );
-    // Update orphaned entities.
-    let mut query = query.p1();
-    let mut iter = query.iter_many_mut(orphaned.read());
-    while let Some((transform, mut global_transform, ignore_floating_origin)) = iter.fetch_next() {
-        if !transform.is_changed() && !global_transform.is_added() {
-            if ignore_floating_origin {
-                *global_transform = GlobalTransform::from(*transform);
-            } else {
-                *global_transform = root.global_transform(&GridCell::ZERO, &transform);
-            }
-        }
-    }
-}
-
 /// Update the [`GlobalTransform`] of entities with a [`Transform`] that are children of a
 /// [`ReferenceFrame`] and do not have a [`GridCell`] component, or that are children of
 /// [`GridCell`]s.
 pub fn propagate_transforms<P: GridPrecision>(
     frames: Query<&Children, With<ReferenceFrame<P>>>,
     frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
-    root_frame_query: Query<
-        (Entity, &Children, &GlobalTransform),
-        (With<GridCell<P>>, Without<Parent>),
-    >,
-    root_frame: Res<RootReferenceFrame<P>>,
-    mut root_frame_gridless_query: Query<
-        (
-            Entity,
-            &Children,
-            &Transform,
-            &mut GlobalTransform,
-            Has<IgnoreFloatingOrigin>,
-        ),
-        (Without<GridCell<P>>, Without<Parent>),
-    >,
     transform_query: Query<
         (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
         (
@@ -122,19 +55,6 @@ pub fn propagate_transforms<P: GridPrecision>(
             .filter_map(|child| frame_child_query.get(*child).ok())
             .for_each(|(e, c, g)| update_transforms((e, c, *g)))
     });
-    root_frame_query
-        .par_iter()
-        .for_each(|(e, c, g)| update_transforms((e, c, *g)));
-    root_frame_gridless_query.par_iter_mut().for_each(
-        |(entity, children, local, mut global, ignore_floating_origin)| {
-            if ignore_floating_origin {
-                *global = GlobalTransform::from(*local);
-            } else {
-                *global = root_frame.global_transform(&GridCell::ZERO, local);
-            }
-            update_transforms((entity, children, *global))
-        },
-    );
 }
 
 /// COPIED FROM BEVY
