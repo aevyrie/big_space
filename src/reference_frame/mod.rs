@@ -15,6 +15,7 @@ use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
 
+/// A reference frame at the root of the entity hierarchy.
 #[derive(Debug, Component, Reflect)]
 pub struct FloatingOriginRoot {
     floating_origin: Option<Entity>,

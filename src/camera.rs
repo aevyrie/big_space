@@ -12,7 +12,7 @@ use bevy::{
 
 use crate::{
     precision::GridPrecision,
-    reference_frame::{local_origin::ReferenceFrames, RootReferenceFrame},
+    reference_frame::local_origin::ReferenceFrames,
     world_query::{GridTransform, GridTransformReadOnly},
 };
 
@@ -176,17 +176,18 @@ pub fn default_camera_inputs(
 
 /// Find the object nearest the camera
 pub fn nearest_objects<P: GridPrecision>(
-    settings: Res<RootReferenceFrame<P>>,
+    ref_frame: ReferenceFrames<P>,
     objects: Query<(Entity, GridTransformReadOnly<P>, &Aabb)>,
-    mut camera: Query<(&mut CameraController, GridTransformReadOnly<P>)>,
+    mut camera: Query<(Entity, &mut CameraController, GridTransformReadOnly<P>)>,
 ) {
-    let Ok((mut camera, cam_pos)) = camera.get_single_mut() else {
+    let Ok((cam_entity, mut camera, cam_pos)) = camera.get_single_mut() else {
         return;
     };
+    let (camera_frame, ..) = ref_frame.reference_frame(ref_frame.parent(cam_entity).unwrap());
     let nearest_object = objects
         .iter()
         .map(|(entity, obj_pos, aabb)| {
-            let center_distance = settings
+            let center_distance = camera_frame
                 .grid_position_double(&(*obj_pos.cell - *cam_pos.cell), obj_pos.transform)
                 - cam_pos.transform.translation.as_dvec3();
             let nearest_distance = center_distance.length()
@@ -208,9 +209,9 @@ pub fn camera_controller<P: GridPrecision>(
     mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
-        let Some(frame) = frames
-            .get_handle(camera)
-            .map(|handle| frames.resolve_handle(handle))
+        let Some((frame, ..)) = frames
+            .parent(camera)
+            .map(|frame| frames.reference_frame(frame))
         else {
             continue;
         };
