@@ -211,10 +211,23 @@ pub struct FloatingSpatialBundle<P: GridPrecision> {
     pub grid_position: GridCell<P>,
 }
 
-/// Marks the entity to use as the floating origin. All other entities will be positioned relative
-/// to this entity's [`GridCell`].
-#[derive(Component, Reflect)]
-pub struct FloatingOrigin;
+/// Bundled needed for root reference frames in `big_space`.
+#[derive(Bundle, Default)]
+pub struct FloatingOriginRootBundle<P: GridPrecision> {
+    /// The visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub visibility: Visibility,
+    /// The inherited visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub inherited: InheritedVisibility,
+    /// The view visibility of the entity.
+    #[cfg(feature = "bevy_render")]
+    pub view: ViewVisibility,
+    /// The root reference frame
+    pub reference_frame: ReferenceFrame<P>,
+    /// Tracks the current floating origin
+    pub root: FloatingOriginRoot,
+}
 
 /// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
 /// grid cell to reduce the size of the transform.
@@ -264,6 +277,15 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(FloatingOriginPlugin::<i32>::default());
 
+        let root = app
+            .world
+            .spawn((
+                Transform::default(),
+                GridCell::<i32>::default(),
+                ReferenceFrame::<i32>::default(),
+            ))
+            .id();
+
         let first = app
             .world
             .spawn((
@@ -271,7 +293,6 @@ mod tests {
                     150.0, 0.0, 0.0,
                 ))),
                 GridCell::<i32>::new(5, 0, 0),
-                FloatingOrigin,
             ))
             .id();
 
@@ -285,10 +306,16 @@ mod tests {
             ))
             .id();
 
+        app.world.entity_mut(root).push_children(&[first, second]);
+        app.world.entity_mut(root).insert(FloatingOriginRoot {
+            floating_origin: Some(first),
+        });
+
         app.update();
 
-        app.world.entity_mut(first).remove::<FloatingOrigin>();
-        app.world.entity_mut(second).insert(FloatingOrigin);
+        app.world.entity_mut(root).insert(FloatingOriginRoot {
+            floating_origin: Some(second),
+        });
 
         app.update();
 
@@ -305,6 +332,15 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(FloatingOriginPlugin::<i32>::default());
 
+        let root = app
+            .world
+            .spawn((
+                Transform::default(),
+                GridCell::<i32>::default(),
+                ReferenceFrame::<i32>::default(),
+            ))
+            .id();
+
         let first = app
             .world
             .spawn((
@@ -312,7 +348,6 @@ mod tests {
                     150.0, 0.0, 0.0,
                 ))),
                 GridCell::<i32>::new(5, 0, 0),
-                FloatingOrigin,
             ))
             .id();
 
@@ -331,10 +366,16 @@ mod tests {
             })
             .id();
 
+        app.world.entity_mut(root).push_children(&[first, second]);
+        app.world.entity_mut(root).insert(FloatingOriginRoot {
+            floating_origin: Some(first),
+        });
+
         app.update();
 
-        app.world.entity_mut(first).remove::<FloatingOrigin>();
-        app.world.entity_mut(second).insert(FloatingOrigin);
+        app.world.entity_mut(root).insert(FloatingOriginRoot {
+            floating_origin: Some(second),
+        });
 
         app.update();
 

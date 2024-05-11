@@ -16,9 +16,10 @@ use self::local_origin::LocalFloatingOrigin;
 pub mod local_origin;
 
 /// A reference frame at the root of the entity hierarchy.
-#[derive(Debug, Component, Reflect)]
+#[derive(Debug, Default, Component, Reflect)]
 pub struct FloatingOriginRoot {
-    floating_origin: Option<Entity>,
+    /// Set the entity to use as the floating origin within this floating origin hierarchy.
+    pub floating_origin: Option<Entity>,
 }
 
 /// A component that defines a reference frame for children of this entity with [`GridCell`]s.

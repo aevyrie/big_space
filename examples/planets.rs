@@ -4,8 +4,8 @@
 use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
 use big_space::{
     camera::CameraController,
-    reference_frame::{ReferenceFrame, RootReferenceFrame},
-    FloatingOrigin, GridCell,
+    reference_frame::{FloatingOriginRoot, ReferenceFrame},
+    FloatingOriginRootBundle, FloatingSpatialBundle, GridCell,
 };
 use rand::Rng;
 
@@ -23,10 +23,22 @@ fn main() {
             color: Color::WHITE,
             brightness: 100.0,
         })
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, spawn_camera).chain())
         .add_systems(Update, rotate)
         .run()
 }
+
+const EARTH_ORBIT_RADIUS_M: f32 = 149.60e9;
+const EARTH_RADIUS_M: f32 = 6.371e6;
+
+#[derive(Component)]
+struct Earth;
+
+#[derive(Component)]
+struct Sun;
+
+#[derive(Component)]
+struct Moon;
 
 #[derive(Component)]
 struct Rotates(f32);
@@ -37,35 +49,80 @@ fn rotate(mut rotate_query: Query<(&mut Transform, &Rotates)>) {
     }
 }
 
+fn spawn_camera(
+    mut commands: Commands,
+    earth: Query<(Entity, &ReferenceFrame<i64>), With<Earth>>,
+    mut root: Query<&mut FloatingOriginRoot>,
+) {
+    let (earth, earth_frame) = earth.single();
+    let (cam_cell, cam_pos): (GridCell<i64>, _) =
+        earth_frame.imprecise_translation_to_grid(Vec3::X * (EARTH_RADIUS_M + 1.0));
+
+    // camera
+    let camera_entity = commands
+        .spawn((
+            Camera3dBundle {
+                transform: Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
+                camera: Camera {
+                    hdr: true,
+                    ..default()
+                },
+                exposure: Exposure::SUNLIGHT,
+                ..default()
+            },
+            BloomSettings::default(),
+            cam_cell,
+            CameraController::default() // Built-in camera controller
+                .with_speed_bounds([10e-18, 10e35])
+                .with_smoothness(0.9, 0.8)
+                .with_speed(1.0),
+        ))
+        .id();
+
+    commands.entity(earth).add_child(camera_entity);
+    root.single_mut().floating_origin = Some(camera_entity);
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    space: Res<RootReferenceFrame<i64>>,
 ) {
+    let space_frame = ReferenceFrame::default();
+
+    let space = commands
+        .spawn(FloatingOriginRootBundle::<i64>::default())
+        .id();
+
     let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
 
-    let star = sphere(1e10);
+    let star_mesh = sphere(1e10);
     let star_mat = materials.add(StandardMaterial {
         base_color: Color::WHITE,
         emissive: Color::rgb_linear(100000., 100000., 100000.),
         ..default()
     });
     let mut rng = rand::thread_rng();
-    for _ in 0..500 {
-        commands.spawn((
-            GridCell::<i64>::new(
-                ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
-                ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
-                ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
-            ),
-            PbrBundle {
-                mesh: star.clone(),
-                material: star_mat.clone(),
-                ..default()
-            },
-        ));
-    }
+    let stars: Vec<Entity> = (0..500)
+        .map(|_| {
+            commands
+                .spawn((
+                    GridCell::<i64>::new(
+                        ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
+                        ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
+                        ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
+                    ),
+                    PbrBundle {
+                        mesh: star_mesh.clone(),
+                        material: star_mat.clone(),
+                        ..default()
+                    },
+                ))
+                .id()
+        })
+        .collect();
+
+    commands.entity(space).push_children(&stars);
 
     let sun_mat = materials.add(StandardMaterial {
         base_color: Color::WHITE,
@@ -74,8 +131,9 @@ fn setup(
     });
     let sun_radius_m = 695_508_000.0;
 
-    commands
+    let sun = commands
         .spawn((
+            Sun,
             GridCell::<i64>::ZERO,
             PointLightBundle {
                 point_light: PointLight {
@@ -87,6 +145,7 @@ fn setup(
                 },
                 ..default()
             },
+            ReferenceFrame::<i64>::default(),
         ))
         .with_children(|builder| {
             builder.spawn((PbrBundle {
@@ -94,10 +153,10 @@ fn setup(
                 material: sun_mat,
                 ..default()
             },));
-        });
+        })
+        .id();
 
-    let earth_orbit_radius_m = 149.60e9;
-    let earth_radius_m = 6.371e6;
+    commands.entity(space).add_child(sun);
 
     let earth_mat = materials.add(StandardMaterial {
         base_color: Color::BLUE,
@@ -107,12 +166,13 @@ fn setup(
     });
 
     let (earth_cell, earth_pos): (GridCell<i64>, _) =
-        space.imprecise_translation_to_grid(Vec3::Z * earth_orbit_radius_m);
+        space_frame.imprecise_translation_to_grid(Vec3::Z * EARTH_ORBIT_RADIUS_M);
 
-    commands
+    let earth = commands
         .spawn((
+            Earth,
             PbrBundle {
-                mesh: sphere(earth_radius_m),
+                mesh: sphere(EARTH_RADIUS_M),
                 material: earth_mat,
                 transform: Transform::from_translation(earth_pos),
                 ..default()
@@ -133,9 +193,10 @@ fn setup(
             });
 
             let (moon_cell, moon_pos): (GridCell<i64>, _) =
-                space.imprecise_translation_to_grid(Vec3::X * moon_orbit_radius_m);
+                space_frame.imprecise_translation_to_grid(Vec3::X * moon_orbit_radius_m);
 
             commands.spawn((
+                Moon,
                 PbrBundle {
                     mesh: sphere(moon_radius_m),
                     material: moon_mat,
@@ -145,33 +206,10 @@ fn setup(
                 moon_cell,
             ));
 
-            let (cam_cell, cam_pos): (GridCell<i64>, _) =
-                space.imprecise_translation_to_grid(Vec3::X * (earth_radius_m + 1.0));
-
-            // camera
-            commands.spawn((
-                Camera3dBundle {
-                    transform: Transform::from_translation(cam_pos)
-                        .looking_to(Vec3::NEG_Z, Vec3::X),
-                    camera: Camera {
-                        hdr: true,
-                        ..default()
-                    },
-                    exposure: Exposure::SUNLIGHT,
-                    ..default()
-                },
-                BloomSettings::default(),
-                cam_cell,
-                FloatingOrigin, // Important: marks the floating origin entity for rendering.
-                CameraController::default() // Built-in camera controller
-                    .with_speed_bounds([10e-18, 10e35])
-                    .with_smoothness(0.9, 0.8)
-                    .with_speed(1.0),
-            ));
-
-            let (ball_cell, ball_pos): (GridCell<i64>, _) = space.imprecise_translation_to_grid(
-                Vec3::X * (earth_radius_m + 1.0) + Vec3::NEG_Z * 5.0,
-            );
+            let (ball_cell, ball_pos): (GridCell<i64>, _) = space_frame
+                .imprecise_translation_to_grid(
+                    Vec3::X * (EARTH_RADIUS_M + 1.0) + Vec3::NEG_Z * 5.0,
+                );
 
             let ball_mat = materials.add(StandardMaterial {
                 base_color: Color::FUCHSIA,
@@ -189,5 +227,8 @@ fn setup(
                 },
                 ball_cell,
             ));
-        });
+        })
+        .id();
+
+    commands.entity(sun).add_child(earth);
 }

@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use crate::{
     precision::GridPrecision,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
-    FloatingOrigin, GridCell,
+    GridCell,
 };
 
 /// This plugin will render the bounds of occupied grid cells.
@@ -28,7 +28,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
 pub fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos,
     reference_frames: ReferenceFrames<P>,
-    occupied_cells: Query<(Entity, &GridCell<P>), Without<FloatingOrigin>>,
+    occupied_cells: Query<(Entity, &GridCell<P>)>,
 ) {
     for (cell_entity, cell) in occupied_cells.iter() {
         let Some((frame, ..)) = reference_frames

@@ -228,7 +228,7 @@ fn propagate_origin_to_child<P: GridPrecision>(
 #[derive(SystemParam)]
 pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
-    position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>)>,
+    position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>), With<ReferenceFrame<P>>>,
     frame_query: Query<'w, 's, Read<ReferenceFrame<P>>>,
 }
 
@@ -397,7 +397,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     ) {
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
         /// there is a degenerate hierarchy. It might take a while, but at least it's not forever?
-        const MAX_REFERENCE_FRAME_DEPTH: usize = usize::MAX;
+        const MAX_REFERENCE_FRAME_DEPTH: usize = 255;
 
         // Return the this reference frame's floating origin if it exists and is a descendent of
         // this root.

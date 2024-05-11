@@ -12,7 +12,7 @@ use bevy::{
 
 use crate::{
     precision::GridPrecision,
-    reference_frame::local_origin::ReferenceFrames,
+    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::{GridTransform, GridTransformReadOnly},
 };
 
@@ -206,7 +206,10 @@ pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
     frames: ReferenceFrames<P>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
+    mut camera: Query<
+        (Entity, GridTransform<P>, &mut CameraController),
+        Without<ReferenceFrame<P>>,
+    >,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
         let Some((frame, ..)) = frames
