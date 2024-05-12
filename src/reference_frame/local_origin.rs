@@ -15,7 +15,7 @@ use bevy::{
     transform::prelude::*,
 };
 
-use super::{ReferenceFrame, RootReferenceFrame};
+use super::{BigSpace, ReferenceFrame};
 use crate::{GridCell, GridPrecision};
 
 pub use inner::LocalFloatingOrigin;
@@ -392,7 +392,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         mut reference_frames: ReferenceFramesMut<P>,
         mut frame_stack: Local<Vec<Entity>>,
         cells: Query<(Entity, &GridCell<P>)>,
-        roots: Query<(Entity, &RootReferenceFrame)>,
+        roots: Query<(Entity, &BigSpace)>,
         parents: Query<&Parent>,
     ) {
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
@@ -403,7 +403,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         // this root.
         fn validate_floating_origin(
             root_entity: Entity,
-            root: &RootReferenceFrame,
+            root: &BigSpace,
             parents: &Query<&Parent>,
         ) -> Option<Entity> {
             let floating_origin = root.floating_origin?;

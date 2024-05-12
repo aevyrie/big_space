@@ -180,7 +180,7 @@ struct RootFrame<P: GridPrecision>(PhantomData<P>);
 impl<P: GridPrecision> HierarchyValidation for RootFrame<P> {
     fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .with::<RootReferenceFrame>()
+            .with::<BigSpace>()
             .with::<ReferenceFrame<P>>()
             .without::<GridCell<P>>()
             .without::<Transform>()
@@ -210,7 +210,7 @@ impl<P: GridPrecision> HierarchyValidation for RootSpatialLowPrecision<P> {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .without::<GridCell<P>>()
-            .without::<RootReferenceFrame>()
+            .without::<BigSpace>()
             .without::<ReferenceFrame<P>>()
             .without::<Parent>();
     }
@@ -235,7 +235,7 @@ impl<P: GridPrecision> HierarchyValidation for ChildFrame<P> {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
-            .without::<RootReferenceFrame>();
+            .without::<BigSpace>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
@@ -261,7 +261,7 @@ impl<P: GridPrecision> HierarchyValidation for ChildSpatialLowPrecision<P> {
             .with::<GlobalTransform>()
             .with::<Parent>()
             .without::<GridCell<P>>()
-            .without::<RootReferenceFrame>()
+            .without::<BigSpace>()
             .without::<ReferenceFrame<P>>();
     }
 
@@ -284,7 +284,7 @@ impl<P: GridPrecision> HierarchyValidation for ChildSpatialHighPrecision<P> {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
-            .without::<RootReferenceFrame>()
+            .without::<BigSpace>()
             .without::<ReferenceFrame<P>>();
     }
 

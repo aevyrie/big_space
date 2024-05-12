@@ -3,35 +3,80 @@
 //! orbiting a star.
 
 use bevy::{
-    ecs::{component::Component, entity::Entity},
+    ecs::prelude::*,
+    hierarchy::prelude::*,
+    log::error,
     math::{Affine3A, DAffine3, DVec3, Vec3},
     reflect::Reflect,
-    transform::components::{GlobalTransform, Transform},
+    transform::prelude::*,
 };
 
-use crate::{GridCell, GridPrecision};
+use crate::{FloatingOrigin, GridCell, GridPrecision};
 
 use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
 
-/// A reference frame at the root of the entity hierarchy.
+/// The root reference frame of a high precision transform hierarchy rendered with a floating
+/// origin.
+///
+/// This component should also be paired with a [`ReferenceFrame`], which defines the properties of
+/// this root reference frame. A hierarchy can have many nested `ReferenceFrame`s, but only one
+/// `BigSpace`, at the root.
 #[derive(Debug, Default, Component, Reflect)]
-pub struct RootReferenceFrame {
-    /// Set the entity to use as the floating origin within this floating origin hierarchy.
+pub struct BigSpace {
+    /// Set the entity to use as the floating origin within this high precision hierarchy.
     pub floating_origin: Option<Entity>,
 }
 
-/// A component that defines a reference frame for children of this entity with [`GridCell`]s.
-///
-/// Entities without a parent are implicitly in the [`RootReferenceFrame`].
+impl BigSpace {
+    /// Automatically update [`BigSpace`] components with the current floating origin. There should
+    /// be one, and only one, floating origin in a `BigSpace` hierarchy.
+    pub fn update_floating_origin(
+        origins: Query<Entity, With<FloatingOrigin>>,
+        parent_query: Query<&Parent>,
+        mut big_spaces: Query<(Entity, &mut BigSpace)>,
+    ) {
+        for (_, mut space) in &mut big_spaces {
+            space.floating_origin = None;
+        }
+        for origin in &origins {
+            let maybe_root = parent_query.iter_ancestors(origin).last();
+            if let Some((_, mut space)) = maybe_root.and_then(|root| big_spaces.get_mut(root).ok())
+            {
+                if space.floating_origin.is_some() {
+                    error!(
+                        "BigSpace {:#?} has multiple floating origins. There must be exactly one.",
+                        maybe_root.unwrap()
+                    )
+                }
+                space.floating_origin = Some(origin);
+                continue;
+            }
+        }
+        for (space_entity, space) in &mut big_spaces {
+            if space.floating_origin.is_none() {
+                error!(
+                    "BigSpace {space_entity:#?} has no floating origins. There must be exactly one.",
+                )
+            }
+        }
+    }
+}
+
+/// A component that defines a reference frame for children of this entity with [`GridCell`]s. All
+/// entities with a [`GridCell`] must be children of an entity with a [`ReferenceFrame`]. The
+/// reference frame *defines* the grid that the `GridCell` indexes into.
 ///
 /// ## Motivation
 ///
 /// Reference frames are hierarchical, allowing more precision for objects with similar relative
-/// velocities. Entities in the same reference frame as the [`crate::FloatingOrigin`] will be
-/// rendered with the most precision. Reference frames are transformed relative to each other
-/// using 64 bit float transforms.
+/// velocities. All entities in the same reference frame will move together, like standard transform
+/// propagation, but with much more precision. Entities in the same reference frame as the
+/// [`crate::FloatingOrigin`] will be rendered with the most precision. Transforms are propagated
+/// starting from the floating origin, ensuring that references frames in a similar point in the
+/// hierarchy have accumulated the least error. Reference frames are transformed relative to each
+/// other using 64 bit float transforms.
 ///
 /// ## Example
 ///

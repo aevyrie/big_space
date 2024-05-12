@@ -6,7 +6,7 @@ use bevy::{
 use big_space::{
     camera::{CameraController, CameraInput},
     propagation::IgnoreFloatingOrigin,
-    reference_frame::RootReferenceFrame,
+    reference_frame::BigSpace,
     world_query::GridTransformReadOnly,
     FloatingOrigin, GridCell,
 };
@@ -166,7 +166,7 @@ fn ui_text_system(
     origin: Query<GridTransformReadOnly<i128>, With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Handle<Mesh>>>,
-    reference_frame: Res<RootReferenceFrame<i128>>,
+    reference_frame: Res<BigSpace<i128>>,
 ) {
     let origin = origin.single();
     let translation = origin.transform.translation;

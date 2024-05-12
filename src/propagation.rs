@@ -4,7 +4,7 @@
 
 use crate::{
     precision::GridPrecision,
-    reference_frame::{ReferenceFrame, RootReferenceFrame},
+    reference_frame::{BigSpace, ReferenceFrame},
     GridCell,
 };
 use bevy::prelude::*;
@@ -29,7 +29,7 @@ pub fn propagate_transforms<P: GridPrecision>(
             Without<Parent>,
             Without<GridCell<P>>,
             Without<ReferenceFrame<P>>,
-            Without<RootReferenceFrame>,
+            Without<BigSpace>,
         ),
     >,
     parent_query: Query<(Entity, Ref<Parent>)>,

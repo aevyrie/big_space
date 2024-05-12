@@ -3,9 +3,10 @@
 /// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
 use big_space::{
+    bundles::{BigSpaceBundle, BigSpatialBundle},
     camera::CameraController,
-    reference_frame::{ReferenceFrame, RootReferenceFrame},
-    FloatingOriginRootBundle, FloatingSpatialBundle, GridCell,
+    reference_frame::{BigSpace, ReferenceFrame},
+    FloatingOrigin, GridCell,
 };
 use rand::Rng;
 
@@ -63,11 +64,7 @@ fn rotate(mut rotate_query: Query<(&mut Transform, &Rotates)>) {
     }
 }
 
-fn spawn_camera(
-    mut commands: Commands,
-    earth: Query<(Entity, &ReferenceFrame<i64>), With<Earth>>,
-    mut root: Query<&mut RootReferenceFrame>,
-) {
+fn spawn_camera(mut commands: Commands, earth: Query<(Entity, &ReferenceFrame<i64>), With<Earth>>) {
     let (earth, earth_frame) = earth.single();
     let (cam_cell, cam_pos): (GridCell<i64>, _) =
         earth_frame.imprecise_translation_to_grid(Vec3::X * (EARTH_RADIUS_M + 1.0));
@@ -90,14 +87,14 @@ fn spawn_camera(
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),
         ))
-        .insert(FloatingSpatialBundle {
-            grid_position: cam_cell,
+        .insert(BigSpatialBundle {
+            cell: cam_cell,
             ..default()
         })
+        .insert(FloatingOrigin)
         .id();
 
     commands.entity(earth).add_child(camera_entity);
-    root.single_mut().floating_origin = Some(camera_entity);
 }
 
 fn spawn_starfield(
@@ -138,7 +135,7 @@ fn spawn_solar_system(
     let space_frame = ReferenceFrame::<i64>::default();
 
     commands
-        .spawn(FloatingOriginRootBundle::<i64>::default())
+        .spawn(BigSpaceBundle::<i64>::default())
         .with_children(|space| {
             let sun_frame = ReferenceFrame::<i64>::default();
             space

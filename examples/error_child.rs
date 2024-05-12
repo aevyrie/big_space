@@ -1,7 +1,7 @@
 //! This example demonstrates error accumulating from parent to children in nested reference frames.
 use bevy::{math::DVec3, prelude::*};
 use big_space::{
-    reference_frame::{ReferenceFrame, RootReferenceFrame},
+    reference_frame::{BigSpace, ReferenceFrame},
     FloatingOrigin, GridCell,
 };
 
@@ -28,7 +28,7 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    root: Res<RootReferenceFrame<i128>>,
+    root: Res<BigSpace<i128>>,
 ) {
     let mesh_handle = meshes.add(Sphere::new(0.5).mesh());
     let matl_handle = materials.add(StandardMaterial {

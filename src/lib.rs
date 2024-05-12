@@ -104,6 +104,7 @@ use propagation::propagate_transforms;
 use std::marker::PhantomData;
 use world_query::GridTransformReadOnly;
 
+pub mod bundles;
 pub mod grid_cell;
 pub mod precision;
 pub mod propagation;
@@ -113,17 +114,13 @@ pub mod world_query;
 
 pub use grid_cell::GridCell;
 
+#[cfg(feature = "camera")]
+pub mod camera;
 #[cfg(feature = "debug")]
 pub mod debug;
 
-#[cfg(feature = "camera")]
-pub mod camera;
-
-use precision::*;
-
-use crate::reference_frame::{
-    local_origin::LocalFloatingOrigin, ReferenceFrame, RootReferenceFrame,
-};
+use crate::precision::*;
+use crate::reference_frame::{local_origin::LocalFloatingOrigin, BigSpace, ReferenceFrame};
 
 /// Add this plugin to your [`App`] for floating origin functionality.
 #[derive(Default)]
@@ -143,7 +140,11 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
 
         let system_set_config = || {
             (
-                recenter_transform_on_grid::<P>.in_set(FloatingOriginSet::RecenterLargeTransforms),
+                (
+                    recenter_transform_on_grid::<P>,
+                    BigSpace::update_floating_origin,
+                )
+                    .in_set(FloatingOriginSet::RecenterLargeTransforms),
                 LocalFloatingOrigin::<P>::update
                     .in_set(FloatingOriginSet::LocalFloatingOrigins)
                     .after(FloatingOriginSet::RecenterLargeTransforms),
@@ -161,7 +162,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
             .register_type::<GlobalTransform>()
             .register_type::<GridCell<P>>()
             .register_type::<ReferenceFrame<P>>()
-            .register_type::<RootReferenceFrame>()
+            .register_type::<BigSpace>()
             .add_systems(PostStartup, system_set_config())
             .add_systems(PostUpdate, system_set_config())
             .add_systems(
@@ -172,45 +173,10 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
     }
 }
 
-/// Minimal bundle needed to position an entity in floating origin space.
-///
-/// This is the floating origin equivalent of the [`SpatialBundle`].
-#[derive(Bundle, Default)]
-pub struct FloatingSpatialBundle<P: GridPrecision> {
-    /// The visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub visibility: Visibility,
-    /// The inherited visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub inherited: InheritedVisibility,
-    /// The view visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub view: ViewVisibility,
-    /// The transform of the entity.
-    pub transform: Transform,
-    /// The global transform of the entity.
-    pub global_transform: GlobalTransform,
-    /// The grid position of the entity
-    pub grid_position: GridCell<P>,
-}
-
-/// Bundled needed for root reference frames.
-#[derive(Bundle, Default)]
-pub struct FloatingOriginRootBundle<P: GridPrecision> {
-    /// The visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub visibility: Visibility,
-    /// The inherited visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub inherited: InheritedVisibility,
-    /// The view visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub view: ViewVisibility,
-    /// The root reference frame
-    pub reference_frame: ReferenceFrame<P>,
-    /// Tracks the current floating origin
-    pub root: RootReferenceFrame,
-}
+/// Marks the entity to use as the floating origin. All other entities will be positioned relative
+/// to this entity's [`GridCell`].
+#[derive(Component, Reflect)]
+pub struct FloatingOrigin;
 
 /// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
 /// grid cell to reduce the size of the transform.
@@ -290,13 +256,13 @@ mod tests {
             .id();
 
         app.world.entity_mut(root).push_children(&[first, second]);
-        app.world.entity_mut(root).insert(RootReferenceFrame {
+        app.world.entity_mut(root).insert(BigSpace {
             floating_origin: Some(first),
         });
 
         app.update();
 
-        app.world.entity_mut(root).insert(RootReferenceFrame {
+        app.world.entity_mut(root).insert(BigSpace {
             floating_origin: Some(second),
         });
 
@@ -350,13 +316,13 @@ mod tests {
             .id();
 
         app.world.entity_mut(root).push_children(&[first, second]);
-        app.world.entity_mut(root).insert(RootReferenceFrame {
+        app.world.entity_mut(root).insert(BigSpace {
             floating_origin: Some(first),
         });
 
         app.update();
 
-        app.world.entity_mut(root).insert(RootReferenceFrame {
+        app.world.entity_mut(root).insert(BigSpace {
             floating_origin: Some(second),
         });
 
