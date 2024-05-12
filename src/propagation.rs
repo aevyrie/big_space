@@ -2,13 +2,12 @@
 //!
 //! This is a modified version of Bevy's own transform propagation system.
 
-use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
+use crate::{
+    precision::GridPrecision,
+    reference_frame::{ReferenceFrame, RootReferenceFrame},
+    GridCell,
+};
 use bevy::prelude::*;
-
-/// Entities with this component will ignore the floating origin, and will instead propagate
-/// transforms normally.
-#[derive(Component, Debug, Reflect)]
-pub struct IgnoreFloatingOrigin;
 
 /// Update the [`GlobalTransform`] of entities with a [`Transform`] that are children of a
 /// [`ReferenceFrame`] and do not have a [`GridCell`] component, or that are children of
@@ -22,6 +21,15 @@ pub fn propagate_transforms<P: GridPrecision>(
             With<Parent>,
             Without<GridCell<P>>,
             Without<ReferenceFrame<P>>,
+        ),
+    >,
+    root_entities: Query<
+        Entity,
+        (
+            Without<Parent>,
+            Without<GridCell<P>>,
+            Without<ReferenceFrame<P>>,
+            Without<RootReferenceFrame>,
         ),
     >,
     parent_query: Query<(Entity, Ref<Parent>)>,

@@ -4,7 +4,7 @@
 use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
 use big_space::{
     camera::CameraController,
-    reference_frame::{FloatingOriginRoot, ReferenceFrame},
+    reference_frame::{ReferenceFrame, RootReferenceFrame},
     FloatingOriginRootBundle, FloatingSpatialBundle, GridCell,
 };
 use rand::Rng;
@@ -13,6 +13,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
+            bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
             big_space::FloatingOriginPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
@@ -23,24 +24,37 @@ fn main() {
             color: Color::WHITE,
             brightness: 100.0,
         })
-        .add_systems(Startup, (setup, spawn_camera).chain())
+        .add_systems(
+            Startup,
+            (
+                spawn_solar_system,
+                spawn_camera,
+                // spawn_starfield
+            )
+                .chain(),
+        )
         .add_systems(Update, rotate)
+        .register_type::<Sun>()
+        .register_type::<Earth>()
+        .register_type::<Moon>()
+        .register_type::<Rotates>()
         .run()
 }
 
 const EARTH_ORBIT_RADIUS_M: f32 = 149.60e9;
 const EARTH_RADIUS_M: f32 = 6.371e6;
+const SUN_RADIUS_M: f32 = 695_508_000_f32;
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 struct Earth;
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 struct Sun;
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 struct Moon;
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 struct Rotates(f32);
 
 fn rotate(mut rotate_query: Query<(&mut Transform, &Rotates)>) {
@@ -52,7 +66,7 @@ fn rotate(mut rotate_query: Query<(&mut Transform, &Rotates)>) {
 fn spawn_camera(
     mut commands: Commands,
     earth: Query<(Entity, &ReferenceFrame<i64>), With<Earth>>,
-    mut root: Query<&mut FloatingOriginRoot>,
+    mut root: Query<&mut RootReferenceFrame>,
 ) {
     let (earth, earth_frame) = earth.single();
     let (cam_cell, cam_pos): (GridCell<i64>, _) =
@@ -71,29 +85,26 @@ fn spawn_camera(
                 ..default()
             },
             BloomSettings::default(),
-            cam_cell,
             CameraController::default() // Built-in camera controller
                 .with_speed_bounds([10e-18, 10e35])
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),
         ))
+        .insert(FloatingSpatialBundle {
+            grid_position: cam_cell,
+            ..default()
+        })
         .id();
 
     commands.entity(earth).add_child(camera_entity);
     root.single_mut().floating_origin = Some(camera_entity);
 }
 
-fn setup(
+fn spawn_starfield(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let space_frame = ReferenceFrame::default();
-
-    let space = commands
-        .spawn(FloatingOriginRootBundle::<i64>::default())
-        .id();
-
     let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
 
     let star_mesh = sphere(1e10);
@@ -103,132 +114,128 @@ fn setup(
         ..default()
     });
     let mut rng = rand::thread_rng();
-    let stars: Vec<Entity> = (0..500)
-        .map(|_| {
-            commands
+    (0..500).for_each(|_| {
+        commands.spawn((PbrBundle {
+            mesh: star_mesh.clone(),
+            material: star_mat.clone(),
+            transform: Transform::from_xyz(
+                (rng.gen::<f32>() - 0.5) * 1e14,
+                (rng.gen::<f32>() - 0.5) * 1e14,
+                (rng.gen::<f32>() - 0.5) * 1e14,
+            ),
+            ..default()
+        },));
+    });
+}
+
+fn spawn_solar_system(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
+
+    let space_frame = ReferenceFrame::<i64>::default();
+
+    commands
+        .spawn(FloatingOriginRootBundle::<i64>::default())
+        .with_children(|space| {
+            let sun_frame = ReferenceFrame::<i64>::default();
+            space
                 .spawn((
-                    GridCell::<i64>::new(
-                        ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
-                        ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
-                        ((rng.gen::<f32>() - 0.5) * 1e11) as i64,
-                    ),
+                    Sun,
+                    GridCell::<i64>::ZERO,
                     PbrBundle {
-                        mesh: star_mesh.clone(),
-                        material: star_mat.clone(),
+                        mesh: sphere(SUN_RADIUS_M),
+                        material: materials.add(StandardMaterial {
+                            base_color: Color::WHITE,
+                            emissive: Color::rgb_linear(10000000., 10000000., 10000000.),
+                            ..default()
+                        }),
                         ..default()
                     },
                 ))
-                .id()
+                .with_children(|sun| {
+                    sun.spawn(PointLightBundle {
+                        point_light: PointLight {
+                            intensity: 35.73e27,
+                            range: 1e20,
+                            radius: SUN_RADIUS_M,
+                            shadows_enabled: true,
+                            ..default()
+                        },
+                        ..default()
+                    });
+
+                    let (earth_cell, earth_pos): (GridCell<i64>, _) =
+                        sun_frame.imprecise_translation_to_grid(Vec3::Z * EARTH_ORBIT_RADIUS_M);
+
+                    let earth_frame = ReferenceFrame::<i64>::default();
+
+                    sun.spawn((
+                        Earth,
+                        PbrBundle {
+                            mesh: sphere(EARTH_RADIUS_M),
+                            material: materials.add(StandardMaterial {
+                                base_color: Color::BLUE,
+                                perceptual_roughness: 0.8,
+                                reflectance: 1.0,
+                                ..default()
+                            }),
+                            transform: Transform::from_translation(earth_pos),
+                            ..default()
+                        },
+                        earth_cell,
+                        Rotates(0.001),
+                    ))
+                    .with_children(|earth| {
+                        let moon_orbit_radius_m = 385e6;
+                        let moon_radius_m = 1.7375e6;
+
+                        let moon_mat = materials.add(StandardMaterial {
+                            base_color: Color::GRAY,
+                            perceptual_roughness: 1.0,
+                            reflectance: 0.0,
+                            ..default()
+                        });
+
+                        let (moon_cell, moon_pos): (GridCell<i64>, _) = earth_frame
+                            .imprecise_translation_to_grid(Vec3::X * moon_orbit_radius_m);
+
+                        earth.spawn((
+                            Moon,
+                            PbrBundle {
+                                mesh: sphere(moon_radius_m),
+                                material: moon_mat,
+                                transform: Transform::from_translation(moon_pos),
+                                ..default()
+                            },
+                            moon_cell,
+                        ));
+
+                        let (ball_cell, ball_pos): (GridCell<i64>, _) = earth_frame
+                            .imprecise_translation_to_grid(
+                                Vec3::X * (EARTH_RADIUS_M + 1.0) + Vec3::NEG_Z * 5.0,
+                            );
+
+                        earth.spawn((
+                            PbrBundle {
+                                mesh: sphere(1.0),
+                                material: materials.add(StandardMaterial {
+                                    base_color: Color::FUCHSIA,
+                                    perceptual_roughness: 1.0,
+                                    reflectance: 0.0,
+                                    ..default()
+                                }),
+                                transform: Transform::from_translation(ball_pos),
+                                ..default()
+                            },
+                            ball_cell,
+                        ));
+                    })
+                    .insert(earth_frame);
+                })
+                .insert(sun_frame);
         })
-        .collect();
-
-    commands.entity(space).push_children(&stars);
-
-    let sun_mat = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
-        emissive: Color::rgb_linear(10000000., 10000000., 10000000.),
-        ..default()
-    });
-    let sun_radius_m = 695_508_000.0;
-
-    let sun = commands
-        .spawn((
-            Sun,
-            GridCell::<i64>::ZERO,
-            PointLightBundle {
-                point_light: PointLight {
-                    intensity: 35.73e27,
-                    range: 1e20,
-                    radius: sun_radius_m,
-                    shadows_enabled: true,
-                    ..default()
-                },
-                ..default()
-            },
-            ReferenceFrame::<i64>::default(),
-        ))
-        .with_children(|builder| {
-            builder.spawn((PbrBundle {
-                mesh: sphere(sun_radius_m),
-                material: sun_mat,
-                ..default()
-            },));
-        })
-        .id();
-
-    commands.entity(space).add_child(sun);
-
-    let earth_mat = materials.add(StandardMaterial {
-        base_color: Color::BLUE,
-        perceptual_roughness: 0.8,
-        reflectance: 1.0,
-        ..default()
-    });
-
-    let (earth_cell, earth_pos): (GridCell<i64>, _) =
-        space_frame.imprecise_translation_to_grid(Vec3::Z * EARTH_ORBIT_RADIUS_M);
-
-    let earth = commands
-        .spawn((
-            Earth,
-            PbrBundle {
-                mesh: sphere(EARTH_RADIUS_M),
-                material: earth_mat,
-                transform: Transform::from_translation(earth_pos),
-                ..default()
-            },
-            earth_cell,
-            ReferenceFrame::<i64>::default(),
-            Rotates(0.001),
-        ))
-        .with_children(|commands| {
-            let moon_orbit_radius_m = 385e6;
-            let moon_radius_m = 1.7375e6;
-
-            let moon_mat = materials.add(StandardMaterial {
-                base_color: Color::GRAY,
-                perceptual_roughness: 1.0,
-                reflectance: 0.0,
-                ..default()
-            });
-
-            let (moon_cell, moon_pos): (GridCell<i64>, _) =
-                space_frame.imprecise_translation_to_grid(Vec3::X * moon_orbit_radius_m);
-
-            commands.spawn((
-                Moon,
-                PbrBundle {
-                    mesh: sphere(moon_radius_m),
-                    material: moon_mat,
-                    transform: Transform::from_translation(moon_pos),
-                    ..default()
-                },
-                moon_cell,
-            ));
-
-            let (ball_cell, ball_pos): (GridCell<i64>, _) = space_frame
-                .imprecise_translation_to_grid(
-                    Vec3::X * (EARTH_RADIUS_M + 1.0) + Vec3::NEG_Z * 5.0,
-                );
-
-            let ball_mat = materials.add(StandardMaterial {
-                base_color: Color::FUCHSIA,
-                perceptual_roughness: 1.0,
-                reflectance: 0.0,
-                ..default()
-            });
-
-            commands.spawn((
-                PbrBundle {
-                    mesh: sphere(1.0),
-                    material: ball_mat,
-                    transform: Transform::from_translation(ball_pos),
-                    ..default()
-                },
-                ball_cell,
-            ));
-        })
-        .id();
-
-    commands.entity(sun).add_child(earth);
+        .insert(space_frame);
 }

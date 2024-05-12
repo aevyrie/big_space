@@ -108,10 +108,10 @@ pub mod grid_cell;
 pub mod precision;
 pub mod propagation;
 pub mod reference_frame;
+pub mod validation;
 pub mod world_query;
 
 pub use grid_cell::GridCell;
-pub use propagation::IgnoreFloatingOrigin;
 
 #[cfg(feature = "debug")]
 pub mod debug;
@@ -122,34 +122,13 @@ pub mod camera;
 use precision::*;
 
 use crate::reference_frame::{
-    local_origin::LocalFloatingOrigin, FloatingOriginRoot, ReferenceFrame,
+    local_origin::LocalFloatingOrigin, ReferenceFrame, RootReferenceFrame,
 };
 
 /// Add this plugin to your [`App`] for floating origin functionality.
+#[derive(Default)]
 pub struct FloatingOriginPlugin<P: GridPrecision> {
-    /// The edge length of a single cell.
-    pub grid_edge_length: f32,
-    /// How far past the extents of a cell an entity must travel before a grid recentering occurs.
-    /// This prevents entities from rapidly switching between cells when moving along a boundary.
-    pub switching_threshold: f32,
     phantom: PhantomData<P>,
-}
-
-impl<P: GridPrecision> Default for FloatingOriginPlugin<P> {
-    fn default() -> Self {
-        Self::new(2_000f32, 100f32)
-    }
-}
-
-impl<P: GridPrecision> FloatingOriginPlugin<P> {
-    /// Construct a new plugin with the following settings.
-    pub fn new(grid_edge_length: f32, switching_threshold: f32) -> Self {
-        FloatingOriginPlugin {
-            grid_edge_length,
-            switching_threshold,
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOriginPlugin<P> {
@@ -182,10 +161,14 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
             .register_type::<GlobalTransform>()
             .register_type::<GridCell<P>>()
             .register_type::<ReferenceFrame<P>>()
-            .register_type::<FloatingOriginRoot>()
-            .add_plugins(ValidParentCheckPlugin::<GlobalTransform>::default())
+            .register_type::<RootReferenceFrame>()
             .add_systems(PostStartup, system_set_config())
-            .add_systems(PostUpdate, system_set_config());
+            .add_systems(PostUpdate, system_set_config())
+            .add_systems(
+                PostUpdate,
+                validation::validation::<validation::BigSpaceRoot<P>>
+                    .before(TransformSystem::TransformPropagate),
+            );
     }
 }
 
@@ -211,7 +194,7 @@ pub struct FloatingSpatialBundle<P: GridPrecision> {
     pub grid_position: GridCell<P>,
 }
 
-/// Bundled needed for root reference frames in `big_space`.
+/// Bundled needed for root reference frames.
 #[derive(Bundle, Default)]
 pub struct FloatingOriginRootBundle<P: GridPrecision> {
     /// The visibility of the entity.
@@ -226,7 +209,7 @@ pub struct FloatingOriginRootBundle<P: GridPrecision> {
     /// The root reference frame
     pub reference_frame: ReferenceFrame<P>,
     /// Tracks the current floating origin
-    pub root: FloatingOriginRoot,
+    pub root: RootReferenceFrame,
 }
 
 /// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
@@ -307,13 +290,13 @@ mod tests {
             .id();
 
         app.world.entity_mut(root).push_children(&[first, second]);
-        app.world.entity_mut(root).insert(FloatingOriginRoot {
+        app.world.entity_mut(root).insert(RootReferenceFrame {
             floating_origin: Some(first),
         });
 
         app.update();
 
-        app.world.entity_mut(root).insert(FloatingOriginRoot {
+        app.world.entity_mut(root).insert(RootReferenceFrame {
             floating_origin: Some(second),
         });
 
@@ -367,13 +350,13 @@ mod tests {
             .id();
 
         app.world.entity_mut(root).push_children(&[first, second]);
-        app.world.entity_mut(root).insert(FloatingOriginRoot {
+        app.world.entity_mut(root).insert(RootReferenceFrame {
             floating_origin: Some(first),
         });
 
         app.update();
 
-        app.world.entity_mut(root).insert(FloatingOriginRoot {
+        app.world.entity_mut(root).insert(RootReferenceFrame {
             floating_origin: Some(second),
         });
 

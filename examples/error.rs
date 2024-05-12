@@ -6,9 +6,7 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::{
-    reference_frame::RootReferenceFrame, FloatingOrigin, GridCell, IgnoreFloatingOrigin,
-};
+use big_space::{GridCell, IgnoreFloatingOrigin};
 
 fn main() {
     App::new()

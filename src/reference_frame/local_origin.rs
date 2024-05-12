@@ -15,7 +15,7 @@ use bevy::{
     transform::prelude::*,
 };
 
-use super::{FloatingOriginRoot, ReferenceFrame};
+use super::{ReferenceFrame, RootReferenceFrame};
 use crate::{GridCell, GridPrecision};
 
 pub use inner::LocalFloatingOrigin;
@@ -392,7 +392,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         mut reference_frames: ReferenceFramesMut<P>,
         mut frame_stack: Local<Vec<Entity>>,
         cells: Query<(Entity, &GridCell<P>)>,
-        roots: Query<(Entity, &FloatingOriginRoot)>,
+        roots: Query<(Entity, &RootReferenceFrame)>,
         parents: Query<&Parent>,
     ) {
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
@@ -403,7 +403,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         // this root.
         fn validate_floating_origin(
             root_entity: Entity,
-            root: &FloatingOriginRoot,
+            root: &RootReferenceFrame,
             parents: &Query<&Parent>,
         ) -> Option<Entity> {
             let floating_origin = root.floating_origin?;
@@ -413,7 +413,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
 
         // TODO: because each tree under a root is disjoint, these updates can be done in parallel
         // without aliasing. This will require unsafe, just like bevy's own transform propagation.
-        for (origin_entity, origin_cell) in roots
+        'outer: for (origin_entity, origin_cell) in roots
             .iter() // TODO: If any of these checks fail, log to some diagnostic
             .filter_map(|(root_entity, root)| validate_floating_origin(root_entity, root, &parents))
             .filter_map(|origin| cells.get(origin).ok())
@@ -471,7 +471,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
                 // processed, so we only need to process the siblings.
                 match reference_frames.parent(this_frame) {
                     Some(parent_frame) => this_frame = parent_frame,
-                    None => continue, // We have reached the root of the tree, and can exit.
+                    None => continue 'outer, // We have reached the root of the tree, and can exit.
                 }
             }
 
