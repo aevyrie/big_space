@@ -1,7 +1,6 @@
-//! Propagates transforms through the entity hierarchy.
-//!
-//! This is a modified version of Bevy's own transform propagation system.
-
+//! This module is specifically for propagating low-precision (no [`GridCell`]) entity
+//! [`Transform`]s. This allows users to seamlessly add normal low-precision bevy hierarchies within
+//! a high precision hierarchy.
 use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
 use bevy::prelude::*;
 

@@ -414,23 +414,11 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
         /// there is a degenerate hierarchy. It might take a while, but at least it's not forever?
         const MAX_REFERENCE_FRAME_DEPTH: usize = 255;
 
-        // Return the this reference frame's floating origin if it exists and is a descendent of
-        // this root.
-        fn validate_floating_origin(
-            root_entity: Entity,
-            root: &BigSpace,
-            parents: &Query<&Parent>,
-        ) -> Option<Entity> {
-            let floating_origin = root.floating_origin?;
-            let origin_root_entity = parents.iter_ancestors(floating_origin).last()?;
-            Some(floating_origin).filter(|_| origin_root_entity == root_entity)
-        }
-
         // TODO: because each tree under a root is disjoint, these updates can be done in parallel
         // without aliasing. This will require unsafe, just like bevy's own transform propagation.
         'outer: for (origin_entity, origin_cell) in roots
             .iter() // TODO: If any of these checks fail, log to some diagnostic
-            .filter_map(|(root_entity, root)| validate_floating_origin(root_entity, root, &parents))
+            .filter_map(|(root_entity, root)| root.validate_floating_origin(root_entity, &parents))
             .filter_map(|origin| cells.get(origin).ok())
         {
             let Some(mut this_frame) = reference_frames.parent_frame(origin_entity) else {

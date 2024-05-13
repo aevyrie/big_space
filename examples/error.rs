@@ -94,25 +94,21 @@ fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator
 }
 
 fn setup_ui(mut commands: Commands) {
-    commands.spawn((TextBundle {
-        style: Style {
-            align_self: AlignSelf::FlexStart,
-            flex_direction: FlexDirection::Column,
-            ..Default::default()
-        },
-        text: Text {
-            sections: vec![TextSection {
-                value: "hello: ".to_string(),
-                style: TextStyle {
-                    font_size: 30.0,
-                    color: Color::WHITE,
-                    ..default()
-                },
-            }],
-            ..Default::default()
-        },
-        ..Default::default()
-    },));
+    commands.spawn(
+        TextBundle::from_section(
+            "",
+            TextStyle {
+                font_size: 30.0,
+                ..default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(12.0),
+            left: Val::Px(12.0),
+            ..default()
+        }),
+    );
 }
 
 fn setup_scene(

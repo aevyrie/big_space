@@ -8,19 +8,19 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i128>::default(),
-            big_space::camera::CameraControllerPlugin::<i128>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
+            bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
+            big_space::FloatingOriginPlugin::<i64>::default(),
+            big_space::camera::CameraControllerPlugin::<i64>::default(),
+            big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
         .add_systems(Startup, setup_scene)
         .run()
 }
 
-// The nearby object is 200 meters away from us. The distance object is 100 quadrillion meters away
-// from us, and has a child that is 100 quadrillion meters toward us (relative its parent) minus 200
-// meters. If we had infinite precision, the child of the distant object would be at the same
-// position as the nearby object, only 200 meters away.
-const DISTANT: DVec3 = DVec3::new(1e17, 1e17, 0.0);
+// The nearby object is 200 meters away from us. The distance object is 1 million kilometers away
+// from us, and has a child that is 1 million kilometers toward us (relative its parent) minus 200
+// meters.
+const DISTANT: DVec3 = DVec3::new(1e9, 1e9, 1e9);
 const NEARBY: DVec3 = DVec3::new(200.0, 200.0, 0.0);
 
 fn setup_scene(
@@ -28,16 +28,16 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh_handle = meshes.add(Sphere::new(0.5).mesh());
+    let mesh_handle = meshes.add(Sphere::new(0.01).mesh());
     let matl_handle = materials.add(StandardMaterial {
         base_color: Color::rgb(0.8, 0.7, 0.6),
         ..default()
     });
 
-    let root_frame = ReferenceFrame::<i128>::default();
+    let root_frame = ReferenceFrame::<i64>::default();
 
     commands
-        .spawn(BigSpaceBundle::<i128>::default())
+        .spawn(BigSpaceBundle::<i64>::default())
         .with_children(|root| {
             // A red sphere located nearby
             root.spawn((
@@ -47,7 +47,7 @@ fn setup_scene(
                     transform: Transform::from_translation(NEARBY.as_vec3()),
                     ..default()
                 },
-                GridCell::<i128>::default(),
+                GridCell::<i64>::default(),
             ));
 
             let parent = root_frame.translation_to_grid(DISTANT);
@@ -64,7 +64,7 @@ fn setup_scene(
                     ..default()
                 },
                 parent.0,
-                ReferenceFrame::<i128>::default(),
+                ReferenceFrame::<i64>::default(),
             ))
             .with_children(|parent| {
                 // A green sphere that is a child of the sphere very far from the origin. This child
@@ -81,7 +81,7 @@ fn setup_scene(
                     },
                     child.0,
                 ));
-                todo!("Seems like there is an error here. The green sphere seems to follow the camera when it changes grid cells, but the red one does not.")
+                // todo!("Seems like there is an error here. The green sphere seems to follow the camera when it changes grid cells, but the red one does not.")
             });
             // light
             root.spawn((
@@ -89,23 +89,24 @@ fn setup_scene(
                     transform: Transform::from_xyz(4.0, -10.0, -4.0),
                     ..default()
                 },
-                GridCell::<i128>::default(),
+                GridCell::<i64>::default(),
             ));
             // camera
             root.spawn((
                 Camera3dBundle {
                     transform: Transform::from_translation(
-                        NEARBY.as_vec3() + Vec3::new(0.0, 0.0, 20.0),
+                        NEARBY.as_vec3() + Vec3::new(0.0, 0.0, 0.5),
                     )
                     .looking_at(NEARBY.as_vec3(), Vec3::Y),
                     ..default()
                 },
-                GridCell::<i128>::default(),
+                GridCell::<i64>::default(),
                 FloatingOrigin,
                 big_space::camera::CameraController::default() // Built-in camera controller
                     .with_speed_bounds([10e-18, 10e35])
                     .with_smoothness(0.9, 0.8)
                     .with_speed(1.0),
             ));
-        });
+        })
+        .insert(root_frame);
 }

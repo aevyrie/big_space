@@ -36,6 +36,20 @@ pub struct BigSpace {
 }
 
 impl BigSpace {
+    /// Return the this reference frame's floating origin if it exists and is a descendent of this
+    /// root.
+    ///
+    /// `this_entity`: the entity this component belongs to.
+    pub fn validate_floating_origin(
+        &self,
+        this_entity: Entity,
+        parents: &Query<&Parent>,
+    ) -> Option<Entity> {
+        let floating_origin = self.floating_origin?;
+        let origin_root_entity = parents.iter_ancestors(floating_origin).last()?;
+        Some(floating_origin).filter(|_| origin_root_entity == this_entity)
+    }
+
     /// Automatically update all [`BigSpace`]s, finding the current floating origin entity within
     /// their hierarchy. There should be one, and only one, [`FloatingOrigin`] component in a
     /// `BigSpace` hierarchy.
