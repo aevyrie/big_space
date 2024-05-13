@@ -1,13 +1,15 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use big_space::{reference_frame::ReferenceFrame, FloatingOrigin, GridCell};
+use big_space::{
+    bundles::BigSpaceBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
+};
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i64>::new(0.5, 0.01),
+            big_space::FloatingOriginPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
@@ -59,75 +61,81 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
-    let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::YELLOW,
-        ..default()
-    });
-
-    commands.spawn((
-        PbrBundle {
-            mesh: mesh_handle.clone(),
-            material: matl_handle.clone(),
-            transform: Transform::from_xyz(0.0, 0.0, 1.0),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-        Mover::<1>,
-    ));
-    commands.spawn((
-        PbrBundle {
-            mesh: mesh_handle.clone(),
-            material: matl_handle.clone(),
-            transform: Transform::from_xyz(1.0, 0.0, 0.0),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-        Mover::<2>,
-    ));
     commands
-        .spawn((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_xyz(0.0, 1.0, 0.0),
+        .spawn(BigSpaceBundle::<i64> {
+            reference_frame: ReferenceFrame::<i64>::new(0.5, 0.01),
+            ..default()
+        })
+        .with_children(|root| {
+            let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
+            let matl_handle = materials.add(StandardMaterial {
+                base_color: Color::YELLOW,
                 ..default()
-            },
-            GridCell::<i64>::default(),
-            ReferenceFrame::<i64>::new(0.2, 0.01),
-            Rotator,
-            Mover::<3>,
-        ))
-        .with_children(|parent| {
-            parent.spawn((
+            });
+
+            root.spawn((
                 PbrBundle {
-                    mesh: mesh_handle,
-                    material: matl_handle,
-                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
+                    mesh: mesh_handle.clone(),
+                    material: matl_handle.clone(),
+                    transform: Transform::from_xyz(0.0, 0.0, 1.0),
                     ..default()
                 },
                 GridCell::<i64>::default(),
-                Mover::<4>,
+                Mover::<1>,
+            ));
+            root.spawn((
+                PbrBundle {
+                    mesh: mesh_handle.clone(),
+                    material: matl_handle.clone(),
+                    transform: Transform::from_xyz(1.0, 0.0, 0.0),
+                    ..default()
+                },
+                GridCell::<i64>::default(),
+                Mover::<2>,
+            ));
+            root.spawn((
+                PbrBundle {
+                    mesh: mesh_handle.clone(),
+                    material: matl_handle.clone(),
+                    transform: Transform::from_xyz(0.0, 1.0, 0.0),
+                    ..default()
+                },
+                GridCell::<i64>::default(),
+                ReferenceFrame::<i64>::new(0.2, 0.01),
+                Rotator,
+                Mover::<3>,
+            ))
+            .with_children(|parent| {
+                parent.spawn((
+                    PbrBundle {
+                        mesh: mesh_handle,
+                        material: matl_handle,
+                        transform: Transform::from_xyz(0.0, 0.5, 0.0),
+                        ..default()
+                    },
+                    GridCell::<i64>::default(),
+                    Mover::<4>,
+                ));
+            });
+
+            // light
+            root.spawn((
+                PointLightBundle {
+                    transform: Transform::from_xyz(4.0, 8.0, 4.0),
+                    ..default()
+                },
+                GridCell::<i64>::default(),
+            ));
+
+            // camera
+            root.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 8.0)
+                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                    ..default()
+                },
+                GridCell::<i64>::default(),
+                FloatingOrigin,
             ));
         });
-
-    // light
-    commands.spawn((
-        PointLightBundle {
-            transform: Transform::from_xyz(4.0, 8.0, 4.0),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-    ));
-
-    // camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-        FloatingOrigin,
-    ));
 }

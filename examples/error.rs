@@ -7,7 +7,8 @@
 
 use bevy::prelude::*;
 use big_space::{
-    reference_frame::{local_origin::ReferenceFrames, BigSpace},
+    bundles::BigSpaceBundle,
+    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     FloatingOrigin, GridCell,
 };
 
@@ -46,7 +47,7 @@ fn toggle_plugin(
     }
 
     let this_frame = ref_frames.parent_frame(floating_origin.single().0).unwrap();
-    let (this_frame, ..) = ref_frames.get(this_frame);
+    let this_frame = ref_frames.get(this_frame);
 
     let mut origin_cell = floating_origin.single_mut().1;
     let index_max = DISTANCE / this_frame.cell_edge_length() as i128;
@@ -116,8 +117,6 @@ fn setup_ui(mut commands: Commands) {
 
 fn setup_scene(
     mut commands: Commands,
-    ref_frames: ReferenceFrames<i128>,
-    big_spaces: Query<Entity, With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -127,57 +126,61 @@ fn setup_scene(
         ..default()
     });
 
-    let this_ref_frame = ref_frames.get(big_spaces.single()).0;
-
-    let d = DISTANCE / this_ref_frame.cell_edge_length() as i128;
-    let distant_grid_cell = GridCell::<i128>::new(d, d, d);
-
-    // Normally, we would put the floating origin on the camera. However in this example, we want to
-    // show what happens as the camera is far from the origin, to emulate what happens when this
-    // plugin isn't used.
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Sphere::default().mesh()),
-            material: materials.add(StandardMaterial::from(Color::RED)),
-            transform: Transform::from_scale(Vec3::splat(10000.0)),
-            ..default()
-        },
-        distant_grid_cell,
-        FloatingOrigin,
-    ));
-
+    let big_space = ReferenceFrame::<i128>::default();
     commands
-        .spawn((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                ..default()
-            },
-            distant_grid_cell,
-            Rotator,
-        ))
-        .with_children(|parent| {
-            parent.spawn(PbrBundle {
-                mesh: mesh_handle,
-                material: matl_handle,
-                transform: Transform::from_xyz(0.0, 0.0, 4.0),
-                ..default()
-            });
-        });
-    // light
-    commands.spawn((
-        DirectionalLightBundle {
-            transform: Transform::from_xyz(4.0, -10.0, -4.0),
-            ..default()
-        },
-        distant_grid_cell,
-    ));
-    // camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(8.0, -8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        },
-        distant_grid_cell,
-    ));
+        .spawn(BigSpaceBundle::<i128>::default())
+        .with_children(|root_frame| {
+            let d = DISTANCE / big_space.cell_edge_length() as i128;
+            let distant_grid_cell = GridCell::<i128>::new(d, d, d);
+
+            // Normally, we would put the floating origin on the camera. However in this example, we
+            // want to show what happens as the camera is far from the origin, to emulate what
+            // happens when this plugin isn't used.
+            root_frame.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Sphere::default().mesh()),
+                    material: materials.add(StandardMaterial::from(Color::RED)),
+                    transform: Transform::from_scale(Vec3::splat(10000.0)),
+                    ..default()
+                },
+                distant_grid_cell,
+                FloatingOrigin,
+            ));
+
+            root_frame
+                .spawn((
+                    PbrBundle {
+                        mesh: mesh_handle.clone(),
+                        material: matl_handle.clone(),
+                        ..default()
+                    },
+                    distant_grid_cell,
+                    Rotator,
+                ))
+                .with_children(|parent| {
+                    parent.spawn(PbrBundle {
+                        mesh: mesh_handle,
+                        material: matl_handle,
+                        transform: Transform::from_xyz(0.0, 0.0, 4.0),
+                        ..default()
+                    });
+                });
+            // light
+            root_frame.spawn((
+                DirectionalLightBundle {
+                    transform: Transform::from_xyz(4.0, -10.0, -4.0),
+                    ..default()
+                },
+                distant_grid_cell,
+            ));
+            // camera
+            root_frame.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_xyz(8.0, -8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+                    ..default()
+                },
+                distant_grid_cell,
+            ));
+        })
+        .insert(big_space);
 }

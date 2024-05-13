@@ -9,7 +9,7 @@ use bevy::{
     math::{Affine3A, DAffine3, DVec3, Vec3},
     reflect::Reflect,
     transform::prelude::*,
-    utils::hashbrown::{HashMap, HashSet},
+    utils::hashbrown::HashMap,
 };
 
 use crate::{FloatingOrigin, GridCell, GridPrecision};

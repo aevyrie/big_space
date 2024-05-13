@@ -1,8 +1,7 @@
 //! This example demonstrates error accumulating from parent to children in nested reference frames.
 use bevy::{math::DVec3, prelude::*};
 use big_space::{
-    reference_frame::{BigSpace, ReferenceFrame},
-    FloatingOrigin, GridCell,
+    bundles::BigSpaceBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
 };
 
 fn main() {
@@ -28,7 +27,6 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    root: Res<BigSpace<i128>>,
 ) {
     let mesh_handle = meshes.add(Sphere::new(0.5).mesh());
     let matl_handle = materials.add(StandardMaterial {
@@ -36,70 +34,78 @@ fn setup_scene(
         ..default()
     });
 
-    // A red sphere located nearby
-    commands.spawn((
-        PbrBundle {
-            mesh: mesh_handle.clone(),
-            material: materials.add(Color::RED),
-            transform: Transform::from_translation(NEARBY.as_vec3()),
-            ..default()
-        },
-        GridCell::<i128>::default(),
-    ));
-
-    let parent = root.translation_to_grid(DISTANT);
-    // This function introduces a small amount of error, because it can only work up to double
-    // precision floats. (f64).
-    let child = root.translation_to_grid(-DISTANT + NEARBY);
+    let root_frame = ReferenceFrame::<i128>::default();
 
     commands
-        .spawn((
-            // A sphere very far from the origin
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_translation(parent.1),
-                ..default()
-            },
-            parent.0,
-            ReferenceFrame::<i128>::default(),
-        ))
-        .with_children(|parent| {
-            // A green sphere that is a child of the sphere very far from the origin. This child is
-            // very far from its parent, and should be located exactly at the origin (if there was
-            // no floating point error). The distance from the green sphere to the red sphere is the
-            // error caused by float imprecision. Note that the sphere does not have any rendering
-            // artifacts, its position just has a fixed error.
-            parent.spawn((
+        .spawn(BigSpaceBundle::<i128>::default())
+        .with_children(|root| {
+            // A red sphere located nearby
+            root.spawn((
                 PbrBundle {
-                    mesh: mesh_handle,
-                    material: materials.add(Color::GREEN),
-                    transform: Transform::from_translation(child.1),
+                    mesh: mesh_handle.clone(),
+                    material: materials.add(Color::RED),
+                    transform: Transform::from_translation(NEARBY.as_vec3()),
                     ..default()
                 },
-                child.0,
+                GridCell::<i128>::default(),
+            ));
+
+            let parent = root_frame.translation_to_grid(DISTANT);
+            // This function introduces a small amount of error, because it can only work up to
+            // double precision floats. (f64).
+            let child = root_frame.translation_to_grid(-DISTANT + NEARBY);
+
+            root.spawn((
+                // A sphere very far from the origin
+                PbrBundle {
+                    mesh: mesh_handle.clone(),
+                    material: matl_handle.clone(),
+                    transform: Transform::from_translation(parent.1),
+                    ..default()
+                },
+                parent.0,
+                ReferenceFrame::<i128>::default(),
+            ))
+            .with_children(|parent| {
+                // A green sphere that is a child of the sphere very far from the origin. This child
+                // is very far from its parent, and should be located exactly at the origin (if
+                // there was no floating point error). The distance from the green sphere to the red
+                // sphere is the error caused by float imprecision. Note that the sphere does not
+                // have any rendering artifacts, its position just has a fixed error.
+                parent.spawn((
+                    PbrBundle {
+                        mesh: mesh_handle,
+                        material: materials.add(Color::GREEN),
+                        transform: Transform::from_translation(child.1),
+                        ..default()
+                    },
+                    child.0,
+                ));
+                todo!("Seems like there is an error here. The green sphere seems to follow the camera when it changes grid cells, but the red one does not.")
+            });
+            // light
+            root.spawn((
+                DirectionalLightBundle {
+                    transform: Transform::from_xyz(4.0, -10.0, -4.0),
+                    ..default()
+                },
+                GridCell::<i128>::default(),
+            ));
+            // camera
+            root.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_translation(
+                        NEARBY.as_vec3() + Vec3::new(0.0, 0.0, 20.0),
+                    )
+                    .looking_at(NEARBY.as_vec3(), Vec3::Y),
+                    ..default()
+                },
+                GridCell::<i128>::default(),
+                FloatingOrigin,
+                big_space::camera::CameraController::default() // Built-in camera controller
+                    .with_speed_bounds([10e-18, 10e35])
+                    .with_smoothness(0.9, 0.8)
+                    .with_speed(1.0),
             ));
         });
-    // light
-    commands.spawn((
-        DirectionalLightBundle {
-            transform: Transform::from_xyz(4.0, -10.0, -4.0),
-            ..default()
-        },
-        GridCell::<i128>::default(),
-    ));
-    // camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_translation(NEARBY.as_vec3() + Vec3::new(0.0, 0.0, 20.0))
-                .looking_at(NEARBY.as_vec3(), Vec3::Y),
-            ..default()
-        },
-        GridCell::<i128>::default(),
-        FloatingOrigin,
-        big_space::camera::CameraController::default() // Built-in camera controller
-            .with_speed_bounds([10e-18, 10e35])
-            .with_smoothness(0.9, 0.8)
-            .with_speed(1.0),
-    ));
 }

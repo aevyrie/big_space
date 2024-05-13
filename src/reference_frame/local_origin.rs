@@ -228,33 +228,19 @@ fn propagate_origin_to_child<P: GridPrecision>(
 pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
     children: Query<'w, 's, Read<Children>>,
-    position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>), With<ReferenceFrame<P>>>,
+    // position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>), With<ReferenceFrame<P>>>,
     frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
 
 impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
     /// Get the reference frame and the position of the reference frame from its `Entity`.
-    pub fn get(&self, frame_entity: Entity) -> (&ReferenceFrame<P>, GridCell<P>, Transform) {
-        let (cell, transform) = self.position(frame_entity);
+    pub fn get(&self, frame_entity: Entity) -> &ReferenceFrame<P> {
         self.frame_query
             .get(frame_entity)
-            .map(|(_entity, frame, _parent)| (frame, cell, transform))
+            .map(|(_entity, frame, _parent)| frame)
             .unwrap_or_else(|e| {
                 panic!("Reference frame entity missing ReferenceFrame component.\n\tError: {e}");
             })
-    }
-
-    /// Get the position of this reference frame, including its grid cell and transform, or return
-    /// defaults if they are missing.
-    ///
-    /// Needed because the root reference frame should not have a grid cell or transform.
-    pub fn position(&self, frame_entity: Entity) -> (GridCell<P>, Transform) {
-        let (cell, transform) = (GridCell::default(), Transform::default());
-        let (cell, transform) = self.position.get(frame_entity).unwrap_or_else(|_| {
-        assert!(self.parent.get(frame_entity).is_err(), "Reference frame entity {frame_entity:?} is missing a GridCell and Transform. This is valid only if this is a root reference frame, but this is not.");
-            (&cell, &transform)
-        });
-        (*cell, *transform)
     }
 
     /// Get the ID of the reference frame that `this` `Entity` is a child of, if it exists.

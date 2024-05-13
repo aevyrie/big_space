@@ -4,9 +4,9 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow},
 };
 use big_space::{
+    bundles::BigSpaceBundle,
     camera::{CameraController, CameraInput},
-    propagation::IgnoreFloatingOrigin,
-    reference_frame::BigSpace,
+    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::GridTransformReadOnly,
     FloatingOrigin, GridCell,
 };
@@ -35,57 +35,65 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-            projection: Projection::Perspective(PerspectiveProjection {
-                near: 1e-18,
+    let space_frame = ReferenceFrame::<i128>::default();
+
+    commands
+        .spawn(BigSpaceBundle::<i128>::default())
+        .with_children(|space| {
+            // camera
+            space.spawn((
+                Camera3dBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 8.0)
+                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                    projection: Projection::Perspective(PerspectiveProjection {
+                        near: 1e-18,
+                        ..default()
+                    }),
+                    ..default()
+                },
+                GridCell::<i128>::default(), // All spatial entities need this component
+                FloatingOrigin, // Important: marks the floating origin entity for rendering.
+                CameraController::default() // Built-in camera controller
+                    .with_speed_bounds([10e-18, 10e35])
+                    .with_smoothness(0.9, 0.8)
+                    .with_speed(1.0),
+            ));
+
+            let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
+            let matl_handle = materials.add(StandardMaterial {
+                base_color: Color::BLUE,
+                perceptual_roughness: 0.8,
+                reflectance: 1.0,
                 ..default()
-            }),
-            ..default()
-        },
-        GridCell::<i128>::default(), // All spatial entities need this component
-        FloatingOrigin,              // Important: marks the floating origin entity for rendering.
-        CameraController::default() // Built-in camera controller
-            .with_speed_bounds([10e-18, 10e35])
-            .with_smoothness(0.9, 0.8)
-            .with_speed(1.0),
-    ));
+            });
 
-    let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
-    let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::BLUE,
-        perceptual_roughness: 0.8,
-        reflectance: 1.0,
-        ..default()
-    });
+            let mut translation = Vec3::ZERO;
+            for i in -16..=27 {
+                let j = 10_f32.powf(i as f32);
+                let k = 10_f32.powf((i - 1) as f32);
+                translation.x += j / 2.0 + k;
+                space.spawn((
+                    PbrBundle {
+                        mesh: mesh_handle.clone(),
+                        material: matl_handle.clone(),
+                        transform: Transform::from_scale(Vec3::splat(j))
+                            .with_translation(translation),
+                        ..default()
+                    },
+                    GridCell::<i128>::default(),
+                ));
+            }
 
-    let mut translation = Vec3::ZERO;
-    for i in -16..=27 {
-        let j = 10_f32.powf(i as f32);
-        let k = 10_f32.powf((i - 1) as f32);
-        translation.x += j / 2.0 + k;
-        commands.spawn((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
+            // light
+            space.spawn((DirectionalLightBundle {
+                directional_light: DirectionalLight {
+                    illuminance: 100_000.0,
+                    ..default()
+                },
                 ..default()
-            },
-            GridCell::<i128>::default(),
-        ));
-    }
-
-    // light
-    commands.spawn((DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            illuminance: 100_000.0,
-            ..default()
-        },
-        ..default()
-    },));
+            },));
+        })
+        .insert(space_frame);
 }
 
 #[derive(Component, Reflect)]
@@ -112,7 +120,6 @@ fn ui_setup(mut commands: Commands) {
             ..default()
         }),
         BigSpaceDebugText,
-        IgnoreFloatingOrigin,
     ));
 
     commands.spawn((
@@ -133,7 +140,6 @@ fn ui_setup(mut commands: Commands) {
         })
         .with_text_justify(JustifyText::Center),
         FunFactText,
-        IgnoreFloatingOrigin,
     ));
 }
 
@@ -162,18 +168,18 @@ fn ui_text_system(
         (With<BigSpaceDebugText>, Without<FunFactText>),
     >,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
+    ref_frames: ReferenceFrames<i128>,
     time: Res<Time>,
-    origin: Query<GridTransformReadOnly<i128>, With<FloatingOrigin>>,
+    origin: Query<(Entity, GridTransformReadOnly<i128>), With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Handle<Mesh>>>,
-    reference_frame: Res<BigSpace<i128>>,
 ) {
-    let origin = origin.single();
-    let translation = origin.transform.translation;
+    let (origin_entity, origin_pos) = origin.single();
+    let translation = origin_pos.transform.translation;
 
     let grid_text = format!(
         "GridCell: {}x, {}y, {}z",
-        origin.cell.x, origin.cell.y, origin.cell.z
+        origin_pos.cell.x, origin_pos.cell.y, origin_pos.cell.z
     );
 
     let translation_text = format!(
@@ -181,7 +187,11 @@ fn ui_text_system(
         translation.x, translation.y, translation.z
     );
 
-    let real_position = reference_frame.grid_position_double(origin.cell, origin.transform);
+    let Some(ref_frame) = ref_frames.parent_frame(origin_entity) else {
+        return;
+    };
+    let ref_frame = ref_frames.get(ref_frame);
+    let real_position = ref_frame.grid_position_double(origin_pos.cell, origin_pos.transform);
     let real_position_f64_text = format!(
         "Combined (f64): {}x, {}y, {}z",
         real_position.x, real_position.y, real_position.z

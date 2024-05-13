@@ -247,15 +247,6 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(FloatingOriginPlugin::<i32>::default());
 
-        let root = app
-            .world
-            .spawn((
-                Transform::default(),
-                GridCell::<i32>::default(),
-                ReferenceFrame::<i32>::default(),
-            ))
-            .id();
-
         let first = app
             .world
             .spawn((
@@ -263,6 +254,7 @@ mod tests {
                     150.0, 0.0, 0.0,
                 ))),
                 GridCell::<i32>::new(5, 0, 0),
+                FloatingOrigin,
             ))
             .id();
 
@@ -276,16 +268,14 @@ mod tests {
             ))
             .id();
 
-        app.world.entity_mut(root).push_children(&[first, second]);
-        app.world.entity_mut(root).insert(BigSpace {
-            floating_origin: Some(first),
-        });
+        app.world
+            .spawn(bundles::BigSpaceBundle::<i32>::default())
+            .push_children(&[first, second]);
 
         app.update();
 
-        app.world.entity_mut(root).insert(BigSpace {
-            floating_origin: Some(second),
-        });
+        app.world.entity_mut(first).remove::<FloatingOrigin>();
+        app.world.entity_mut(second).insert(FloatingOrigin);
 
         app.update();
 
@@ -302,15 +292,6 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(FloatingOriginPlugin::<i32>::default());
 
-        let root = app
-            .world
-            .spawn((
-                Transform::default(),
-                GridCell::<i32>::default(),
-                ReferenceFrame::<i32>::default(),
-            ))
-            .id();
-
         let first = app
             .world
             .spawn((
@@ -318,6 +299,7 @@ mod tests {
                     150.0, 0.0, 0.0,
                 ))),
                 GridCell::<i32>::new(5, 0, 0),
+                FloatingOrigin,
             ))
             .id();
 
@@ -336,16 +318,14 @@ mod tests {
             })
             .id();
 
-        app.world.entity_mut(root).push_children(&[first, second]);
-        app.world.entity_mut(root).insert(BigSpace {
-            floating_origin: Some(first),
-        });
+        app.world
+            .spawn(bundles::BigSpaceBundle::<i32>::default())
+            .push_children(&[first, second]);
 
         app.update();
 
-        app.world.entity_mut(root).insert(BigSpace {
-            floating_origin: Some(second),
-        });
+        app.world.entity_mut(first).remove::<FloatingOrigin>();
+        app.world.entity_mut(second).insert(FloatingOrigin);
 
         app.update();
 

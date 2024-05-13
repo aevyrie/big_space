@@ -3,9 +3,7 @@
 /// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
 use big_space::{
-    bundles::{BigSpaceBundle, BigSpatialBundle},
-    camera::CameraController,
-    reference_frame::ReferenceFrame,
+    bundles::BigSpaceBundle, camera::CameraController, reference_frame::ReferenceFrame,
     FloatingOrigin, GridCell,
 };
 use rand::Rng;
@@ -79,11 +77,8 @@ fn spawn_camera(mut commands: Commands, earth: Query<(Entity, &ReferenceFrame<i6
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),
         ))
-        .insert(BigSpatialBundle {
-            cell: cam_cell,
-            ..default()
-        })
-        // .insert(FloatingOrigin)
+        .insert(cam_cell)
+        .insert(FloatingOrigin)
         .id();
 
     commands.entity(earth).add_child(camera_entity);

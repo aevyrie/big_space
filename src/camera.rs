@@ -13,7 +13,7 @@ use bevy::{
 use crate::{
     precision::GridPrecision,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
-    world_query::{GridTransform, GridTransformReadOnly},
+    world_query::GridTransform,
 };
 
 /// Adds the `big_space` camera controller
@@ -176,26 +176,21 @@ pub fn default_camera_inputs(
 
 /// Find the object nearest the camera, within the same reference frame as the camera.
 pub fn nearest_objects<P: GridPrecision>(
-    reference_frames: ReferenceFrames<P>,
-    children: Query<&Children>,
-    objects: Query<(Entity, GridTransformReadOnly<P>, &Aabb)>,
-    mut camera: Query<(Entity, &mut CameraController, GridTransformReadOnly<P>)>,
+    objects: Query<(Entity, &Transform, &GlobalTransform, &Aabb)>,
+    mut camera: Query<(&mut CameraController, &GlobalTransform)>,
 ) {
-    let Ok((cam_entity, mut camera, cam_pos)) = camera.get_single_mut() else {
+    let Ok((mut camera, cam_pos)) = camera.get_single_mut() else {
         return;
     };
-    let ref_frame_entity = reference_frames.parent_frame(cam_entity).unwrap();
-    let (ref_frame, ..) = reference_frames.get(ref_frame_entity);
-    let objects_in_frame = children.get(ref_frame_entity).unwrap();
 
     let nearest_object = objects
-        .iter_many(objects_in_frame)
-        .map(|(entity, obj_pos, aabb)| {
-            let center_distance = ref_frame
-                .grid_position_double(&(*obj_pos.cell - *cam_pos.cell), obj_pos.transform)
-                - cam_pos.transform.translation.as_dvec3();
+        .iter()
+        // .iter_many(objects_in_frame)
+        .map(|(entity, object_local, obj_pos, aabb)| {
+            let center_distance =
+                obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
             let nearest_distance = center_distance.length()
-                - (aabb.half_extents.as_dvec3() * obj_pos.transform.scale.as_dvec3())
+                - (aabb.half_extents.as_dvec3() * object_local.scale.as_dvec3())
                     .abs()
                     .max_element();
             (entity, nearest_distance)
@@ -216,7 +211,7 @@ pub fn camera_controller<P: GridPrecision>(
     >,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
-        let Some((frame, ..)) = frames.parent_frame(camera).map(|frame| frames.get(frame)) else {
+        let Some(frame) = frames.parent_frame(camera).map(|frame| frames.get(frame)) else {
             continue;
         };
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
