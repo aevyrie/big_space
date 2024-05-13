@@ -9,7 +9,8 @@ use crate::precision::GridPrecision;
 /// This component is generic over a few integer types to allow you to select the grid size you
 /// need. These correspond to a total usable volume of a cube with the following edge lengths:
 ///
-/// **Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter**
+/// **Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter, which
+/// gives you a worst case precision of 0.5mm**
 ///
 /// - i8: 2,560 km = 74% of the diameter of the Moon
 /// - i16: 655,350 km = 85% of the diameter of the Moon's orbit around Earth

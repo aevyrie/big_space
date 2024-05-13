@@ -49,7 +49,7 @@
 use crate::*;
 
 /// Validate the entity hierarchy and report errors.
-pub fn validation<V: 'static + HierarchyValidation + Default>(world: &mut World) {
+pub fn validate_hierarchy<V: 'static + HierarchyValidation + Default>(world: &mut World) {
     let mut root_entities: Vec<Entity> = world
         .query_filtered::<Entity, Without<Parent>>()
         .iter(world)

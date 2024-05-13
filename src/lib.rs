@@ -22,37 +22,55 @@
 //! recomputed relative to the center of that new cell. This prevents `Transforms` from ever
 //! becoming larger than a single grid cell, and thus prevents floating point precision artifacts.
 //!
-//! `ReferenceFrame`s can also be nested. This allows you to define moving reference frames, which
-//! can make certain use cases much simpler. For example, if you have a planet rotating, and
+//! The grid adds precision to your transforms. If you are using (32-bit) `Transform`s on an `i32`
+//! grid, you will have 64 bits of precision: 32 bits to address into a large integer grid, and 32
+//! bits of floating point precision within a grid cell. This plugin is generic up to `i128` grids,
+//! giving you up tp 160 bits of precision of translation.
+//!
+//! `ReferenceFrame`s - grids - can be nested. This allows you to define moving reference frames,
+//! which can make certain use cases much simpler. For example, if you have a planet rotating, and
 //! orbiting around its star, it would be very annoying if you had to compute this orbit and
-//! rotation for all object on the surface in high precision. Instead, you can place the planet and
+//! rotation for all objects on the surface in high precision. Instead, you can place the planet and
 //! all objects on its surface in the same reference frame. The motion of the planet will be
-//! inherited by all children in that reference frame, in high precision. Entities at the root of
-//! the hierarchy will be implicitly placed in the [`RootReferenceFrame`].
+//! inherited by all children in that reference frame, in high precision.
 //!
-//! The above steps are also applied to the entity marked with the [`FloatingOrigin`] component. The
-//! only difference is that the `GridCell` of the floating origin is used when computing the
-//! [`GlobalTransform`] of all other entities. To an outside observer, as the floating origin camera
-//! moves through space and reaches the limits of its `GridCell`, it would appear to teleport to the
-//! opposite side of the cell, similar to the spaceship in the game *Asteroids*.
+//! Entities at the root of bevy's entity hierarchy are not in any reference frame. This allows
+//! plugins from the rest of the ecosystem to operate normally, such as bevy_ui, which relies on the
+//! built in transform propagation system. This also means that if you don't need to place entities
+//! in a high-precision reference frame, you don't have to, as the process is opt-in. The
+//! high-precision hierarchical reference frames are explicit. Each high-precision tree must have a
+//! [`BigSpaceBundle`] at the root, and each `BigSpace` is independent. This means that each
+//! `BigSpace` has its own floating origin, which allows you to do things like rendering two players
+//! on opposite ends of the universe simultaneously.
 //!
-//! The `GlobalTransform` of all entities is computed relative to the floating origin's grid cell.
-//! Because of this, entities very far from the origin will have very large, imprecise positions.
-//! However, this is always relative to the camera (floating origin), so these artifacts will always
-//! be too far away to be seen, no matter where the camera moves. Because this only affects the
-//! `GlobalTransform` and not the `Transform`, this also means that entities will never permanently
-//! lose precision just because they were far from the origin at some point. The lossy calculation
-//! only occurs when computing the `GlobalTransform` of entities, the high precision `GridCell` and
-//! `Transform` are unaffected.
+//! All of the above applies to the entity marked with the [`FloatingOrigin`] component. The
+//! floating origin can be any high-precision entity in a `BigSpace`. The only thing special about
+//! the entity marked as the floating origin, is that it used to compute the[`GlobalTransform`] of
+//! all other entities in that `BigSpace`. To an outside observer, every high-precision entity
+//! within a `BigSpace` is confined to a box the size of a grid cell - like a game of *Asteroids*.
+//! Only once you render the `BigSpace` from the point of view of the floating origin, by
+//! calculating their `GlobalTransform`s, do entities appear very distant from the floating origin.
+//!
+//! As described above. the `GlobalTransform` of all entities is computed relative to the floating
+//! origin's grid cell. Because of this, entities very far from the origin will have very large,
+//! imprecise positions. However, this is always relative to the camera (floating origin), so these
+//! artifacts will always be too far away to be seen, no matter where the camera moves. Because this
+//! only affects the `GlobalTransform` and not the `Transform`, this also means that entities will
+//! never permanently lose precision just because they were far from the origin at some point. The
+//! lossy calculation only occurs when computing the `GlobalTransform` of entities, the high
+//! precision `GridCell` and `Transform` are never touched.
 //!
 //! # Getting Started
 //!
 //! To start using this plugin:
+//! 0. Choose how big your world should be! Do you need an i32, or an i128?
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
 //! 2. Add the [`FloatingOriginPlugin`] to your `App`
-//! 3. Add the [`GridCell`] component to all spatial entities
-//! 4. Add the [`FloatingOrigin`] component to the active camera
-//! 5. Add the [`IgnoreFloatingOrigin`] component
+//! 3. Create a new `BigSpace` tree using a [`BigSpaceBundle`].
+//! 4. Spawn entities as children of the `BigSpace`, using the [`BigSpatialBundle`].
+//! 5. Add the [`FloatingOrigin`] component to the active camera
+//! 6. To add more levels to the hierarchy, add a [`ReferenceFrame`] to an existing
+//!    [`BigSpatialBundle`], or use the [`BigReferenceFrameBundle`] instead.
 //!
 //! Take a look at [`ReferenceFrame`] component for some useful helper methods.
 //!
@@ -91,8 +109,8 @@
 //! However, if you have something that must not accumulate error, like the orbit of a planet, you
 //! can instead do the orbital calculation (position as a function of time) to compute the absolute
 //! position of the planet with high precision, then directly compute the [`GridCell`] and
-//! [`Transform`] of that entity using [`ReferenceFrame::translation_to_grid`]. If the star
-//! this planet is orbiting around is also moving through space, note that you can add/subtract grid
+//! [`Transform`] of that entity using [`ReferenceFrame::translation_to_grid`]. If the star this
+//! planet is orbiting around is also moving through space, note that you can add/subtract grid
 //! cells. This means you can do each calculation in the reference frame of the moving body, and sum
 //! up the computed translations and grid cell offsets to get a more precise result.
 
@@ -112,6 +130,7 @@ pub mod reference_frame;
 pub mod validation;
 pub mod world_query;
 
+pub use bundles::*;
 pub use grid_cell::GridCell;
 
 #[cfg(feature = "camera")]
@@ -168,7 +187,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
             .add_systems(PostUpdate, system_set_config())
             .add_systems(
                 PostUpdate,
-                validation::validation::<validation::BigSpaceRoot<P>>
+                validation::validate_hierarchy::<validation::BigSpaceRoot<P>>
                     .before(TransformSystem::TransformPropagate),
             )
             .add_systems(
