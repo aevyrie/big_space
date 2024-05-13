@@ -2,17 +2,14 @@
 //!
 //! This is a modified version of Bevy's own transform propagation system.
 
-use crate::{
-    precision::GridPrecision,
-    reference_frame::{BigSpace, ReferenceFrame},
-    GridCell,
-};
+use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
 use bevy::prelude::*;
 
 /// Update the [`GlobalTransform`] of entities with a [`Transform`] that are children of a
 /// [`ReferenceFrame`] and do not have a [`GridCell`] component, or that are children of
-/// [`GridCell`]s.
-pub fn propagate_transforms<P: GridPrecision>(
+/// [`GridCell`]s. This will recursively propagate entities that only have low-precision
+/// [`Transform`]s, just like bevy's built in systems.
+pub fn propagate_reference_frame_transforms<P: GridPrecision>(
     frames: Query<&Children, With<ReferenceFrame<P>>>,
     frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
     transform_query: Query<
@@ -23,15 +20,6 @@ pub fn propagate_transforms<P: GridPrecision>(
             Without<ReferenceFrame<P>>,
         ),
     >,
-    root_entities: Query<
-        Entity,
-        (
-            Without<Parent>,
-            Without<GridCell<P>>,
-            Without<ReferenceFrame<P>>,
-            Without<BigSpace>,
-        ),
-    >,
     parent_query: Query<(Entity, Ref<Parent>)>,
 ) {
     let update_transforms = |(entity, children, global_transform)| {
@@ -40,6 +28,20 @@ pub fn propagate_transforms<P: GridPrecision>(
                 actual_parent.get(), entity,
                 "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
             );
+
+            // Unlike bevy's transform propagation, change detection is much more complex, because
+            // it is relative to the floating origin, *and* whether entities are moving.
+            // - If the floating origin changes grid cells, everything needs to update
+            // - If the floating origin's reference frame moves (translation, rotation), every
+            //   entity outside of the reference frame subtree that the floating origin is in must
+            //   update.
+            // - All entities or reference frame subtrees that move within the same frame as the
+            //   floating origin must be updated.
+            //
+            // Instead of adding this complexity and computation, is it much simpler to update
+            // everything every frame.
+            let changed = true;
+
             // SAFETY:
             // - `child` must have consistent parentage, or the above assertion would panic. Since
             // `child` is parented to a root entity, the entire hierarchy leading to it is
@@ -52,7 +54,13 @@ pub fn propagate_transforms<P: GridPrecision>(
             // - Since this is the only place where `transform_query` gets used, there will be no
             //   conflicting fetches elsewhere.
             unsafe {
-                propagate_recursive(&global_transform, &transform_query, &parent_query, child);
+                propagate_recursive(
+                    &global_transform,
+                    &transform_query,
+                    &parent_query,
+                    child,
+                    changed,
+                );
             }
         }
     };
@@ -86,12 +94,13 @@ unsafe fn propagate_recursive<P: GridPrecision>(
         (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
         (
             With<Parent>,
-            Without<GridCell<P>>,
-            Without<ReferenceFrame<P>>,
+            Without<GridCell<P>>, // ***ADDED*** Only recurse low-precision entities
+            Without<ReferenceFrame<P>>, // ***ADDED*** Only recurse low-precision entities
         ),
     >,
     parent_query: &Query<(Entity, Ref<Parent>)>,
     entity: Entity,
+    mut changed: bool,
 ) {
     let (global_matrix, children) = {
         let Ok((transform, mut global_transform, children)) =
@@ -125,8 +134,10 @@ unsafe fn propagate_recursive<P: GridPrecision>(
                 return;
             };
 
-        *global_transform = parent.mul_transform(*transform);
-
+        changed |= transform.is_changed() || global_transform.is_added();
+        if changed {
+            *global_transform = parent.mul_transform(*transform);
+        }
         (*global_transform, children)
     };
 
@@ -142,7 +153,13 @@ unsafe fn propagate_recursive<P: GridPrecision>(
         // The above assertion ensures that each child has one and only one unique parent throughout the
         // entire hierarchy.
         unsafe {
-            propagate_recursive(&global_matrix, transform_query, parent_query, child);
+            propagate_recursive(
+                &global_matrix,
+                transform_query,
+                parent_query,
+                child,
+                changed || actual_parent.is_changed(),
+            );
         }
     }
 }

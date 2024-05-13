@@ -100,7 +100,7 @@
 #![deny(missing_docs)]
 
 use bevy::{prelude::*, transform::TransformSystem};
-use propagation::propagate_transforms;
+use propagation::propagate_reference_frame_transforms;
 use std::marker::PhantomData;
 use world_query::GridTransformReadOnly;
 
@@ -151,7 +151,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
                 update_grid_cell_global_transforms::<P>
                     .in_set(FloatingOriginSet::RootGlobalTransforms)
                     .after(FloatingOriginSet::LocalFloatingOrigins),
-                propagate_transforms::<P>
+                propagate_reference_frame_transforms::<P>
                     .in_set(FloatingOriginSet::PropagateTransforms)
                     .after(FloatingOriginSet::RootGlobalTransforms),
             )
@@ -163,23 +163,44 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOri
             .register_type::<GridCell<P>>()
             .register_type::<ReferenceFrame<P>>()
             .register_type::<BigSpace>()
+            .register_type::<FloatingOrigin>()
             .add_systems(PostStartup, system_set_config())
             .add_systems(PostUpdate, system_set_config())
             .add_systems(
                 PostUpdate,
                 validation::validation::<validation::BigSpaceRoot<P>>
                     .before(TransformSystem::TransformPropagate),
+            )
+            .add_systems(
+                PostStartup,
+                (
+                    // These are the bevy transform propagation systems. Because these start from
+                    // the root of the hierarchy, and BigSpace bundles (at the root) do not contain
+                    // a Transform, these systems will not interact with any high precision entities
+                    // in big space. These systems are added for ecosystem compatibility with bevy,
+                    // although the rendered behavior might look strange if they share a camera with
+                    // one using the floating origin.
+                    //
+                    // This is most useful for bevy_ui, which relies on the transform systems to
+                    // work, or if you want to render a camera that only needs to render a
+                    // low-precision scene.
+                    bevy::transform::systems::sync_simple_transforms,
+                    bevy::transform::systems::propagate_transforms,
+                )
+                    .in_set(TransformSystem::TransformPropagate),
             );
     }
 }
 
-/// Marks the entity to use as the floating origin. All other entities will be positioned relative
-/// to this entity's [`GridCell`].
+/// Marks the entity to use as the floating origin. The [`GlobalTransform`] of all entities within
+/// this [`BigSpace`] will be computed relative to this floating origin. There should always be
+/// exactly one entity marked with this component within a [`BigSpace`].
 #[derive(Component, Reflect)]
 pub struct FloatingOrigin;
 
-/// If an entity's transform becomes larger than the specified limit, it is relocated to the nearest
-/// grid cell to reduce the size of the transform.
+/// If an entity's transform translation becomes larger than the limit specified in its
+/// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
+/// transform.
 pub fn recenter_transform_on_grid<P: GridPrecision>(
     reference_frames: Query<&ReferenceFrame<P>>,
     mut changed_transform: Query<(&mut GridCell<P>, &mut Transform, &Parent), Changed<Transform>>,

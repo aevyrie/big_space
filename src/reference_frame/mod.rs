@@ -9,6 +9,7 @@ use bevy::{
     math::{Affine3A, DAffine3, DVec3, Vec3},
     reflect::Reflect,
     transform::prelude::*,
+    utils::hashbrown::{HashMap, HashSet},
 };
 
 use crate::{FloatingOrigin, GridCell, GridPrecision};
@@ -17,12 +18,17 @@ use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
 
-/// The root reference frame of a high precision transform hierarchy rendered with a floating
-/// origin.
+/// A "big space" is a hierarchy of high precision reference frames, rendered with a floating
+/// origin. It is the root of this high precision hierarchy, and it tracks the entity inside this
+/// hierarchy that has been marked as the [`FloatingOrigin`].
 ///
 /// This component should also be paired with a [`ReferenceFrame`], which defines the properties of
 /// this root reference frame. A hierarchy can have many nested `ReferenceFrame`s, but only one
 /// `BigSpace`, at the root.
+///
+/// Your world can have multiple [`BigSpace`]s, and they will remain completely independent. Each
+/// big space uses the floating origin contained within it to compute the [`GlobalTransform`] of all
+/// spatial entities within that `BigSpace`.
 #[derive(Debug, Default, Component, Reflect)]
 pub struct BigSpace {
     /// Set the entity to use as the floating origin within this high precision hierarchy.
@@ -30,36 +36,46 @@ pub struct BigSpace {
 }
 
 impl BigSpace {
-    /// Automatically update [`BigSpace`] components with the current floating origin. There should
-    /// be one, and only one, floating origin in a `BigSpace` hierarchy.
+    /// Automatically update all [`BigSpace`]s, finding the current floating origin entity within
+    /// their hierarchy. There should be one, and only one, [`FloatingOrigin`] component in a
+    /// `BigSpace` hierarchy.
     pub fn update_floating_origin(
-        origins: Query<Entity, With<FloatingOrigin>>,
+        floating_origins: Query<Entity, With<FloatingOrigin>>,
         parent_query: Query<&Parent>,
         mut big_spaces: Query<(Entity, &mut BigSpace)>,
     ) {
-        for (_, mut space) in &mut big_spaces {
+        let mut spaces_set = HashMap::new();
+        // Reset all floating origin fields, so we know if any are missing.
+        for (entity, mut space) in &mut big_spaces {
             space.floating_origin = None;
+            spaces_set.insert(entity, 0);
         }
-        for origin in &origins {
+        // Navigate to the root of the hierarchy, starting from each floating origin. This is faster than the reverse direction because it is a tree, and an entity can only have a single parent, but many children. The root should have an empty floating_origin field.
+        for origin in &floating_origins {
             let maybe_root = parent_query.iter_ancestors(origin).last();
-            if let Some((_, mut space)) = maybe_root.and_then(|root| big_spaces.get_mut(root).ok())
+            if let Some((root, mut space)) =
+                maybe_root.and_then(|root| big_spaces.get_mut(root).ok())
             {
-                if space.floating_origin.is_some() {
+                let space_origins = spaces_set.entry(root).or_default();
+                *space_origins += 1;
+                if *space_origins > 1 {
                     error!(
-                        "BigSpace {:#?} has multiple floating origins. There must be exactly one.",
-                        maybe_root.unwrap()
-                    )
+                        "BigSpace {root:#?} has multiple floating origins. There must be exactly one. Resetting this big space and disabling the floating origin to avoid unexpected propagation behavior.",
+                    );
+                    space.floating_origin = None
+                } else {
+                    space.floating_origin = Some(origin);
                 }
-                space.floating_origin = Some(origin);
                 continue;
             }
         }
-        for (space_entity, space) in &mut big_spaces {
-            if space.floating_origin.is_none() {
-                error!(
-                    "BigSpace {space_entity:#?} has no floating origins. There must be exactly one.",
-                )
-            }
+        // Check if any big spaces did not have a floating origin.
+        for space in spaces_set
+            .iter()
+            .filter(|(_k, v)| **v == 0)
+            .map(|(k, _v)| k)
+        {
+            error!("BigSpace {space:#?} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",)
         }
     }
 }

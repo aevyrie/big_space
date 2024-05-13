@@ -6,13 +6,16 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::GridCell;
+use big_space::{
+    reference_frame::{local_origin::ReferenceFrames, BigSpace},
+    FloatingOrigin, GridCell,
+};
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i128>::new(10.0, 1.0),
+            big_space::FloatingOriginPlugin::<i128>::default(),
         ))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
@@ -33,17 +36,20 @@ const DISTANCE: i128 = 21_000_000;
 /// this issue.
 fn toggle_plugin(
     input: Res<ButtonInput<KeyCode>>,
-    settings: Res<RootReferenceFrame<i128>>,
+    ref_frames: ReferenceFrames<i128>,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
-    mut floating_origin: Query<&mut GridCell<i128>, With<FloatingOrigin>>,
+    mut floating_origin: Query<(Entity, &mut GridCell<i128>), With<FloatingOrigin>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
         *disabled = !*disabled;
     }
 
-    let mut origin_cell = floating_origin.single_mut();
-    let index_max = DISTANCE / settings.cell_edge_length() as i128;
+    let this_frame = ref_frames.parent_frame(floating_origin.single().0).unwrap();
+    let (this_frame, ..) = ref_frames.get(this_frame);
+
+    let mut origin_cell = floating_origin.single_mut().1;
+    let index_max = DISTANCE / this_frame.cell_edge_length() as i128;
     let increment = index_max / 100;
 
     let msg = if *disabled {
@@ -60,7 +66,7 @@ fn toggle_plugin(
         "Floating Origin Enabled"
     };
 
-    let dist = index_max.saturating_sub(origin_cell.x) * settings.cell_edge_length() as i128;
+    let dist = index_max.saturating_sub(origin_cell.x) * this_frame.cell_edge_length() as i128;
 
     let thousands = |num: i128| {
         num.to_string()
@@ -87,35 +93,33 @@ fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator
 }
 
 fn setup_ui(mut commands: Commands) {
-    commands.spawn((
-        TextBundle {
-            style: Style {
-                align_self: AlignSelf::FlexStart,
-                flex_direction: FlexDirection::Column,
-                ..Default::default()
-            },
-            text: Text {
-                sections: vec![TextSection {
-                    value: "hello: ".to_string(),
-                    style: TextStyle {
-                        font_size: 30.0,
-                        color: Color::WHITE,
-                        ..default()
-                    },
-                }],
-                ..Default::default()
-            },
+    commands.spawn((TextBundle {
+        style: Style {
+            align_self: AlignSelf::FlexStart,
+            flex_direction: FlexDirection::Column,
             ..Default::default()
         },
-        IgnoreFloatingOrigin,
-    ));
+        text: Text {
+            sections: vec![TextSection {
+                value: "hello: ".to_string(),
+                style: TextStyle {
+                    font_size: 30.0,
+                    color: Color::WHITE,
+                    ..default()
+                },
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    },));
 }
 
 fn setup_scene(
     mut commands: Commands,
+    ref_frames: ReferenceFrames<i128>,
+    big_spaces: Query<Entity, With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    reference_frame: Res<RootReferenceFrame<i128>>,
 ) {
     let mesh_handle = meshes.add(Sphere::new(1.5).mesh());
     let matl_handle = materials.add(StandardMaterial {
@@ -123,7 +127,9 @@ fn setup_scene(
         ..default()
     });
 
-    let d = DISTANCE / reference_frame.cell_edge_length() as i128;
+    let this_ref_frame = ref_frames.get(big_spaces.single()).0;
+
+    let d = DISTANCE / this_ref_frame.cell_edge_length() as i128;
     let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
     // Normally, we would put the floating origin on the camera. However in this example, we want to

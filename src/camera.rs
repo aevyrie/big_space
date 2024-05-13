@@ -174,20 +174,24 @@ pub fn default_camera_inputs(
     }
 }
 
-/// Find the object nearest the camera
+/// Find the object nearest the camera, within the same reference frame as the camera.
 pub fn nearest_objects<P: GridPrecision>(
-    ref_frame: ReferenceFrames<P>,
+    reference_frames: ReferenceFrames<P>,
+    children: Query<&Children>,
     objects: Query<(Entity, GridTransformReadOnly<P>, &Aabb)>,
     mut camera: Query<(Entity, &mut CameraController, GridTransformReadOnly<P>)>,
 ) {
     let Ok((cam_entity, mut camera, cam_pos)) = camera.get_single_mut() else {
         return;
     };
-    let (camera_frame, ..) = ref_frame.reference_frame(ref_frame.parent(cam_entity).unwrap());
+    let ref_frame_entity = reference_frames.parent_frame(cam_entity).unwrap();
+    let (ref_frame, ..) = reference_frames.get(ref_frame_entity);
+    let objects_in_frame = children.get(ref_frame_entity).unwrap();
+
     let nearest_object = objects
-        .iter()
+        .iter_many(objects_in_frame)
         .map(|(entity, obj_pos, aabb)| {
-            let center_distance = camera_frame
+            let center_distance = ref_frame
                 .grid_position_double(&(*obj_pos.cell - *cam_pos.cell), obj_pos.transform)
                 - cam_pos.transform.translation.as_dvec3();
             let nearest_distance = center_distance.length()
@@ -212,10 +216,7 @@ pub fn camera_controller<P: GridPrecision>(
     >,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
-        let Some((frame, ..)) = frames
-            .parent(camera)
-            .map(|frame| frames.reference_frame(frame))
-        else {
+        let Some((frame, ..)) = frames.parent_frame(camera).map(|frame| frames.get(frame)) else {
             continue;
         };
         let speed = match (controller.nearest_object, controller.slow_near_objects) {

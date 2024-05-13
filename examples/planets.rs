@@ -5,7 +5,7 @@ use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Expo
 use big_space::{
     bundles::{BigSpaceBundle, BigSpatialBundle},
     camera::CameraController,
-    reference_frame::{BigSpace, ReferenceFrame},
+    reference_frame::ReferenceFrame,
     FloatingOrigin, GridCell,
 };
 use rand::Rng;
@@ -25,15 +25,7 @@ fn main() {
             color: Color::WHITE,
             brightness: 100.0,
         })
-        .add_systems(
-            Startup,
-            (
-                spawn_solar_system,
-                spawn_camera,
-                // spawn_starfield
-            )
-                .chain(),
-        )
+        .add_systems(Startup, (spawn_solar_system, spawn_camera).chain())
         .add_systems(Update, rotate)
         .register_type::<Sun>()
         .register_type::<Earth>()
@@ -91,38 +83,10 @@ fn spawn_camera(mut commands: Commands, earth: Query<(Entity, &ReferenceFrame<i6
             cell: cam_cell,
             ..default()
         })
-        .insert(FloatingOrigin)
+        // .insert(FloatingOrigin)
         .id();
 
     commands.entity(earth).add_child(camera_entity);
-}
-
-fn spawn_starfield(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
-
-    let star_mesh = sphere(1e10);
-    let star_mat = materials.add(StandardMaterial {
-        base_color: Color::WHITE,
-        emissive: Color::rgb_linear(100000., 100000., 100000.),
-        ..default()
-    });
-    let mut rng = rand::thread_rng();
-    (0..500).for_each(|_| {
-        commands.spawn((PbrBundle {
-            mesh: star_mesh.clone(),
-            material: star_mat.clone(),
-            transform: Transform::from_xyz(
-                (rng.gen::<f32>() - 0.5) * 1e14,
-                (rng.gen::<f32>() - 0.5) * 1e14,
-                (rng.gen::<f32>() - 0.5) * 1e14,
-            ),
-            ..default()
-        },));
-    });
 }
 
 fn spawn_solar_system(
@@ -137,6 +101,31 @@ fn spawn_solar_system(
     commands
         .spawn(BigSpaceBundle::<i64>::default())
         .with_children(|space| {
+            // Star field
+            let star_mesh = sphere(1e10);
+            let star_mat = materials.add(StandardMaterial {
+                base_color: Color::WHITE,
+                emissive: Color::rgb_linear(100000., 100000., 100000.),
+                ..default()
+            });
+            let mut rng = rand::thread_rng();
+            (0..500).for_each(|_| {
+                space.spawn((
+                    PbrBundle {
+                        mesh: star_mesh.clone(),
+                        material: star_mat.clone(),
+                        transform: Transform::from_xyz(
+                            (rng.gen::<f32>() - 0.5) * 1e14,
+                            (rng.gen::<f32>() - 0.5) * 1e14,
+                            (rng.gen::<f32>() - 0.5) * 1e14,
+                        ),
+                        ..default()
+                    },
+                    GridCell::<i64>::ZERO,
+                ));
+            });
+
+            // Sun
             let sun_frame = ReferenceFrame::<i64>::default();
             space
                 .spawn((

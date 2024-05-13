@@ -32,8 +32,8 @@ pub fn update_debug_bounds<P: GridPrecision>(
 ) {
     for (cell_entity, cell) in occupied_cells.iter() {
         let Some((frame, ..)) = reference_frames
-            .parent(cell_entity)
-            .map(|frame_entity| reference_frames.reference_frame(frame_entity))
+            .parent_frame(cell_entity)
+            .map(|frame_entity| reference_frames.get(frame_entity))
         else {
             continue;
         };
