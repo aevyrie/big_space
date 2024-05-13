@@ -8,6 +8,7 @@ use bevy::{
     prelude::*,
     render::primitives::Aabb,
     transform::TransformSystem,
+    utils::hashbrown::HashSet,
 };
 
 use crate::{
@@ -177,15 +178,18 @@ pub fn default_camera_inputs(
 /// Find the object nearest the camera, within the same reference frame as the camera.
 pub fn nearest_objects<P: GridPrecision>(
     objects: Query<(Entity, &Transform, &GlobalTransform, &Aabb)>,
-    mut camera: Query<(&mut CameraController, &GlobalTransform)>,
+    mut camera: Query<(Entity, &mut CameraController, &GlobalTransform)>,
+    children: Query<&Children>,
 ) {
-    let Ok((mut camera, cam_pos)) = camera.get_single_mut() else {
+    let Ok((cam_entity, mut camera, cam_pos)) = camera.get_single_mut() else {
         return;
     };
 
+    let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
+
     let nearest_object = objects
         .iter()
-        // .iter_many(objects_in_frame)
+        .filter(|(entity, ..)| !cam_children.contains(entity))
         .map(|(entity, object_local, obj_pos, aabb)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
