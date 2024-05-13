@@ -9,7 +9,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i64>::default(),
+            big_space::BigSpacePlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))

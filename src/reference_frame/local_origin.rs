@@ -494,7 +494,7 @@ mod tests {
     #[test]
     fn frame_hierarchy_getters() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let frame_bundle = (
             Transform::default(),
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn child_propagation() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let root_frame = ReferenceFrame {
             local_floating_origin: LocalFloatingOrigin::new(
@@ -604,7 +604,7 @@ mod tests {
     #[test]
     fn parent_propagation() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i64>::default());
+        app.add_plugins(BigSpacePlugin::<i64>::default());
 
         let frame_bundle = (
             Transform::default(),
@@ -665,7 +665,7 @@ mod tests {
     #[test]
     fn origin_transform() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let root = app
             .world

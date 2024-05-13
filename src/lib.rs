@@ -143,11 +143,11 @@ use crate::reference_frame::{local_origin::LocalFloatingOrigin, BigSpace, Refere
 
 /// Add this plugin to your [`App`] for floating origin functionality.
 #[derive(Default)]
-pub struct FloatingOriginPlugin<P: GridPrecision> {
+pub struct BigSpacePlugin<P: GridPrecision> {
     phantom: PhantomData<P>,
 }
 
-impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for FloatingOriginPlugin<P> {
+impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlugin<P> {
     fn build(&self, app: &mut App) {
         #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
         enum FloatingOriginSet {
@@ -272,7 +272,7 @@ mod tests {
     #[test]
     fn changing_floating_origin_updates_global_transform() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let first = app
             .world
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn child_global_transforms_are_updated_when_floating_origin_changes() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let first = app
             .world

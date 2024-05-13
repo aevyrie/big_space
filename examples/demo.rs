@@ -15,7 +15,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i128>::default(),
+            big_space::BigSpacePlugin::<i128>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
             big_space::camera::CameraControllerPlugin::<i128>::default(),
             bevy_framepace::FramepacePlugin,

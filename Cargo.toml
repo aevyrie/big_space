@@ -15,6 +15,8 @@ bevy = { version = "0.13", default_features = false }
 
 [dev-dependencies]
 bevy = { version = "0.13", default-features = false, features = [
+    "bevy_scene",
+    "bevy_gltf",
     "bevy_winit",
     "default_font",
     "bevy_ui",

@@ -1,7 +1,10 @@
 /// Example with spheres at the scale and distance of the earth and moon around the sun, at 1:1
 /// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
 /// demonstrate how high precision nested reference frames work at large scales.
-use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
+use bevy::{
+    core_pipeline::bloom::BloomSettings, pbr::ScreenSpaceAmbientOcclusionBundle, prelude::*,
+    render::camera::Exposure,
+};
 use big_space::{
     bundles::BigSpaceBundle, camera::CameraController, reference_frame::ReferenceFrame,
     FloatingOrigin, GridCell,
@@ -13,7 +16,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            big_space::FloatingOriginPlugin::<i64>::default(),
+            big_space::BigSpacePlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             bevy_framepace::FramepacePlugin,
@@ -23,6 +26,7 @@ fn main() {
             color: Color::WHITE,
             brightness: 100.0,
         })
+        .insert_resource(Msaa::Off)
         .add_systems(Startup, (spawn_solar_system, spawn_camera).chain())
         .add_systems(Update, rotate)
         .register_type::<Sun>()
@@ -54,7 +58,11 @@ fn rotate(mut rotate_query: Query<(&mut Transform, &Rotates)>) {
     }
 }
 
-fn spawn_camera(mut commands: Commands, earth: Query<(Entity, &ReferenceFrame<i64>), With<Earth>>) {
+fn spawn_camera(
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
+    earth: Query<(Entity, &ReferenceFrame<i64>), With<Earth>>,
+) {
     let (earth, earth_frame) = earth.single();
     let (cam_cell, cam_pos): (GridCell<i64>, _) =
         earth_frame.imprecise_translation_to_grid(Vec3::X * (EARTH_RADIUS_M + 1.0));
@@ -79,6 +87,15 @@ fn spawn_camera(mut commands: Commands, earth: Query<(Entity, &ReferenceFrame<i6
         ))
         .insert(cam_cell)
         .insert(FloatingOrigin)
+        .insert(ScreenSpaceAmbientOcclusionBundle::default())
+        .with_children(|camera| {
+            camera.spawn(SceneBundle {
+                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                transform: Transform::from_xyz(0.0, -2.0, -14.0)
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                ..default()
+            });
+        })
         .id();
 
     commands.entity(earth).add_child(camera_entity);
