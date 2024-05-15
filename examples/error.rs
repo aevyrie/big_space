@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 use big_space::{
-    bundles::BigSpaceBundle,
+    bundles::BigSpaceRootBundle,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     FloatingOrigin, GridCell,
 };
@@ -124,7 +124,7 @@ fn setup_scene(
 
     let big_space = ReferenceFrame::<i128>::default();
     commands
-        .spawn(BigSpaceBundle::<i128>::default())
+        .spawn(BigSpaceRootBundle::<i128>::default())
         .with_children(|root_frame| {
             let d = DISTANCE / big_space.cell_edge_length() as i128;
             let distant_grid_cell = GridCell::<i128>::new(d, d, d);

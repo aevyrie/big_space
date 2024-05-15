@@ -1,7 +1,7 @@
 //! This example demonstrates error accumulating from parent to children in nested reference frames.
 use bevy::{math::DVec3, prelude::*};
 use big_space::{
-    bundles::BigSpaceBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
+    bundles::BigSpaceRootBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
 };
 
 fn main() {
@@ -37,7 +37,7 @@ fn setup_scene(
     let root_frame = ReferenceFrame::<i64>::default();
 
     commands
-        .spawn(BigSpaceBundle::<i64>::default())
+        .spawn(BigSpaceRootBundle::<i64>::default())
         .with_children(|root| {
             // A red sphere located nearby
             root.spawn((

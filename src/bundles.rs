@@ -41,17 +41,17 @@ pub struct BigReferenceFrameBundle<P: GridPrecision> {
     pub view: ViewVisibility,
     /// The transform of the entity.
     pub transform: Transform,
-    /// The global transform of the entity.
+    /// The global transform of the entity for rendering, computed relative to the floating origin.
     pub global_transform: GlobalTransform,
-    /// The grid position of the entity
+    /// The grid position of the entity within
     pub cell: GridCell<P>,
     /// The reference frame
     pub reference_frame: ReferenceFrame<P>,
 }
 
-/// Bundled needed for root reference frames.
+/// The root of any [`BigSpace`] needs these components to function.
 #[derive(Bundle, Default)]
-pub struct BigSpaceBundle<P: GridPrecision> {
+pub struct BigSpaceRootBundle<P: GridPrecision> {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: Visibility,

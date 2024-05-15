@@ -4,7 +4,7 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow},
 };
 use big_space::{
-    bundles::BigSpaceBundle,
+    bundles::BigSpaceRootBundle,
     camera::{CameraController, CameraInput},
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::GridTransformReadOnly,
@@ -38,7 +38,7 @@ fn setup(
     let space_frame = ReferenceFrame::<i128>::default();
 
     commands
-        .spawn(BigSpaceBundle::<i128>::default())
+        .spawn(BigSpaceRootBundle::<i128>::default())
         .with_children(|space| {
             // camera
             space.spawn((

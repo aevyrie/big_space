@@ -8,6 +8,33 @@ use bevy::reflect::Reflect;
 ///
 /// Larger grids result in a larger useable volume, at the cost of increased memory usage. In
 /// addition, some platforms may be unable to use larger numeric types (e.g. [`i128`]).
+///
+/// [`big_space`](crate) is generic over a few integer types to allow you to select the grid size
+/// you need. Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter,
+/// these correspond to a total usable volume of a cube with the following edge lengths:
+///
+/// - i8: 2,560 km = 74% of the diameter of the Moon
+/// - i16: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
+/// - i32: 0.0045 light years = ~4 times the width of the solar system
+/// - i64: 19.5 million light years = ~100 times the width of the milky way galaxy
+/// - i128: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
+///
+/// where
+///
+/// `usable_edge_length = 2^(integer_bits) * cell_edge_length`
+///
+/// resulting in a worst case precision of 0.5mm in any of these cases.
+///
+/// # Note
+///
+/// Be sure you are using the same grid index precision everywhere. It might be a good idea to
+/// define a type alias!
+///
+/// ```
+/// # use big_space::GridCell;
+/// type GalacticGrid = GridCell<i64>;
+/// ```
+///
 pub trait GridPrecision:
     Default
     + PartialEq

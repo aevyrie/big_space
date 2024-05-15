@@ -14,7 +14,7 @@
 //!
 //! ### Solution
 //!
-//! While using the [`FloatingOriginPlugin`], the position of entities is now defined with the
+//! While using the [`BigSpacePlugin`], the position of entities is now defined with the
 //! [`ReferenceFrame`], [`GridCell`], and [`Transform`] components. The `ReferenceFrame` is a large
 //! integer grid of cells; entities are located within this grid using the `GridCell` component.
 //! Finally, the `Transform` is used to position the entity relative to the center of its
@@ -39,7 +39,7 @@
 //! built in transform propagation system. This also means that if you don't need to place entities
 //! in a high-precision reference frame, you don't have to, as the process is opt-in. The
 //! high-precision hierarchical reference frames are explicit. Each high-precision tree must have a
-//! [`BigSpaceBundle`] at the root, and each `BigSpace` is independent. This means that each
+//! [`BigSpaceRootBundle`] at the root, and each `BigSpace` is independent. This means that each
 //! `BigSpace` has its own floating origin, which allows you to do things like rendering two players
 //! on opposite ends of the universe simultaneously.
 //!
@@ -63,10 +63,11 @@
 //! # Getting Started
 //!
 //! To start using this plugin:
-//! 0. Choose how big your world should be! Do you need an i32, or an i128?
+//! 0. Choose how big your world should be! Do you need an i8, or an i128? See [`GridCell`] for more
+//!    details and documentation.
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
-//! 2. Add the [`FloatingOriginPlugin`] to your `App`
-//! 3. Create a new `BigSpace` tree using a [`BigSpaceBundle`].
+//! 2. Add the [`BigSpacePlugin`] to your `App`
+//! 3. Create a new `BigSpace` tree using a [`BigSpaceRootBundle`].
 //! 4. Spawn entities as children of the `BigSpace`, using the [`BigSpatialBundle`].
 //! 5. Add the [`FloatingOrigin`] component to the active camera
 //! 6. To add more levels to the hierarchy, add a [`ReferenceFrame`] to an existing
@@ -123,6 +124,7 @@ use std::marker::PhantomData;
 use world_query::GridTransformReadOnly;
 
 pub mod bundles;
+pub mod commands;
 pub mod grid_cell;
 pub mod precision;
 pub mod propagation;
@@ -187,7 +189,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlu
             .add_systems(PostUpdate, system_set_config())
             .add_systems(
                 PostUpdate,
-                validation::validate_hierarchy::<validation::BigSpaceRoot<P>>
+                validation::validate_hierarchy::<validation::SpatialHierarchyRoot<P>>
                     .before(TransformSystem::TransformPropagate),
             )
             // These are the bevy transform propagation systems. Because these start from
@@ -296,7 +298,7 @@ mod tests {
             .id();
 
         app.world
-            .spawn(bundles::BigSpaceBundle::<i32>::default())
+            .spawn(bundles::BigSpaceRootBundle::<i32>::default())
             .push_children(&[first, second]);
 
         app.update();
@@ -346,7 +348,7 @@ mod tests {
             .id();
 
         app.world
-            .spawn(bundles::BigSpaceBundle::<i32>::default())
+            .spawn(bundles::BigSpaceRootBundle::<i32>::default())
             .push_children(&[first, second]);
 
         app.update();

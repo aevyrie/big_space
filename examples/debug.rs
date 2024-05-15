@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 use big_space::{
-    bundles::BigSpaceBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
+    bundles::BigSpaceRootBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
 };
 
 fn main() {
@@ -62,7 +62,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands
-        .spawn(BigSpaceBundle::<i64> {
+        .spawn(BigSpaceRootBundle::<i64> {
             reference_frame: ReferenceFrame::<i64>::new(0.5, 0.01),
             ..default()
         })

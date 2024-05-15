@@ -1,55 +1,9 @@
 //! Tools for validating high-precision transform hierarchies
 
-/// TODO:
-///
-/// MAKE ReferenceFrame optional!
-///
-/// root reference frame
-/// - should NOT have a Transform, GlobalTransform, or Parent
-/// - MUST have a ReferenceFrame, the local_origin field should be Some
-///
-/// entities with GridCell
-/// - MUST have a parent with ReferenceFrame
-/// - MUST have a Transform and GlobalTransform
-///
-/// Normal, low precision bevy transforms
-/// entities with a Transform and WITHOUT a GridCell
-/// - MUST have a chain of parents with Transforms that ends at the root OR end at a
-///   RootReferenceFrame
-/// - MUST have a GlobalTransform
-///
-/// Maybe a faster way to do this would be to do a depth first search of the tree to make sure every branch is valid? If you see an entity that is a child that doesn't match, that should trigger an error as that entity
-/// ROOT
-/// - root_frame:
-///     - MUST(RootReferenceFrame, ReferenceFrame),
-///     - NOT(GridCell, Transform, GlobalTransform, Parent)
-///     - CHILDREN: child_frame, high_precision_spatial, low_precision_spatial
-///
-/// - root_spatial_low_precision:
-///     - MUST(Transform, GlobalTransform),
-///     - NOT(GridCell, RootReferenceFrame, ReferenceFrame, Parent)
-///     - CHILDREN: low_precision_spatial
-///
-/// CHILDREN:
-///- child_frame:
-///     - MUST(GridCell, Transform, GlobalTransform, ReferenceFrame, Parent)
-///     - NOT(RootReferenceFrame)
-///     - CHILDREN: child_frame, high_precision_spatial, low_precision_spatial
-///
-/// - child_spatial_low_precision:
-///     - MUST(Transform, GlobalTransform, Parent),
-///     - NOT(GridCell, RootReferenceFrame, ReferenceFrame)
-///     - CHILDREN: low_precision_spatial
-///
-///- child_spatial_high_precision:
-///     - MUST(GridCell, Transform, GlobalTransform, Parent),
-///     - NOT(RootReferenceFrame, ReferenceFrame)
-///     - CHILDREN: low_precision_spatial
-///
 use crate::*;
 
 /// Validate the entity hierarchy and report errors.
-pub fn validate_hierarchy<V: 'static + HierarchyValidation + Default>(world: &mut World) {
+pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut World) {
     let mut root_entities: Vec<Entity> = world
         .query_filtered::<Entity, Without<Parent>>()
         .iter(world)
@@ -59,7 +13,7 @@ pub fn validate_hierarchy<V: 'static + HierarchyValidation + Default>(world: &mu
         bevy::utils::HashMap::<&'static str, QueryState<(Entity, Option<&Children>)>>::default();
 
     struct ValidationStackEntry {
-        parent_node: Box<dyn HierarchyValidation>,
+        parent_node: Box<dyn ValidHierarchyNode>,
         entity: Entity,
     }
 
@@ -77,9 +31,14 @@ pub fn validate_hierarchy<V: 'static + HierarchyValidation + Default>(world: &mu
         let test_allowed_nodes = allowed_nodes
             .drain(..)
             .filter_map(|validator| {
-                let validation_query = query_state_cache
-                    .entry(validator.name())
-                    .or_insert_with(|| validator.build_query(world));
+                let validation_query =
+                    query_state_cache
+                        .entry(validator.name())
+                        .or_insert_with(|| {
+                            let mut query_builder = QueryBuilder::new(world);
+                            validator.match_self(&mut query_builder);
+                            query_builder.build()
+                        });
 
                 validation_query
                     .get(world, entry.entity)
@@ -102,14 +61,14 @@ pub fn validate_hierarchy<V: 'static + HierarchyValidation + Default>(world: &mu
                         possibilities.push('\n');
                     });
 
-                error!("Entity {:#?} is a child of the node {:#?} and failed its validation criteria.\n\tThis entity must be one of the following allowed nodes:\n{}", entry.entity, entry.parent_node.name(),  possibilities);
+                error!("big_space hierarchy validation error:\n\tEntity {:#?} is a child of the node {:#?}\n\tThis entity must be one of the following allowed nodes:\n{}\tSee {} for details.", entry.entity, entry.parent_node.name(), possibilities, file!());
                 continue;
             }
             Some(None) => continue, // no children
             Some(Some((this_validator, children))) => {
                 for child in children {
                     validator_stack.push(ValidationStackEntry {
-                        parent_node: this_validator.dyn_boxed(),
+                        parent_node: this_validator.clone(),
                         entity: child,
                     })
                 }
@@ -119,116 +78,130 @@ pub fn validate_hierarchy<V: 'static + HierarchyValidation + Default>(world: &mu
 }
 
 /// Defines a valid node in the hierarchy: what components it must have, must not have, and what
-/// kinds of nodes its children can be.
-pub trait HierarchyValidation {
-    /// Add filters to validate this node.
-    fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>);
+/// kinds of nodes its children can be. This can be used recursively to validate an entire entity
+/// hierarchy by starting from the root.
+pub trait ValidHierarchyNode: sealed::CloneHierarchy {
+    /// Add filters to a query to check if entities match this type of node
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>);
     /// The types of nodes that can be children of this node.
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>>;
-    /// Builds a query from the validation method. Automatically implemented.
-    fn build_query(&self, world: &mut World) -> QueryState<(Entity, Option<&'static Children>)> {
-        let mut query_builder = QueryBuilder::new(world);
-        self.validate(&mut query_builder);
-        query_builder.build()
-    }
-    /// Create a boxed trait object.
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation>;
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>>;
     /// A unique identifier of this type
     fn name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
 }
 
+pub(super) mod sealed {
+    use super::ValidHierarchyNode;
+
+    pub trait CloneHierarchy {
+        fn clone_box(&self) -> Box<dyn ValidHierarchyNode>;
+    }
+
+    impl<T: ?Sized> CloneHierarchy for T
+    where
+        T: 'static + ValidHierarchyNode + Clone,
+    {
+        fn clone_box(&self) -> Box<dyn ValidHierarchyNode> {
+            Box::new(self.clone())
+        }
+    }
+
+    impl Clone for Box<dyn ValidHierarchyNode> {
+        fn clone(&self) -> Self {
+            self.clone_box()
+        }
+    }
+}
+
 /// The root hierarchy validation struct, used as a generic parameter in [`validation`].
-#[derive(Default, Clone, Copy)]
-pub struct BigSpaceRoot<P: GridPrecision>(PhantomData<P>);
+#[derive(Default, Clone)]
+pub struct SpatialHierarchyRoot<P: GridPrecision>(PhantomData<P>);
 
-impl<P: GridPrecision> HierarchyValidation for BigSpaceRoot<P> {
-    fn validate(&self, _: &mut QueryBuilder<(Entity, Option<&Children>)>) {}
+impl<P: GridPrecision> ValidHierarchyNode for SpatialHierarchyRoot<P> {
+    fn match_self(&self, _: &mut QueryBuilder<(Entity, Option<&Children>)>) {}
 
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
             Box::<RootFrame<P>>::default(),
             Box::<RootSpatialLowPrecision<P>>::default(),
-            Box::<AnyRoot>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
         ]
     }
+}
 
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
+#[derive(Default, Clone)]
+struct AnyNonSpatial<P: GridPrecision>(PhantomData<P>);
+
+impl<P: GridPrecision> ValidHierarchyNode for AnyNonSpatial<P> {
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+        query
+            .without::<GridCell<P>>()
+            .without::<Transform>()
+            .without::<GlobalTransform>()
+            .without::<BigSpace>()
+            .without::<ReferenceFrame<P>>()
+            .without::<FloatingOrigin>();
+    }
+
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
+        vec![Box::<AnyNonSpatial<P>>::default()]
     }
 }
 
-#[derive(Default, Clone, Copy)]
-struct AnyRoot;
-
-impl HierarchyValidation for AnyRoot {
-    fn validate(&self, _: &mut QueryBuilder<(Entity, Option<&Children>)>) {}
-
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
-        vec![Box::<AnyRoot>::default()]
-    }
-
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
-    }
-}
-
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 struct RootFrame<P: GridPrecision>(PhantomData<P>);
 
-impl<P: GridPrecision> HierarchyValidation for RootFrame<P> {
-    fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<BigSpace>()
             .with::<ReferenceFrame<P>>()
             .without::<GridCell<P>>()
             .without::<Transform>()
             .without::<GlobalTransform>()
-            .without::<Parent>();
+            .without::<Parent>()
+            .without::<FloatingOrigin>();
     }
 
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
             Box::<ChildFrame<P>>::default(),
             Box::<ChildSpatialLowPrecision<P>>::default(),
             Box::<ChildSpatialHighPrecision<P>>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
         ]
-    }
-
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 struct RootSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
 
-impl<P: GridPrecision> HierarchyValidation for RootSpatialLowPrecision<P> {
-    fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+impl<P: GridPrecision> ValidHierarchyNode for RootSpatialLowPrecision<P> {
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
             .without::<GridCell<P>>()
             .without::<BigSpace>()
             .without::<ReferenceFrame<P>>()
-            .without::<Parent>();
+            .without::<Parent>()
+            .without::<FloatingOrigin>();
     }
 
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
-        vec![Box::<ChildSpatialLowPrecision<P>>::default()]
-    }
-
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
+        vec![
+            Box::<ChildSpatialLowPrecision<P>>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
+        ]
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 struct ChildFrame<P: GridPrecision>(PhantomData<P>);
 
-impl<P: GridPrecision> HierarchyValidation for ChildFrame<P> {
-    fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<ReferenceFrame<P>>()
             .with::<GridCell<P>>()
@@ -238,47 +211,44 @@ impl<P: GridPrecision> HierarchyValidation for ChildFrame<P> {
             .without::<BigSpace>();
     }
 
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
             Box::<ChildFrame<P>>::default(),
             Box::<ChildSpatialLowPrecision<P>>::default(),
             Box::<ChildSpatialHighPrecision<P>>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
         ]
-    }
-
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 struct ChildSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
 
-impl<P: GridPrecision> HierarchyValidation for ChildSpatialLowPrecision<P> {
-    fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
             .without::<GridCell<P>>()
             .without::<BigSpace>()
-            .without::<ReferenceFrame<P>>();
+            .without::<ReferenceFrame<P>>()
+            .without::<FloatingOrigin>();
     }
 
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
-        vec![Box::<ChildSpatialLowPrecision<P>>::default()]
-    }
-
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
+        vec![
+            Box::<ChildSpatialLowPrecision<P>>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
+        ]
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 struct ChildSpatialHighPrecision<P: GridPrecision>(PhantomData<P>);
 
-impl<P: GridPrecision> HierarchyValidation for ChildSpatialHighPrecision<P> {
-    fn validate(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialHighPrecision<P> {
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<GridCell<P>>()
             .with::<Transform>()
@@ -288,11 +258,10 @@ impl<P: GridPrecision> HierarchyValidation for ChildSpatialHighPrecision<P> {
             .without::<ReferenceFrame<P>>();
     }
 
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn HierarchyValidation>> {
-        vec![Box::<ChildSpatialLowPrecision<P>>::default()]
-    }
-
-    fn dyn_boxed(&self) -> Box<dyn HierarchyValidation> {
-        Box::new(*self)
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
+        vec![
+            Box::<ChildSpatialLowPrecision<P>>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
+        ]
     }
 }

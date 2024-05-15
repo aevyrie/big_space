@@ -1,13 +1,10 @@
 /// Example with spheres at the scale and distance of the earth and moon around the sun, at 1:1
 /// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
 /// demonstrate how high precision nested reference frames work at large scales.
-use bevy::{
-    core_pipeline::bloom::BloomSettings, pbr::ScreenSpaceAmbientOcclusionBundle, prelude::*,
-    render::camera::Exposure,
-};
+use bevy::{core_pipeline::bloom::BloomSettings, prelude::*, render::camera::Exposure};
 use big_space::{
-    bundles::BigSpaceBundle, camera::CameraController, reference_frame::ReferenceFrame,
-    FloatingOrigin, GridCell,
+    bundles::BigSpaceRootBundle, camera::CameraController, commands::BigSpaceCommandExt,
+    reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
 };
 use rand::Rng;
 
@@ -26,7 +23,6 @@ fn main() {
             color: Color::WHITE,
             brightness: 100.0,
         })
-        .insert_resource(Msaa::Off)
         .add_systems(Startup, (spawn_solar_system, spawn_camera).chain())
         .add_systems(Update, rotate)
         .register_type::<Sun>()
@@ -87,11 +83,10 @@ fn spawn_camera(
         ))
         .insert(cam_cell)
         .insert(FloatingOrigin)
-        .insert(ScreenSpaceAmbientOcclusionBundle::default())
         .with_children(|camera| {
             camera.spawn(SceneBundle {
                 scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                transform: Transform::from_xyz(0.0, -2.0, -14.0)
+                transform: Transform::from_xyz(0.0, -4.0, -18.0)
                     .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
                 ..default()
             });
@@ -108,10 +103,34 @@ fn spawn_solar_system(
 ) {
     let mut sphere = |radius| meshes.add(Sphere::new(radius).mesh().ico(32).unwrap());
 
+    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
+        root_frame.with_default_frame(|sun_frame| {
+            sun_frame
+                .insert(Sun)
+                .with_spatial_entity(|sun_mesh| {
+                    sun_mesh.insert(PbrBundle {
+                        mesh: sphere(SUN_RADIUS_M),
+                        material: materials.add(StandardMaterial {
+                            base_color: Color::WHITE,
+                            emissive: Color::rgb_linear(10000000., 10000000., 10000000.),
+                            ..default()
+                        }),
+                        ..default()
+                    });
+                })
+                .with_spatial_entity(|sun_light| {
+                    sun_light.insert(PointLightBundle::default());
+                })
+                .with_default_frame(|earth_frame| {
+                    earth_frame.insert(Earth).with_spatial_entity(|spatial| {});
+                });
+        });
+    });
+
     let space_frame = ReferenceFrame::<i64>::default();
 
     commands
-        .spawn(BigSpaceBundle::<i64>::default())
+        .spawn(BigSpaceRootBundle::<i64>::default())
         .with_children(|space| {
             // Star field
             let star_mesh = sphere(1e10);

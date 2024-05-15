@@ -4,34 +4,14 @@ use bevy::prelude::*;
 
 use crate::precision::GridPrecision;
 
-/// Defines the grid cell this entity's `Transform` is relative to.
+/// The cell index an entity within a [`crate::ReferenceFrame`]'s grid. The [`Transform`] of an
+/// entity with this component is a transformation from the center of this cell.
 ///
-/// This component is generic over a few integer types to allow you to select the grid size you
-/// need. These correspond to a total usable volume of a cube with the following edge lengths:
-///
-/// **Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter, which
-/// gives you a worst case precision of 0.5mm**
-///
-/// - i8: 2,560 km = 74% of the diameter of the Moon
-/// - i16: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
-/// - i32: 0.0045 light years = ~4 times the width of the solar system
-/// - i64: 19.5 million light years = ~100 times the width of the milky way galaxy
-/// - i128: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
-///
-/// where
-///
-/// `usable_edge_length = 2^(integer_bits) * grid_cell_edge_length`
-///
-/// # Note
-///
-/// Be sure you are using the same grid index precision everywhere. It might be a good idea to
-/// define a type alias!
-///
-/// ```
-/// # use big_space::GridCell;
-/// type GalacticGrid = GridCell<i64>;
-/// ```
-///
+/// This component adds precision to the translation of an entity's [`Transform`]. In a
+/// high-precision [`big_space`](crate) world, the position of an entity is described by a
+/// [`Transform`] *and* a [`GridCell`]. This component is the index of a cell inside a large grid
+/// defined by a reference frame, and the transform is the position of the entity relative to the
+/// center of that cell.
 #[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 pub struct GridCell<P: GridPrecision> {
