@@ -8,7 +8,7 @@ use big_space::{
     camera::{CameraController, CameraInput},
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::GridTransformReadOnly,
-    FloatingOrigin, GridCell,
+    BigSpatialBundle, FloatingOrigin, GridCell,
 };
 
 fn main() {
@@ -41,23 +41,28 @@ fn setup(
         .spawn(BigSpaceRootBundle::<i128>::default())
         .with_children(|space| {
             // camera
-            space.spawn((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-                    projection: Projection::Perspective(PerspectiveProjection {
-                        near: 1e-18,
+            space
+                .spawn((
+                    Camera3dBundle {
+                        transform: Transform::from_xyz(0.0, 0.0, 8.0)
+                            .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                        projection: Projection::Perspective(PerspectiveProjection {
+                            near: 1e-18,
+                            ..default()
+                        }),
                         ..default()
-                    }),
-                    ..default()
-                },
-                GridCell::<i128>::default(), // All spatial entities need this component
-                FloatingOrigin, // Important: marks the floating origin entity for rendering.
-                CameraController::default() // Built-in camera controller
-                    .with_speed_bounds([10e-18, 10e35])
-                    .with_smoothness(0.9, 0.8)
-                    .with_speed(1.0),
-            ));
+                    },
+                    ReferenceFrame::<i128>::default(),
+                    GridCell::<i128>::default(), // All spatial entities need this component
+                    FloatingOrigin, // Important: marks the floating origin entity for rendering.
+                    CameraController::default() // Built-in camera controller
+                        .with_speed_bounds([10e-18, 10e35])
+                        .with_smoothness(0.9, 0.8)
+                        .with_speed(1.0),
+                ))
+                .with_children(|child| {
+                    child.spawn(BigSpatialBundle::<i128>::default());
+                });
 
             let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
             let matl_handle = materials.add(StandardMaterial {

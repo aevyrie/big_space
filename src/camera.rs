@@ -209,10 +209,7 @@ pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
     frames: ReferenceFrames<P>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<
-        (Entity, GridTransform<P>, &mut CameraController),
-        Without<ReferenceFrame<P>>,
-    >,
+    mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
         let Some(frame) = frames.parent_frame(camera).map(|frame| frames.get(frame)) else {

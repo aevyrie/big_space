@@ -44,7 +44,7 @@ pub fn update_debug_bounds<P: GridPrecision>(
         if origin.is_none() {
             gizmos.cuboid(transform, Color::GREEN)
         } else {
-            gizmos.cuboid(transform, Color::rgba(0.0, 0.0, 1.0, 0.5))
+            // gizmos.cuboid(transform, Color::rgba(0.0, 0.0, 1.0, 0.5))
         }
     }
 }
@@ -56,7 +56,7 @@ pub fn update_reference_frame_axes<P: GridPrecision>(
 ) {
     for (transform, frame) in frames.iter() {
         let start = transform.translation();
-        let len = frame.cell_edge_length() * 1.0;
+        let len = frame.cell_edge_length() * 2.0;
         gizmos.ray(start, transform.right() * len, Color::RED);
         gizmos.ray(start, transform.up() * len, Color::GREEN);
         gizmos.ray(start, transform.back() * len, Color::BLUE);

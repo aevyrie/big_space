@@ -45,7 +45,7 @@ pub struct ReferenceFrameCommands<'a, P: GridPrecision> {
 
 impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
     /// Get a reference to the current reference frame.
-    pub fn this_frame(&mut self) -> &ReferenceFrame<P> {
+    pub fn get_frame(&mut self) -> &ReferenceFrame<P> {
         &self.reference_frame
     }
 
@@ -55,12 +55,19 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
         self
     }
 
-    /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame.
-    pub fn with_spatial_entity(
+    /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, which is
+    /// provided to help position the entity with high precision using
+    /// [`ReferenceFrame::translation_to_grid`].
+    pub fn spawn_spatial(
         &mut self,
-        spatial: impl FnOnce(&mut SpatialEntityCommands<P>),
+        spatial: impl FnOnce(&ReferenceFrame<P>, &mut SpatialEntityCommands<P>),
     ) -> &mut Self {
-        self.entity_commands.with_children(move |child_builder| {
+        let Self {
+            entity_commands,
+            reference_frame,
+        } = self;
+
+        entity_commands.with_children(move |child_builder| {
             let entity_commands = child_builder.spawn((
                 #[cfg(feature = "bevy_render")]
                 Visibility::default(),
@@ -72,22 +79,29 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
                 GlobalTransform::default(),
                 GridCell::<P>::default(),
             ));
+
             let mut cmd = SpatialEntityCommands {
                 entity_commands,
                 phantom: PhantomData,
             };
-            spatial(&mut cmd);
+
+            spatial(reference_frame, &mut cmd);
         });
         self
     }
 
     /// Spawn a reference frame as a child of the current reference frame.
-    pub fn with_frame(
+    pub fn spawn_frame(
         &mut self,
-        reference_frame: ReferenceFrame<P>,
-        frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
+        child_reference_frame: ReferenceFrame<P>,
+        frame: impl FnOnce(&ReferenceFrame<P>, &mut ReferenceFrameCommands<P>),
     ) -> &mut Self {
-        self.entity_commands.with_children(move |child_builder| {
+        let Self {
+            entity_commands,
+            reference_frame,
+        } = self;
+
+        entity_commands.with_children(move |child_builder| {
             let entity_commands = child_builder.spawn((
                 #[cfg(feature = "bevy_render")]
                 Visibility::default(),
@@ -100,21 +114,24 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
                 GridCell::<P>::default(),
                 ReferenceFrame::<P>::default(),
             ));
+
             let mut cmd = ReferenceFrameCommands {
                 entity_commands,
-                reference_frame,
+                reference_frame: child_reference_frame,
             };
-            frame(&mut cmd);
+
+            frame(reference_frame, &mut cmd);
         });
         self
     }
 
-    /// Spawn a reference frame as a child of the current reference frame.
-    pub fn with_default_frame(
+    /// Spawn a reference frame as a child of the current reference frame. The first argument in the
+    /// closure is the paren't reference frame.
+    pub fn spawn_frame_default(
         &mut self,
-        frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
+        frame: impl FnOnce(&ReferenceFrame<P>, &mut ReferenceFrameCommands<P>),
     ) -> &mut Self {
-        self.with_frame(ReferenceFrame::default(), frame)
+        self.spawn_frame(ReferenceFrame::default(), frame)
     }
 
     /// Takes a closure which provides this reference frame and a [`ChildBuilder`].
@@ -146,32 +163,6 @@ impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
     /// Insert a component on this reference frame
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
         self.entity_commands.insert(bundle);
-        self
-    }
-
-    /// Add a high-precision spatial entity ( [`GridCell`] ) to this reference frame.
-    pub fn with_spatial_entity(
-        &mut self,
-        spatial: impl FnOnce(&mut SpatialEntityCommands<P>),
-    ) -> &mut Self {
-        self.entity_commands.with_children(move |child_builder| {
-            let entity_commands = child_builder.spawn((
-                #[cfg(feature = "bevy_render")]
-                Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                ViewVisibility::default(),
-                Transform::default(),
-                GlobalTransform::default(),
-                GridCell::<P>::default(),
-            ));
-            let mut cmd = SpatialEntityCommands {
-                entity_commands,
-                phantom: PhantomData,
-            };
-            spatial(&mut cmd);
-        });
         self
     }
 
