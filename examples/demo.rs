@@ -4,11 +4,11 @@ use bevy::{
     window::{CursorGrabMode, PrimaryWindow},
 };
 use big_space::{
-    bundles::BigSpaceRootBundle,
     camera::{CameraController, CameraInput},
+    commands::BigSpaceCommandExt,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::GridTransformReadOnly,
-    BigSpatialBundle, FloatingOrigin, GridCell,
+    FloatingOrigin, GridCell,
 };
 
 fn main() {
@@ -22,10 +22,10 @@ fn main() {
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
-        .add_systems(PreUpdate, cursor_grab_system)
+        .add_systems(PreUpdate, (cursor_grab_system, ui_text_system))
         .add_systems(
             PostUpdate,
-            (highlight_nearest_sphere, ui_text_system).after(TransformSystem::TransformPropagate),
+            highlight_nearest_sphere.after(TransformSystem::TransformPropagate),
         )
         .run()
 }
@@ -35,70 +35,62 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let space_frame = ReferenceFrame::<i128>::default();
-
-    commands
-        .spawn(BigSpaceRootBundle::<i128>::default())
-        .with_children(|space| {
-            // camera
-            space
-                .spawn((
-                    Camera3dBundle {
-                        transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                            .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-                        projection: Projection::Perspective(PerspectiveProjection {
-                            near: 1e-18,
-                            ..default()
-                        }),
+    commands.spawn_big_space(ReferenceFrame::<i128>::new(0.0000000001, 0.0), |root| {
+        root.spawn_spatial(|_, camera| {
+            camera.insert((
+                Camera3dBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 8.0)
+                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                    projection: Projection::Perspective(PerspectiveProjection {
+                        near: 1e-18,
                         ..default()
-                    },
-                    ReferenceFrame::<i128>::default(),
-                    GridCell::<i128>::default(), // All spatial entities need this component
-                    FloatingOrigin, // Important: marks the floating origin entity for rendering.
-                    CameraController::default() // Built-in camera controller
-                        .with_speed_bounds([10e-18, 10e35])
-                        .with_smoothness(0.9, 0.8)
-                        .with_speed(1.0),
-                ))
-                .with_children(|child| {
-                    child.spawn(BigSpatialBundle::<i128>::default());
+                    }),
+                    ..default()
+                },
+                FloatingOrigin, // Important: marks the floating origin entity for rendering.
+                CameraController::default() // Built-in camera controller
+                    .with_speed_bounds([10e-18, 10e35])
+                    .with_smoothness(0.9, 0.8)
+                    .with_speed(1.0),
+            ));
+        });
+
+        let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
+        let matl_handle = materials.add(StandardMaterial {
+            base_color: Color::BLUE,
+            perceptual_roughness: 0.8,
+            reflectance: 1.0,
+            ..default()
+        });
+
+        let mut translation = Vec3::ZERO;
+        for i in -16..=27 {
+            let j = 10_f32.powf(i as f32);
+            let k = 10_f32.powf((i - 1) as f32);
+            translation.x += j / 2.0 + k;
+            translation.y = j / 2.0;
+
+            root.spawn_spatial(|_, sphere| {
+                sphere.insert(PbrBundle {
+                    mesh: mesh_handle.clone(),
+                    material: matl_handle.clone(),
+                    transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
+                    ..default()
                 });
-
-            let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
-            let matl_handle = materials.add(StandardMaterial {
-                base_color: Color::BLUE,
-                perceptual_roughness: 0.8,
-                reflectance: 1.0,
-                ..default()
             });
+        }
 
-            let mut translation = Vec3::ZERO;
-            for i in -16..=27 {
-                let j = 10_f32.powf(i as f32);
-                let k = 10_f32.powf((i - 1) as f32);
-                translation.x += j / 2.0 + k;
-                space.spawn((
-                    PbrBundle {
-                        mesh: mesh_handle.clone(),
-                        material: matl_handle.clone(),
-                        transform: Transform::from_scale(Vec3::splat(j))
-                            .with_translation(translation),
-                        ..default()
-                    },
-                    GridCell::<i128>::default(),
-                ));
-            }
-
-            // light
-            space.spawn((DirectionalLightBundle {
+        // light
+        root.spawn_spatial(|_, light| {
+            light.insert(DirectionalLightBundle {
                 directional_light: DirectionalLight {
                     illuminance: 100_000.0,
                     ..default()
                 },
                 ..default()
-            },));
-        })
-        .insert(space_frame);
+            });
+        });
+    });
 }
 
 #[derive(Component, Reflect)]
@@ -196,6 +188,27 @@ fn ui_text_system(
         return;
     };
     let ref_frame = ref_frames.get(ref_frame);
+
+    let trans_int =
+        origin_pos.transform.translation.abs().floor() * origin_pos.transform.translation.signum();
+    let real_position_frac = origin_pos.transform.translation - trans_int;
+    let rpf_x = format!("{}", real_position_frac.x);
+    let rpf_y = format!("{}", real_position_frac.y);
+    let rpf_z = format!("{}", real_position_frac.z);
+    let rpf_x = rpf_x.trim_start_matches(['-', '0']);
+    let rpf_y = rpf_y.trim_start_matches(['-', '0']);
+    let rpf_z = rpf_z.trim_start_matches(['-', '0']);
+    let real_position_int = origin_pos.cell * ref_frame.cell_edge_length() as i128
+        + GridCell {
+            x: trans_int.x as i128,
+            y: trans_int.y as i128,
+            z: trans_int.z as i128,
+        };
+    let real_position_text = format!(
+        "Combined:       {}{}x, {}{}y, {}{}z",
+        real_position_int.x, rpf_x, real_position_int.y, rpf_y, real_position_int.z, rpf_z
+    );
+
     let real_position = ref_frame.grid_position_double(origin_pos.cell, origin_pos.transform);
     let real_position_f64_text = format!(
         "Combined (f64): {}x, {}y, {}z",
@@ -232,7 +245,7 @@ fn ui_text_system(
     let mut debug_text = debug_text.single_mut();
 
     debug_text.0.sections[0].value = format!(
-        "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
+        "{grid_text}\n{translation_text}\n\n{real_position_text}\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
     );
 
     fun_text.single_mut().sections[0].value = fact_text

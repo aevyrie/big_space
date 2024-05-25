@@ -93,3 +93,23 @@ impl<P: GridPrecision> std::ops::SubAssign for GridCell<P> {
         *self = self.sub(rhs);
     }
 }
+
+impl<P: GridPrecision> std::ops::Mul<P> for GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn mul(self, rhs: P) -> Self::Output {
+        GridCell {
+            x: self.x.mul(rhs),
+            y: self.y.mul(rhs),
+            z: self.z.mul(rhs),
+        }
+    }
+}
+
+impl<P: GridPrecision> std::ops::Mul<P> for &GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn mul(self, rhs: P) -> Self::Output {
+        (*self).mul(rhs)
+    }
+}

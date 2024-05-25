@@ -1,9 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use big_space::{
-    bundles::BigSpaceRootBundle, reference_frame::ReferenceFrame, FloatingOrigin, GridCell,
-};
+use big_space::{commands::BigSpaceCommandExt, reference_frame::ReferenceFrame, FloatingOrigin};
 
 fn main() {
     App::new()
@@ -61,81 +59,78 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands
-        .spawn(BigSpaceRootBundle::<i64> {
-            reference_frame: ReferenceFrame::<i64>::new(0.5, 0.01),
-            ..default()
-        })
-        .with_children(|root| {
-            let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
-            let matl_handle = materials.add(StandardMaterial {
-                base_color: Color::YELLOW,
-                ..default()
-            });
+    let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
+    let matl_handle = materials.add(StandardMaterial {
+        base_color: Color::YELLOW,
+        ..default()
+    });
 
-            root.spawn((
+    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root| {
+        root.spawn_spatial(|_, spatial| {
+            spatial.insert((
                 PbrBundle {
                     mesh: mesh_handle.clone(),
                     material: matl_handle.clone(),
                     transform: Transform::from_xyz(0.0, 0.0, 1.0),
                     ..default()
                 },
-                GridCell::<i64>::default(),
                 Mover::<1>,
             ));
-            root.spawn((
+        });
+        root.spawn_spatial(|_, spatial| {
+            spatial.insert((
                 PbrBundle {
                     mesh: mesh_handle.clone(),
                     material: matl_handle.clone(),
                     transform: Transform::from_xyz(1.0, 0.0, 0.0),
                     ..default()
                 },
-                GridCell::<i64>::default(),
                 Mover::<2>,
             ));
-            root.spawn((
+        });
+        root.spawn_frame(ReferenceFrame::<i64>::new(0.2, 0.01), |_, spatial| {
+            spatial.insert((
                 PbrBundle {
                     mesh: mesh_handle.clone(),
                     material: matl_handle.clone(),
                     transform: Transform::from_xyz(0.0, 1.0, 0.0),
                     ..default()
                 },
-                GridCell::<i64>::default(),
-                ReferenceFrame::<i64>::new(0.2, 0.01),
                 Rotator,
                 Mover::<3>,
-            ))
-            .with_children(|parent| {
-                parent.spawn((
+            ));
+
+            spatial.spawn_spatial(|_, spatial| {
+                spatial.insert((
                     PbrBundle {
                         mesh: mesh_handle,
                         material: matl_handle,
                         transform: Transform::from_xyz(0.0, 0.5, 0.0),
                         ..default()
                     },
-                    GridCell::<i64>::default(),
                     Mover::<4>,
                 ));
             });
+        });
 
-            // light
-            root.spawn((
-                PointLightBundle {
-                    transform: Transform::from_xyz(4.0, 8.0, 4.0),
-                    ..default()
-                },
-                GridCell::<i64>::default(),
-            ));
+        // light
+        root.spawn_spatial(|_, spatial| {
+            spatial.insert((PointLightBundle {
+                transform: Transform::from_xyz(4.0, 8.0, 4.0),
+                ..default()
+            },));
+        });
 
-            // camera
-            root.spawn((
+        // camera
+        root.spawn_spatial(|_, spatial| {
+            spatial.insert((
                 Camera3dBundle {
                     transform: Transform::from_xyz(0.0, 0.0, 8.0)
                         .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
                     ..default()
                 },
-                GridCell::<i64>::default(),
                 FloatingOrigin,
             ));
         });
+    });
 }

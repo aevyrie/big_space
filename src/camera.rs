@@ -12,8 +12,7 @@ use bevy::{
 };
 
 use crate::{
-    precision::GridPrecision,
-    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
+    precision::GridPrecision, reference_frame::local_origin::ReferenceFrames,
     world_query::GridTransform,
 };
 
@@ -196,7 +195,7 @@ pub fn nearest_objects<P: GridPrecision>(
             let nearest_distance = center_distance.length()
                 - (aabb.half_extents.as_dvec3() * object_local.scale.as_dvec3())
                     .abs()
-                    .max_element();
+                    .min_element();
             (entity, nearest_distance)
         })
         .filter(|v| v.1.is_finite())

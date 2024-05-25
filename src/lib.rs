@@ -116,7 +116,7 @@
 //! up the computed translations and grid cell offsets to get a more precise result.
 
 #![allow(clippy::type_complexity)]
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 use bevy::{prelude::*, transform::TransformSystem};
 use propagation::propagate_reference_frame_transforms;
@@ -149,16 +149,17 @@ pub struct BigSpacePlugin<P: GridPrecision> {
     phantom: PhantomData<P>,
 }
 
+#[allow(missing_docs)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+pub enum FloatingOriginSet {
+    RecenterLargeTransforms,
+    LocalFloatingOrigins,
+    RootGlobalTransforms,
+    PropagateTransforms,
+}
+
 impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlugin<P> {
     fn build(&self, app: &mut App) {
-        #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-        enum FloatingOriginSet {
-            RecenterLargeTransforms,
-            LocalFloatingOrigins,
-            RootGlobalTransforms,
-            PropagateTransforms,
-        }
-
         let system_set_config = || {
             (
                 (

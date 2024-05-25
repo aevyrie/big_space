@@ -9,8 +9,8 @@ pub trait BigSpaceCommandExt<P: GridPrecision> {
     /// Spawn a root [`BigSpace`] [`ReferenceFrame`].
     fn spawn_big_space(
         &mut self,
-        reference_frame: ReferenceFrame<P>,
-        frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
+        root_frame: ReferenceFrame<P>,
+        child_builder: impl FnOnce(&mut ReferenceFrameCommands<P>),
     );
 }
 
