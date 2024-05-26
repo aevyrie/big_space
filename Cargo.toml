@@ -23,6 +23,7 @@ bevy = { version = "0.13", default-features = false, features = [
     "bevy_pbr",
     "x11",
     "tonemapping_luts",
+    "multi-threaded",
 ] }
 bevy-inspector-egui = "0.24"
 bevy_framepace = { version = "0.15", default-features = false }

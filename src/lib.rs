@@ -144,9 +144,24 @@ use crate::precision::*;
 use crate::reference_frame::{local_origin::LocalFloatingOrigin, BigSpace, ReferenceFrame};
 
 /// Add this plugin to your [`App`] for floating origin functionality.
-#[derive(Default)]
 pub struct BigSpacePlugin<P: GridPrecision> {
     phantom: PhantomData<P>,
+    validate_hierarchies: bool,
+}
+
+impl<P: GridPrecision> Default for BigSpacePlugin<P> {
+    fn default() -> Self {
+        #[cfg(debug_assertions)]
+        let validate_hierarchies = true;
+
+        #[cfg(not(debug_assertions))]
+        let validate_hierarchies = false;
+
+        Self {
+            phantom: Default::default(),
+            validate_hierarchies,
+        }
+    }
 }
 
 #[allow(missing_docs)]
@@ -191,7 +206,11 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlu
             .add_systems(
                 PostUpdate,
                 validation::validate_hierarchy::<validation::SpatialHierarchyRoot<P>>
-                    .before(TransformSystem::TransformPropagate),
+                    .before(TransformSystem::TransformPropagate)
+                    .run_if({
+                        let run = self.validate_hierarchies;
+                        move || run
+                    }),
             )
             // These are the bevy transform propagation systems. Because these start from
             // the root of the hierarchy, and BigSpace bundles (at the root) do not contain
@@ -255,17 +274,18 @@ pub fn recenter_transform_on_grid<P: GridPrecision>(
 /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`] the
 /// entity belongs to.
 pub fn update_grid_cell_global_transforms<P: GridPrecision>(
-    reference_frames: Query<(&ReferenceFrame<P>, &Children)>,
-    mut entities: Query<(GridTransformReadOnly<P>, &mut GlobalTransform), With<Parent>>,
+    reference_frames: Query<&ReferenceFrame<P>>,
+    mut entities: Query<(GridTransformReadOnly<P>, &Parent, &mut GlobalTransform)>,
 ) {
     // Update the GlobalTransform of GridCell entities that are children of a ReferenceFrame
-    for (frame, children) in &reference_frames {
-        let mut frame_children = entities.iter_many_mut(children);
-        while let Some((grid_transform, mut global_transform)) = frame_children.fetch_next() {
-            *global_transform =
-                frame.global_transform(grid_transform.cell, grid_transform.transform);
-        }
-    }
+    entities
+        .par_iter_mut()
+        .for_each(|(grid_transform, parent, mut global_transform)| {
+            if let Ok(frame) = reference_frames.get(parent.get()) {
+                *global_transform =
+                    frame.global_transform(grid_transform.cell, grid_transform.transform);
+            }
+        });
 }
 
 #[cfg(test)]
