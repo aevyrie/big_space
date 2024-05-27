@@ -1,7 +1,5 @@
 //! Adds `big_space`-specific commands to bevy's `Commands`.
 
-use bevy::ecs::system::EntityCommands;
-
 use crate::{reference_frame::ReferenceFrame, GridPrecision, *};
 
 /// Adds `big_space` commands to bevy's `Commands`.
@@ -20,7 +18,7 @@ impl<P: GridPrecision> BigSpaceCommandExt<P> for Commands<'_, '_> {
         reference_frame: ReferenceFrame<P>,
         root_frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
     ) {
-        let entity_commands = self.spawn((
+        let mut entity_commands = self.spawn((
             #[cfg(feature = "bevy_render")]
             Visibility::default(),
             #[cfg(feature = "bevy_render")]
@@ -30,7 +28,8 @@ impl<P: GridPrecision> BigSpaceCommandExt<P> for Commands<'_, '_> {
             BigSpace::default(),
         ));
         let mut cmd = ReferenceFrameCommands {
-            entity_commands,
+            entity: entity_commands.id(),
+            commands: entity_commands.commands(),
             reference_frame,
         };
         root_frame(&mut cmd);
@@ -39,7 +38,8 @@ impl<P: GridPrecision> BigSpaceCommandExt<P> for Commands<'_, '_> {
 
 /// Build [`big_space`](crate) hierarchies more easily, with access to reference frames.
 pub struct ReferenceFrameCommands<'a, P: GridPrecision> {
-    entity_commands: EntityCommands<'a>,
+    entity: Entity,
+    commands: Commands<'a, 'a>,
     reference_frame: ReferenceFrame<P>,
 }
 
@@ -51,24 +51,19 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
 
     /// Insert a component on this reference frame
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
-        self.entity_commands.insert(bundle);
+        self.commands.entity(self.entity).insert(bundle);
         self
     }
 
-    /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, which is
-    /// provided to help position the entity with high precision using
-    /// [`ReferenceFrame::translation_to_grid`].
-    pub fn spawn_spatial(
-        &mut self,
-        spatial: impl FnOnce(&ReferenceFrame<P>, &mut SpatialEntityCommands<P>),
-    ) -> &mut Self {
-        let Self {
-            entity_commands,
-            reference_frame,
-        } = self;
+    /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, and insert the
+    /// provided bundle.
+    pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
+        let mut entity_commands = self.commands.entity(self.entity);
+        let parent = entity_commands.id();
+        let mut commands = entity_commands.commands();
 
-        entity_commands.with_children(move |child_builder| {
-            let entity_commands = child_builder.spawn((
+        let entity = commands
+            .spawn((
                 #[cfg(feature = "bevy_render")]
                 Visibility::default(),
                 #[cfg(feature = "bevy_render")]
@@ -78,31 +73,63 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
                 Transform::default(),
                 GlobalTransform::default(),
                 GridCell::<P>::default(),
-            ));
+            ))
+            .insert(bundle)
+            .id();
 
-            let mut cmd = SpatialEntityCommands {
-                entity_commands,
-                phantom: PhantomData,
-            };
+        commands.entity(entity).set_parent(parent);
 
-            spatial(reference_frame, &mut cmd);
-        });
+        SpatialEntityCommands {
+            entity,
+            commands: self.commands.reborrow(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Returns the [`Entity``] id of the entity.
+    pub fn id(&self) -> Entity {
+        self.entity
+    }
+
+    /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, and apply entity commands to it via the closure. This allows you to insert bundles on this new spatial entities, and add more children to it.
+    pub fn with_spatial(
+        &mut self,
+        spatial: impl FnOnce(&mut SpatialEntityCommands<P>),
+    ) -> &mut Self {
+        spatial(&mut self.spawn_spatial(()));
         self
+    }
+
+    /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, and apply entity commands to it via the closure. This allows you to insert bundles on this new spatial entities, and add more children to it.
+    pub fn with_frame(
+        &mut self,
+        new_frame: ReferenceFrame<P>,
+        builder: impl FnOnce(&mut ReferenceFrameCommands<P>),
+    ) -> &mut Self {
+        builder(&mut self.spawn_frame(new_frame, ()));
+        self
+    }
+
+    /// Same as [`Self::with_frame`], but using the default [`ReferenceFrame`] value.
+    pub fn with_frame_default(
+        &mut self,
+        builder: impl FnOnce(&mut ReferenceFrameCommands<P>),
+    ) -> &mut Self {
+        self.with_frame(ReferenceFrame::default(), builder)
     }
 
     /// Spawn a reference frame as a child of the current reference frame.
     pub fn spawn_frame(
         &mut self,
-        child_reference_frame: ReferenceFrame<P>,
-        frame: impl FnOnce(&ReferenceFrame<P>, &mut ReferenceFrameCommands<P>),
-    ) -> &mut Self {
-        let Self {
-            entity_commands,
-            reference_frame,
-        } = self;
+        new_frame: ReferenceFrame<P>,
+        bundle: impl Bundle,
+    ) -> ReferenceFrameCommands<P> {
+        let mut entity_commands = self.commands.entity(self.entity);
+        let parent = entity_commands.id();
+        let mut commands = entity_commands.commands();
 
-        entity_commands.with_children(move |child_builder| {
-            let entity_commands = child_builder.spawn((
+        let entity = commands
+            .spawn((
                 #[cfg(feature = "bevy_render")]
                 Visibility::default(),
                 #[cfg(feature = "bevy_render")]
@@ -113,34 +140,30 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
                 GlobalTransform::default(),
                 GridCell::<P>::default(),
                 ReferenceFrame::<P>::default(),
-            ));
+            ))
+            .insert(bundle)
+            .id();
 
-            let mut cmd = ReferenceFrameCommands {
-                entity_commands,
-                reference_frame: child_reference_frame,
-            };
+        commands.entity(entity).set_parent(parent);
 
-            frame(reference_frame, &mut cmd);
-        });
-        self
+        ReferenceFrameCommands {
+            entity,
+            commands: self.commands.reborrow(),
+            reference_frame: new_frame,
+        }
     }
 
     /// Spawn a reference frame as a child of the current reference frame. The first argument in the
     /// closure is the paren't reference frame.
-    pub fn spawn_frame_default(
-        &mut self,
-        frame: impl FnOnce(&ReferenceFrame<P>, &mut ReferenceFrameCommands<P>),
-    ) -> &mut Self {
-        self.spawn_frame(ReferenceFrame::default(), frame)
+    pub fn spawn_frame_default(&mut self, bundle: impl Bundle) -> ReferenceFrameCommands<P> {
+        self.spawn_frame(ReferenceFrame::default(), bundle)
     }
 
     /// Takes a closure which provides this reference frame and a [`ChildBuilder`].
-    pub fn with_children(
-        &mut self,
-        spawn_children: impl FnOnce(&ReferenceFrame<P>, &mut ChildBuilder),
-    ) -> &mut Self {
-        self.entity_commands
-            .with_children(|child_builder| spawn_children(&self.reference_frame, child_builder));
+    pub fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
+        self.commands
+            .entity(self.entity)
+            .with_children(|child_builder| spawn_children(child_builder));
         self
     }
 }
@@ -148,28 +171,36 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
 /// Insert the reference frame on drop.
 impl<'a, P: GridPrecision> Drop for ReferenceFrameCommands<'a, P> {
     fn drop(&mut self) {
-        self.entity_commands
+        self.commands
+            .entity(self.entity)
             .insert(std::mem::take(&mut self.reference_frame));
     }
 }
 
 /// Build [`big_space`](crate) hierarchies more easily, with access to reference frames.
 pub struct SpatialEntityCommands<'a, P: GridPrecision> {
-    entity_commands: EntityCommands<'a>,
+    entity: Entity,
+    commands: Commands<'a, 'a>,
     phantom: PhantomData<P>,
 }
 
 impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
     /// Insert a component on this reference frame
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
-        self.entity_commands.insert(bundle);
+        self.commands.entity(self.entity).insert(bundle);
         self
     }
 
     /// Takes a closure which provides a [`ChildBuilder`].
     pub fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
-        self.entity_commands
+        self.commands
+            .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
         self
+    }
+
+    /// Returns the [`Entity``] id of the entity.
+    pub fn id(&self) -> Entity {
+        self.entity
     }
 }

@@ -153,27 +153,25 @@ fn spawn_solar_system(
     ));
 
     commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
-        root_frame.spawn_frame_default(|_root_frame, sun_frame| {
-            sun_frame.insert((Sun, Name::new("Sun")));
-
-            sun_frame.spawn_spatial(|_sun_frame, sun_mesh| {
-                sun_mesh.insert((
-                    PbrBundle {
-                        mesh: sun_mesh_handle,
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::WHITE,
-                            emissive: Color::rgb_linear(100000000., 100000000., 100000000.),
-                            ..default()
-                        }),
+        root_frame.with_frame_default(|sun| {
+            sun.insert((Sun, Name::new("Sun")));
+            sun.spawn_spatial((
+                PbrBundle {
+                    mesh: sun_mesh_handle,
+                    material: materials.add(StandardMaterial {
+                        base_color: Color::WHITE,
+                        emissive: Color::rgb_linear(100000000., 100000000., 100000000.),
                         ..default()
-                    },
-                    NotShadowCaster,
-                ));
-            });
-            sun_frame.spawn_frame_default(|sun_frame, earth_frame| {
-                let earth_pos = DVec3::Z * EARTH_ORBIT_RADIUS_M;
-                let (earth_cell, earth_pos) = sun_frame.translation_to_grid(earth_pos);
-                earth_frame.insert((
+                    }),
+                    ..default()
+                },
+                NotShadowCaster,
+            ));
+
+            let earth_pos = DVec3::Z * EARTH_ORBIT_RADIUS_M;
+            let (earth_cell, earth_pos) = sun.get_frame().translation_to_grid(earth_pos);
+            sun.with_frame_default(|earth| {
+                earth.insert((
                     Name::new("Earth"),
                     earth_cell,
                     PbrBundle {
@@ -190,33 +188,32 @@ fn spawn_solar_system(
                     },
                     Rotates(0.000001),
                 ));
-                earth_frame.spawn_spatial(|earth_frame, moon| {
-                    let moon_orbit_radius_m = 385e6;
-                    let moon_pos = DVec3::NEG_Z * moon_orbit_radius_m;
-                    let (moon_cell, moon_pos) = earth_frame.translation_to_grid(moon_pos);
-                    let moon_matl = materials.add(StandardMaterial {
-                        base_color: Color::GRAY,
-                        perceptual_roughness: 1.0,
-                        reflectance: 0.0,
-                        ..default()
-                    });
-                    moon.insert((
-                        Name::new("Moon"),
-                        PbrBundle {
-                            mesh: moon_mesh_handle,
-                            material: moon_matl,
-                            transform: Transform::from_translation(moon_pos),
+
+                let moon_orbit_radius_m = 385e6;
+                let moon_pos = DVec3::NEG_Z * moon_orbit_radius_m;
+                let (moon_cell, moon_pos) = earth.get_frame().translation_to_grid(moon_pos);
+                earth.spawn_spatial((
+                    Name::new("Moon"),
+                    PbrBundle {
+                        mesh: moon_mesh_handle,
+                        material: materials.add(StandardMaterial {
+                            base_color: Color::GRAY,
+                            perceptual_roughness: 1.0,
+                            reflectance: 0.0,
                             ..default()
-                        },
-                        moon_cell,
-                    ));
-                });
-                earth_frame.spawn_spatial(|earth_frame, ball| {
-                    let ball_pos =
-                        DVec3::X * (EARTH_RADIUS_M + 1.0) + DVec3::NEG_Z * 30.0 + DVec3::Y * 10.0;
-                    let (ball_cell, ball_pos) = earth_frame.translation_to_grid(ball_pos);
-                    ball.insert((ball_cell, Transform::from_translation(ball_pos)));
-                    ball.with_children(|children| {
+                        }),
+                        transform: Transform::from_translation(moon_pos),
+                        ..default()
+                    },
+                    moon_cell,
+                ));
+
+                let ball_pos =
+                    DVec3::X * (EARTH_RADIUS_M + 1.0) + DVec3::NEG_Z * 30.0 + DVec3::Y * 10.0;
+                let (ball_cell, ball_pos) = earth.get_frame().translation_to_grid(ball_pos);
+                earth
+                    .spawn_spatial((ball_cell, Transform::from_translation(ball_pos)))
+                    .with_children(|children| {
                         children.spawn((PbrBundle {
                             mesh: ball_mesh_handle,
                             material: materials.add(StandardMaterial {
@@ -225,6 +222,7 @@ fn spawn_solar_system(
                             }),
                             ..default()
                         },));
+
                         children.spawn((PbrBundle {
                             mesh: plane_mesh_handle,
                             material: materials.add(StandardMaterial {
@@ -238,11 +236,11 @@ fn spawn_solar_system(
                             ..default()
                         },));
                     });
-                });
-                earth_frame.spawn_frame_default(|earth_frame, camera_frame| {
-                    let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
-                    let (cam_cell, cam_pos) = earth_frame.translation_to_grid(cam_pos);
-                    camera_frame.insert((
+
+                let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
+                let (cam_cell, cam_pos) = earth.get_frame().translation_to_grid(cam_pos);
+                earth.with_frame_default(|camera| {
+                    camera.insert((
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
                         CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
@@ -250,22 +248,22 @@ fn spawn_solar_system(
                             .with_speed(1.0),
                         cam_cell,
                     ));
-                    camera_frame.spawn_spatial(|_, camera_arm| {
-                        camera_arm.insert((
-                            FloatingOrigin,
-                            Camera3dBundle {
-                                transform: Transform::from_xyz(0.0, 4.0, 22.0),
-                                camera: Camera {
-                                    hdr: true,
-                                    ..default()
-                                },
-                                exposure: Exposure::SUNLIGHT,
+
+                    camera.spawn_spatial((
+                        FloatingOrigin,
+                        Camera3dBundle {
+                            transform: Transform::from_xyz(0.0, 4.0, 22.0),
+                            camera: Camera {
+                                hdr: true,
                                 ..default()
                             },
-                            BloomSettings::default(),
-                        ));
-                    });
-                    camera_frame.with_children(|_camera_frame, camera| {
+                            exposure: Exposure::SUNLIGHT,
+                            ..default()
+                        },
+                        BloomSettings::default(),
+                    ));
+
+                    camera.with_children(|camera| {
                         camera.spawn((
                             Spaceship,
                             SceneBundle {
@@ -290,17 +288,15 @@ fn spawn_solar_system(
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());
         let mut rng = rand::thread_rng();
         (0..1000).for_each(|_| {
-            root_frame.spawn_spatial(|_root_frame, star| {
-                star.insert((
-                    star_mesh_handle.clone(),
-                    star_mat.clone(),
-                    Transform::from_xyz(
-                        (rng.gen::<f32>() - 0.5) * 1e14,
-                        (rng.gen::<f32>() - 0.5) * 1e14,
-                        (rng.gen::<f32>() - 0.5) * 1e14,
-                    ),
-                ));
-            });
+            root_frame.spawn_spatial((
+                star_mesh_handle.clone(),
+                star_mat.clone(),
+                Transform::from_xyz(
+                    (rng.gen::<f32>() - 0.5) * 1e14,
+                    (rng.gen::<f32>() - 0.5) * 1e14,
+                    (rng.gen::<f32>() - 0.5) * 1e14,
+                ),
+            ));
         });
     });
 }

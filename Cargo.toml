@@ -64,3 +64,9 @@ name = "planets"
 path = "examples/planets.rs"
 required-features = ["default"]
 doc-scrape-examples = true
+
+[[example]]
+name = "split_screen"
+path = "examples/split_screen.rs"
+required-features = ["default"]
+doc-scrape-examples = true

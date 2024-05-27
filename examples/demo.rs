@@ -36,24 +36,22 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
-        root.spawn_spatial(|_, camera| {
-            camera.insert((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-                    projection: Projection::Perspective(PerspectiveProjection {
-                        near: 1e-18,
-                        ..default()
-                    }),
+        root.spawn_spatial((
+            Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 0.0, 8.0)
+                    .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                projection: Projection::Perspective(PerspectiveProjection {
+                    near: 1e-18,
                     ..default()
-                },
-                FloatingOrigin, // Important: marks the floating origin entity for rendering.
-                CameraController::default() // Built-in camera controller
-                    .with_speed_bounds([10e-18, 10e35])
-                    .with_smoothness(0.9, 0.8)
-                    .with_speed(1.0),
-            ));
-        });
+                }),
+                ..default()
+            },
+            FloatingOrigin, // Important: marks the floating origin entity for rendering.
+            CameraController::default() // Built-in camera controller
+                .with_speed_bounds([10e-18, 10e35])
+                .with_smoothness(0.9, 0.8)
+                .with_speed(1.0),
+        ));
 
         let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
         let matl_handle = materials.add(StandardMaterial {
@@ -70,25 +68,21 @@ fn setup(
             translation.x += j / 2.0 + k;
             translation.y = j / 2.0;
 
-            root.spawn_spatial(|_, sphere| {
-                sphere.insert(PbrBundle {
-                    mesh: mesh_handle.clone(),
-                    material: matl_handle.clone(),
-                    transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
-                    ..default()
-                });
+            root.spawn_spatial(PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: matl_handle.clone(),
+                transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
+                ..default()
             });
         }
 
         // light
-        root.spawn_spatial(|_, light| {
-            light.insert(DirectionalLightBundle {
-                directional_light: DirectionalLight {
-                    illuminance: 100_000.0,
-                    ..default()
-                },
+        root.spawn_spatial(DirectionalLightBundle {
+            directional_light: DirectionalLight {
+                illuminance: 100_000.0,
                 ..default()
-            });
+            },
+            ..default()
         });
     });
 }

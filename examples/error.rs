@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 use big_space::{
-    bundles::BigSpaceRootBundle,
+    commands::BigSpaceCommandExt,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     FloatingOrigin, GridCell,
 };
@@ -122,61 +122,56 @@ fn setup_scene(
         ..default()
     });
 
-    let big_space = ReferenceFrame::<i128>::default();
-    commands
-        .spawn(BigSpaceRootBundle::<i128>::default())
-        .with_children(|root_frame| {
-            let d = DISTANCE / big_space.cell_edge_length() as i128;
-            let distant_grid_cell = GridCell::<i128>::new(d, d, d);
+    commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
+        let d = DISTANCE / root.get_frame().cell_edge_length() as i128;
+        let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
-            // Normally, we would put the floating origin on the camera. However in this example, we
-            // want to show what happens as the camera is far from the origin, to emulate what
-            // happens when this plugin isn't used.
-            root_frame.spawn((
-                PbrBundle {
-                    mesh: meshes.add(Sphere::default().mesh()),
-                    material: materials.add(StandardMaterial::from(Color::RED)),
-                    transform: Transform::from_scale(Vec3::splat(10000.0)),
-                    ..default()
-                },
-                distant_grid_cell,
-                FloatingOrigin,
-            ));
+        // Normally, we would put the floating origin on the camera. However in this example, we
+        // want to show what happens as the camera is far from the origin, to emulate what
+        // happens when this plugin isn't used.
+        root.spawn_spatial((
+            PbrBundle {
+                mesh: meshes.add(Sphere::default().mesh()),
+                material: materials.add(StandardMaterial::from(Color::RED)),
+                transform: Transform::from_scale(Vec3::splat(10000.0)),
+                ..default()
+            },
+            distant_grid_cell,
+            FloatingOrigin,
+        ));
 
-            root_frame
-                .spawn((
-                    PbrBundle {
-                        mesh: mesh_handle.clone(),
-                        material: matl_handle.clone(),
-                        ..default()
-                    },
-                    distant_grid_cell,
-                    Rotator,
-                ))
-                .with_children(|parent| {
-                    parent.spawn(PbrBundle {
-                        mesh: mesh_handle,
-                        material: matl_handle,
-                        transform: Transform::from_xyz(0.0, 0.0, 4.0),
-                        ..default()
-                    });
-                });
-            // light
-            root_frame.spawn((
-                DirectionalLightBundle {
-                    transform: Transform::from_xyz(4.0, -10.0, -4.0),
-                    ..default()
-                },
-                distant_grid_cell,
-            ));
-            // camera
-            root_frame.spawn((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(8.0, -8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-                    ..default()
-                },
-                distant_grid_cell,
-            ));
-        })
-        .insert(big_space);
+        root.spawn_spatial((
+            PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: matl_handle.clone(),
+                ..default()
+            },
+            distant_grid_cell,
+            Rotator,
+        ))
+        .with_children(|parent| {
+            parent.spawn(PbrBundle {
+                mesh: mesh_handle,
+                material: matl_handle,
+                transform: Transform::from_xyz(0.0, 0.0, 4.0),
+                ..default()
+            });
+        });
+        // light
+        root.spawn_spatial((
+            DirectionalLightBundle {
+                transform: Transform::from_xyz(4.0, -10.0, -4.0),
+                ..default()
+            },
+            distant_grid_cell,
+        ));
+        // camera
+        root.spawn_spatial((
+            Camera3dBundle {
+                transform: Transform::from_xyz(8.0, -8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+                ..default()
+            },
+            distant_grid_cell,
+        ));
+    });
 }

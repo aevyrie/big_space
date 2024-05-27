@@ -65,31 +65,29 @@ fn setup(
         ..default()
     });
 
-    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root| {
-        root.spawn_spatial(|_, spatial| {
-            spatial.insert((
-                PbrBundle {
-                    mesh: mesh_handle.clone(),
-                    material: matl_handle.clone(),
-                    transform: Transform::from_xyz(0.0, 0.0, 1.0),
-                    ..default()
-                },
-                Mover::<1>,
-            ));
-        });
-        root.spawn_spatial(|_, spatial| {
-            spatial.insert((
-                PbrBundle {
-                    mesh: mesh_handle.clone(),
-                    material: matl_handle.clone(),
-                    transform: Transform::from_xyz(1.0, 0.0, 0.0),
-                    ..default()
-                },
-                Mover::<2>,
-            ));
-        });
-        root.spawn_frame(ReferenceFrame::<i64>::new(0.2, 0.01), |_, spatial| {
-            spatial.insert((
+    commands.spawn_big_space(ReferenceFrame::<i64>::new(1.0, 0.01), |root| {
+        root.spawn_spatial((
+            PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: matl_handle.clone(),
+                transform: Transform::from_xyz(0.0, 0.0, 1.0),
+                ..default()
+            },
+            Mover::<1>,
+        ));
+
+        root.spawn_spatial((
+            PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: matl_handle.clone(),
+                transform: Transform::from_xyz(1.0, 0.0, 0.0),
+                ..default()
+            },
+            Mover::<2>,
+        ));
+
+        root.with_frame(ReferenceFrame::new(0.2, 0.01), |new_frame| {
+            new_frame.insert((
                 PbrBundle {
                     mesh: mesh_handle.clone(),
                     material: matl_handle.clone(),
@@ -99,38 +97,31 @@ fn setup(
                 Rotator,
                 Mover::<3>,
             ));
-
-            spatial.spawn_spatial(|_, spatial| {
-                spatial.insert((
-                    PbrBundle {
-                        mesh: mesh_handle,
-                        material: matl_handle,
-                        transform: Transform::from_xyz(0.0, 0.5, 0.0),
-                        ..default()
-                    },
-                    Mover::<4>,
-                ));
-            });
+            new_frame.spawn_spatial((
+                PbrBundle {
+                    mesh: mesh_handle,
+                    material: matl_handle,
+                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
+                    ..default()
+                },
+                Mover::<4>,
+            ));
         });
 
         // light
-        root.spawn_spatial(|_, spatial| {
-            spatial.insert((PointLightBundle {
-                transform: Transform::from_xyz(4.0, 8.0, 4.0),
-                ..default()
-            },));
-        });
+        root.spawn_spatial((PointLightBundle {
+            transform: Transform::from_xyz(4.0, 8.0, 4.0),
+            ..default()
+        },));
 
         // camera
-        root.spawn_spatial(|_, spatial| {
-            spatial.insert((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                        .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-                    ..default()
-                },
-                FloatingOrigin,
-            ));
-        });
+        root.spawn_spatial((
+            Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 0.0, 8.0)
+                    .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+                ..default()
+            },
+            FloatingOrigin,
+        ));
     });
 }

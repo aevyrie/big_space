@@ -1,3 +1,9 @@
+//! Demonstrates how a single bevy world can contain multiple big_space hierarchies, each rendered
+//! relative to a floating origin inside that big space.
+//!
+//! This takes the simplest approach, of simply duplicating the worlds and players for each split
+//! screen, and synchronizing the player locations between both.
+
 use bevy::{
     prelude::*,
     render::{camera::Viewport, view::RenderLayers},
@@ -57,8 +63,8 @@ fn setup(
 
     // Big Space 1
     commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
-        root_frame.spawn_spatial(|_, camera_entity| {
-            camera_entity.insert((
+        root_frame
+            .spawn_spatial((
                 Camera3dBundle {
                     transform: Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
                         .looking_to(Vec3::NEG_X, Vec3::Y),
@@ -68,9 +74,8 @@ fn setup(
                 RenderLayers::layer(2),
                 LeftCamera,
                 FloatingOrigin,
-            ));
-
-            camera_entity.with_children(|child_builder| {
+            ))
+            .with_children(|child_builder| {
                 child_builder.spawn((
                     PbrBundle {
                         mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
@@ -83,60 +88,53 @@ fn setup(
                     RenderLayers::layer(2),
                 ));
             });
-        });
 
-        root_frame.spawn_spatial(|_, replica| {
-            replica.insert((
-                RightCameraReplicated,
-                PbrBundle {
-                    mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::PINK,
-                        ..default()
-                    }),
+        root_frame.spawn_spatial((
+            RightCameraReplicated,
+            PbrBundle {
+                mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::PINK,
                     ..default()
-                },
-                RenderLayers::layer(2),
-            ));
-        });
+                }),
+                ..default()
+            },
+            RenderLayers::layer(2),
+        ));
 
-        root_frame.spawn_spatial(|_, child| {
-            child.insert((
-                PbrBundle {
-                    mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::BLUE,
-                        ..default()
-                    }),
-                    transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
-                        .with_scale(Vec3::splat(100_000.0)),
+        root_frame.spawn_spatial((
+            PbrBundle {
+                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::BLUE,
                     ..default()
-                },
-                RenderLayers::layer(2),
-            ));
-        });
+                }),
+                transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
+                    .with_scale(Vec3::splat(100_000.0)),
+                ..default()
+            },
+            RenderLayers::layer(2),
+        ));
 
-        root_frame.spawn_spatial(|_, child| {
-            child.insert((
-                PbrBundle {
-                    mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::GREEN,
-                        ..default()
-                    }),
-                    transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
-                        .with_scale(Vec3::splat(100_000.0)),
+        root_frame.spawn_spatial((
+            PbrBundle {
+                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::GREEN,
                     ..default()
-                },
-                RenderLayers::layer(2),
-            ));
-        });
+                }),
+                transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
+                    .with_scale(Vec3::splat(100_000.0)),
+                ..default()
+            },
+            RenderLayers::layer(2),
+        ));
     });
 
     // Big Space 2
     commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
-        root_frame.spawn_spatial(|_, camera_entity| {
-            camera_entity.insert((
+        root_frame
+            .spawn_spatial((
                 Camera3dBundle {
                     transform: Transform::from_xyz(1_000_000.0, 100_005.0, 0.0)
                         .looking_to(Vec3::NEG_X, Vec3::Y),
@@ -150,9 +148,8 @@ fn setup(
                 RenderLayers::layer(1),
                 RightCamera,
                 FloatingOrigin,
-            ));
-
-            camera_entity.with_children(|child_builder| {
+            ))
+            .with_children(|child_builder| {
                 child_builder.spawn((
                     PbrBundle {
                         mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
@@ -165,54 +162,47 @@ fn setup(
                     RenderLayers::layer(1),
                 ));
             });
-        });
 
-        root_frame.spawn_spatial(|_, replica| {
-            replica.insert((
-                LeftCameraReplicated,
-                PbrBundle {
-                    mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::YELLOW,
-                        ..default()
-                    }),
+        root_frame.spawn_spatial((
+            LeftCameraReplicated,
+            PbrBundle {
+                mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::YELLOW,
                     ..default()
-                },
-                RenderLayers::layer(1),
-            ));
-        });
+                }),
+                ..default()
+            },
+            RenderLayers::layer(1),
+        ));
 
-        root_frame.spawn_spatial(|_, child| {
-            child.insert((
-                PbrBundle {
-                    mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::BLUE,
-                        ..default()
-                    }),
-                    transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
-                        .with_scale(Vec3::splat(100_000.0)),
+        root_frame.spawn_spatial((
+            PbrBundle {
+                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::BLUE,
                     ..default()
-                },
-                RenderLayers::layer(1),
-            ));
-        });
+                }),
+                transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
+                    .with_scale(Vec3::splat(100_000.0)),
+                ..default()
+            },
+            RenderLayers::layer(1),
+        ));
 
-        root_frame.spawn_spatial(|_, child| {
-            child.insert((
-                PbrBundle {
-                    mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::GREEN,
-                        ..default()
-                    }),
-                    transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
-                        .with_scale(Vec3::splat(100_000.0)),
+        root_frame.spawn_spatial((
+            PbrBundle {
+                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::GREEN,
                     ..default()
-                },
-                RenderLayers::layer(1),
-            ));
-        });
+                }),
+                transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
+                    .with_scale(Vec3::splat(100_000.0)),
+                ..default()
+            },
+            RenderLayers::layer(1),
+        ));
     });
 }
 
