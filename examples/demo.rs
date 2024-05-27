@@ -8,7 +8,7 @@ use big_space::{
     commands::BigSpaceCommandExt,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::GridTransformReadOnly,
-    FloatingOrigin, GridCell,
+    FloatingOrigin,
 };
 
 fn main() {
@@ -35,7 +35,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_big_space(ReferenceFrame::<i128>::new(0.0000000001, 0.0), |root| {
+    commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
         root.spawn_spatial(|_, camera| {
             camera.insert((
                 Camera3dBundle {
@@ -189,26 +189,6 @@ fn ui_text_system(
     };
     let ref_frame = ref_frames.get(ref_frame);
 
-    let trans_int =
-        origin_pos.transform.translation.abs().floor() * origin_pos.transform.translation.signum();
-    let real_position_frac = origin_pos.transform.translation - trans_int;
-    let rpf_x = format!("{}", real_position_frac.x);
-    let rpf_y = format!("{}", real_position_frac.y);
-    let rpf_z = format!("{}", real_position_frac.z);
-    let rpf_x = rpf_x.trim_start_matches(['-', '0']);
-    let rpf_y = rpf_y.trim_start_matches(['-', '0']);
-    let rpf_z = rpf_z.trim_start_matches(['-', '0']);
-    let real_position_int = origin_pos.cell * ref_frame.cell_edge_length() as i128
-        + GridCell {
-            x: trans_int.x as i128,
-            y: trans_int.y as i128,
-            z: trans_int.z as i128,
-        };
-    let real_position_text = format!(
-        "Combined:       {}{}x, {}{}y, {}{}z",
-        real_position_int.x, rpf_x, real_position_int.y, rpf_y, real_position_int.z, rpf_z
-    );
-
     let real_position = ref_frame.grid_position_double(origin_pos.cell, origin_pos.transform);
     let real_position_f64_text = format!(
         "Combined (f64): {}x, {}y, {}z",
@@ -245,7 +225,7 @@ fn ui_text_system(
     let mut debug_text = debug_text.single_mut();
 
     debug_text.0.sections[0].value = format!(
-        "{grid_text}\n{translation_text}\n\n{real_position_text}\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
+        "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
     );
 
     fun_text.single_mut().sections[0].value = fact_text

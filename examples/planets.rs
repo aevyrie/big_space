@@ -114,9 +114,9 @@ fn springy_ship(
     ship.single_mut().translation = ship
         .single_mut()
         .translation
-        .lerp(desired_dir.0 * Vec3::new(0.5, 0.5, -2.0), 0.05);
+        .lerp(desired_dir.0 * Vec3::new(0.5, 0.5, -2.0), 0.02);
 
-    ship.single_mut().rotation = ship.single_mut().rotation.slerp(desired_dir.1, 0.05);
+    ship.single_mut().rotation = ship.single_mut().rotation.slerp(desired_dir.1, 0.02);
 }
 
 fn spawn_solar_system(
@@ -143,7 +143,7 @@ fn spawn_solar_system(
             cascade_shadow_config: CascadeShadowConfigBuilder {
                 num_cascades: 4,
                 minimum_distance: 0.1,
-                maximum_distance: 10_000_000.0,
+                maximum_distance: 10_000.0,
                 first_cascade_far_bound: 100.0,
                 overlap_proportion: 0.2,
             }
@@ -246,7 +246,7 @@ fn spawn_solar_system(
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
                         CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
-                            .with_smoothness(0.95, 0.95)
+                            .with_smoothness(0.98, 0.98)
                             .with_speed(1.0),
                         cam_cell,
                     ));

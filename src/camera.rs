@@ -6,7 +6,7 @@ use bevy::{
     input::mouse::MouseMotion,
     math::{DQuat, DVec3},
     prelude::*,
-    render::primitives::Aabb,
+    render::{primitives::Aabb, view::RenderLayers},
     transform::TransformSystem,
     utils::hashbrown::HashSet,
 };
@@ -27,7 +27,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
                 default_camera_inputs
                     .before(camera_controller::<P>)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects::<P>.before(camera_controller::<P>),
+                nearest_objects_in_frame::<P>.before(camera_controller::<P>),
                 camera_controller::<P>.before(TransformSystem::TransformPropagate),
             ),
         );
@@ -93,7 +93,7 @@ impl Default for CameraController {
         Self {
             smoothness: 0.8,
             rotational_smoothness: 0.5,
-            speed: 10e8,
+            speed: 1.0,
             speed_bounds: [1e-17, 1e30],
             slow_near_objects: true,
             nearest_object: None,
@@ -163,8 +163,8 @@ pub fn default_camera_inputs(
     keyboard
         .pressed(KeyCode::ControlLeft)
         .then(|| cam.up -= 1.0);
-    keyboard.pressed(KeyCode::KeyQ).then(|| cam.roll += 1.0);
-    keyboard.pressed(KeyCode::KeyE).then(|| cam.roll -= 1.0);
+    keyboard.pressed(KeyCode::KeyQ).then(|| cam.roll += 2.0);
+    keyboard.pressed(KeyCode::KeyE).then(|| cam.roll -= 2.0);
     keyboard
         .pressed(KeyCode::ShiftLeft)
         .then(|| cam.boost = true);
@@ -175,21 +175,36 @@ pub fn default_camera_inputs(
 }
 
 /// Find the object nearest the camera, within the same reference frame as the camera.
-pub fn nearest_objects<P: GridPrecision>(
-    objects: Query<(Entity, &Transform, &GlobalTransform, &Aabb)>,
-    mut camera: Query<(Entity, &mut CameraController, &GlobalTransform)>,
+pub fn nearest_objects_in_frame<P: GridPrecision>(
+    objects: Query<(
+        Entity,
+        &Transform,
+        &GlobalTransform,
+        &Aabb,
+        Option<&RenderLayers>,
+    )>,
+    mut camera: Query<(
+        Entity,
+        &mut CameraController,
+        &GlobalTransform,
+        Option<&RenderLayers>,
+    )>,
     children: Query<&Children>,
 ) {
-    let Ok((cam_entity, mut camera, cam_pos)) = camera.get_single_mut() else {
+    let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.get_single_mut() else {
         return;
     };
-
+    let cam_layer = cam_layer.copied().unwrap_or(RenderLayers::all());
     let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
 
     let nearest_object = objects
         .iter()
         .filter(|(entity, ..)| !cam_children.contains(entity))
-        .map(|(entity, object_local, obj_pos, aabb)| {
+        .filter(|(.., obj_layer)| {
+            let obj_layer = obj_layer.copied().unwrap_or(RenderLayers::layer(0));
+            cam_layer.intersects(&obj_layer)
+        })
+        .map(|(entity, object_local, obj_pos, aabb, _)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
             let nearest_distance = center_distance.length()
