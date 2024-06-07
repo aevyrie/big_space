@@ -2,15 +2,21 @@
 //! the observable universe, with no added dependencies, while remaining largely compatible with the
 //! rest of the Bevy ecosystem.
 //!
+//! The next section explains the problem this solves in more detail, how this plugin works, and a
+//! list of other solutions that were considered. If you'd like, you can instead skip ahead to
+//! [Usage](crate#usage).
+//!
 //! ### Problem
 //!
 //! Objects far from the origin suffer from reduced precision, causing rendered meshes to jitter and
 //! jiggle, and transformation calculations to encounter catastrophic cancellation.
 //!
-//! As the camera moves farther from the origin, the scale of floats needed to describe the position
-//! of meshes and the camera get larger, which in turn means there is less precision available.
-//! Consequently, when the matrix math is done to compute the position of objects in view space,
-//! mesh vertices will be displaced due to this lost precision.
+//! As a camera moves far from the origin, the values describing its x/y/z coordinates become large,
+//! leaving less precision to the right of the decimal place. Consequently, when computing the
+//! position of objects in view space, mesh vertices will be displaced due to this lost precision.
+//!
+//! This is a great little tool to calculate how much precision a floating point value has at a
+//! given scale: <http://www.ehopkinson.com/floatprecision.html>.
 //!
 //! ### Solution
 //!
@@ -60,20 +66,22 @@
 //! lossy calculation only occurs when computing the `GlobalTransform` of entities, the high
 //! precision `GridCell` and `Transform` are never touched.
 //!
-//! # Getting Started
+//! # Usage
 //!
-//! To start using this plugin:
-//! 0. Choose how big your world should be! Do you need an i8, or an i128? See [`GridCell`] for more
-//!    details and documentation.
+//! To start using this plugin, you will first need to choose how big your world should be! Do you
+//! need an i8, or an i128? See [`GridPrecision`] for more details and documentation.
+//!
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
 //! 2. Add the [`BigSpacePlugin`] to your `App`
-//! 3. Create a new `BigSpace` tree using a [`BigSpaceRootBundle`].
-//! 4. Spawn entities as children of the `BigSpace`, using the [`BigSpatialBundle`].
-//! 5. Add the [`FloatingOrigin`] component to the active camera
-//! 6. To add more levels to the hierarchy, add a [`ReferenceFrame`] to an existing
-//!    [`BigSpatialBundle`], or use the [`BigReferenceFrameBundle`] instead.
+//! 3. Spawn a [`BigSpace`] with [`spawn_big_space`](commands::BigSpaceCommandExt::spawn_big_space),
+//!    and spawn entities in it.
+//! 4. Add the [`FloatingOrigin`] to your active camera in the [`BigSpace`].
 //!
-//! Take a look at [`ReferenceFrame`] component for some useful helper methods.
+//! To add more levels to the hierarchy, you can use [`ReferenceFrame`]s, which themselves can
+//! contain high-precision spatial entities.
+//!
+//! Take a look at the [`ReferenceFrame`] component for some useful helper methods. Note that the
+//! root [`BigSpace`] also has a [`ReferenceFrame`] component.
 //!
 //! # Moving Entities
 //!
@@ -149,6 +157,16 @@ pub struct BigSpacePlugin<P: GridPrecision> {
     validate_hierarchies: bool,
 }
 
+impl<P: GridPrecision> BigSpacePlugin<P> {
+    /// Create a big space plugin, and specify whether hierarchy validation should be enabled.
+    pub fn new(validate_hierarchies: bool) -> Self {
+        Self {
+            phantom: PhantomData::<P>,
+            validate_hierarchies,
+        }
+    }
+}
+
 impl<P: GridPrecision> Default for BigSpacePlugin<P> {
     fn default() -> Self {
         #[cfg(debug_assertions)]
@@ -212,16 +230,15 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlu
                         move || run
                     }),
             )
-            // These are the bevy transform propagation systems. Because these start from
-            // the root of the hierarchy, and BigSpace bundles (at the root) do not contain
-            // a Transform, these systems will not interact with any high precision entities
-            // in big space. These systems are added for ecosystem compatibility with bevy,
-            // although the rendered behavior might look strange if they share a camera with
-            // one using the floating origin.
+            // These are the bevy transform propagation systems. Because these start from the root
+            // of the hierarchy, and BigSpace bundles (at the root) do not contain a Transform,
+            // these systems will not interact with any high precision entities in big space. These
+            // systems are added for ecosystem compatibility with bevy, although the rendered
+            // behavior might look strange if they share a camera with one using the floating
+            // origin.
             //
-            // This is most useful for bevy_ui, which relies on the transform systems to
-            // work, or if you want to render a camera that only needs to render a
-            // low-precision scene.
+            // This is most useful for bevy_ui, which relies on the transform systems to work, or if
+            // you want to render a camera that only needs to render a low-precision scene.
             .add_systems(
                 PostStartup,
                 (

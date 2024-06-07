@@ -1,86 +1,110 @@
 //! Tools for validating high-precision transform hierarchies
 
+use bevy::utils::HashMap;
+
 use crate::*;
+
+struct ValidationStackEntry {
+    parent_node: Box<dyn ValidHierarchyNode>,
+    children: Vec<Entity>,
+}
+
+#[derive(Default, Resource)]
+struct ValidatorCaches {
+    query_state_cache: HashMap<&'static str, QueryState<(Entity, Option<&'static Children>)>>,
+    validator_cache: HashMap<&'static str, Vec<Box<dyn ValidHierarchyNode>>>,
+    root_query: Option<QueryState<Entity, Without<Parent>>>,
+    stack: Vec<ValidationStackEntry>,
+}
 
 /// Validate the entity hierarchy and report errors.
 pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut World) {
-    let mut root_entities: Vec<Entity> = world
-        .query_filtered::<Entity, Without<Parent>>()
+    world.init_resource::<ValidatorCaches>();
+    let mut caches = world.remove_resource::<ValidatorCaches>().unwrap();
+
+    let root_entities = caches
+        .root_query
+        .get_or_insert(world.query_filtered::<Entity, Without<Parent>>())
         .iter(world)
         .collect();
 
-    let mut query_state_cache =
-        bevy::utils::HashMap::<&'static str, QueryState<(Entity, Option<&Children>)>>::default();
+    caches.stack.push(ValidationStackEntry {
+        parent_node: Box::<V>::default(),
+        children: root_entities,
+    });
 
-    struct ValidationStackEntry {
-        parent_node: Box<dyn ValidHierarchyNode>,
-        entity: Entity,
-    }
+    while let Some(stack_entry) = caches.stack.pop() {
+        let mut validators_and_queries = caches
+            .validator_cache
+            .entry(stack_entry.parent_node.name())
+            .or_insert_with(|| stack_entry.parent_node.allowed_child_nodes())
+            .iter()
+            .map(|validator| {
+                let query = caches
+                    .query_state_cache
+                    .remove(validator.name())
+                    .unwrap_or_else(|| {
+                        let mut query_builder = QueryBuilder::new(world);
+                        validator.match_self(&mut query_builder);
+                        query_builder.build()
+                    });
+                (validator, query)
+            })
+            .collect::<Vec<_>>();
 
-    let mut validator_stack = Vec::<ValidationStackEntry>::with_capacity(root_entities.len());
+        for entity in stack_entry.children.iter() {
+            let query_result = validators_and_queries
+                .iter_mut()
+                .find_map(|(validator, query)| {
+                    query.get(world, *entity).ok().map(|res| (validator, res.1))
+                });
 
-    for entity in root_entities.drain(..) {
-        validator_stack.push(ValidationStackEntry {
-            parent_node: Box::<V>::default(),
-            entity,
-        })
-    }
-
-    while let Some(entry) = validator_stack.pop() {
-        let mut allowed_nodes = entry.parent_node.allowed_child_nodes();
-        let test_allowed_nodes = allowed_nodes
-            .drain(..)
-            .filter_map(|validator| {
-                let validation_query =
-                    query_state_cache
-                        .entry(validator.name())
-                        .or_insert_with(|| {
-                            let mut query_builder = QueryBuilder::new(world);
-                            validator.match_self(&mut query_builder);
-                            query_builder.build()
+            match query_result {
+                Some((validator, Some(children))) => {
+                    caches.stack.push(ValidationStackEntry {
+                        parent_node: validator.clone(),
+                        children: children.to_vec(),
+                    });
+                }
+                Some(_) => (), // Matched, but no children to push on the stack
+                None => {
+                    let mut possibilities = String::new();
+                    stack_entry
+                        .parent_node
+                        .allowed_child_nodes()
+                        .iter()
+                        .for_each(|v| {
+                            possibilities.push('\t');
+                            possibilities.push('\t');
+                            possibilities.push_str(v.name());
+                            possibilities.push('\n');
                         });
 
-                validation_query
-                    .get(world, entry.entity)
-                    .ok()
-                    .map(|(_e, c)| c.map(|c| (validator, c.to_vec())))
-            })
-            .next();
-
-        match test_allowed_nodes {
-            None => {
-                let mut possibilities = String::new();
-                entry
-                    .parent_node
-                    .allowed_child_nodes()
-                    .iter()
-                    .for_each(|v| {
-                        possibilities.push('\t');
-                        possibilities.push('\t');
-                        possibilities.push_str(v.name());
-                        possibilities.push('\n');
+                    let mut inspect = String::new();
+                    world.inspect_entity(*entity).iter().for_each(|info| {
+                        inspect.push('\t');
+                        inspect.push('\t');
+                        inspect.push_str(info.name());
+                        inspect.push('\n');
                     });
 
-                error!("big_space hierarchy validation error:\n\tEntity {:#?} is a child of the node {:#?}\n\tThis entity must be one of the following allowed nodes:\n{}\tSee {} for details.", entry.entity, entry.parent_node.name(), possibilities, file!());
-                continue;
-            }
-            Some(None) => continue, // no children
-            Some(Some((this_validator, children))) => {
-                for child in children {
-                    validator_stack.push(ValidationStackEntry {
-                        parent_node: this_validator.clone(),
-                        entity: child,
-                    })
+                    error!("big_space hierarchy validation error:\n\tEntity {:#?} is a child of the node {:#?}, but the entity does not match its parent's validation criteria.\n\tBecause it is a child of a {:#?}, the entity must be one of the following kinds of nodes:\n{}\tHowever, the entity has the following components, which does not match any of the above allowed archetypes:\n{}\tCommon errors include:\n\t  - Using mismatched GridPrecisions, like GridCell<i32> and GridCell<i64>\n\t  - Spawning an entity with a GridCell as a child of an entity without a ReferenceFrame.\n\tIf possible, use commands.spawn_big_space(), which prevents these errors, instead of manually assembling a hierarchy.\n\tSee {} for details.", entity, stack_entry.parent_node.name(), stack_entry.parent_node.name(), possibilities, inspect, file!());
                 }
             }
         }
+
+        for (validator, query) in validators_and_queries.drain(..) {
+            caches.query_state_cache.insert(validator.name(), query);
+        }
     }
+
+    world.insert_resource(caches);
 }
 
 /// Defines a valid node in the hierarchy: what components it must have, must not have, and what
 /// kinds of nodes its children can be. This can be used recursively to validate an entire entity
 /// hierarchy by starting from the root.
-pub trait ValidHierarchyNode: sealed::CloneHierarchy {
+pub trait ValidHierarchyNode: sealed::CloneHierarchy + Send + Sync {
     /// Add filters to a query to check if entities match this type of node
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>);
     /// The types of nodes that can be children of this node.

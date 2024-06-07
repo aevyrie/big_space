@@ -24,7 +24,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            big_space::BigSpacePlugin::<i64>::default(),
+            big_space::BigSpacePlugin::<i64>::new(true),
             // big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
         ))

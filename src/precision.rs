@@ -35,6 +35,9 @@ use bevy::reflect::Reflect;
 /// type GalacticGrid = GridCell<i64>;
 /// ```
 ///
+/// Additionally, consider using the provided command extensions in [`crate::commands`] to
+/// completely eliminate the use of this generic.
+///
 pub trait GridPrecision:
     Default
     + PartialEq
