@@ -30,7 +30,7 @@ mod inner {
     /// An isometry that describes the location of the floating origin's grid cell's origin, in the
     /// local reference frame.
     ///
-    /// Used to compute the [`GlobalTransform`](bevy::transform::components::GlobalTransform) of
+    /// Used to compute the [`GlobalTransform`](bevy_transform::components::GlobalTransform) of
     /// every entity within a reference frame. Because this tells us where the floating origin cell
     /// is located in the local frame, we can compute the inverse transform once, then use it to
     /// transform every entity relative to the floating origin.

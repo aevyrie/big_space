@@ -7,7 +7,7 @@ use bevy_transform::prelude::*;
 
 /// Minimal bundle needed to position an entity in floating origin space.
 ///
-/// This is the floating origin equivalent of the [`bevy::prelude::SpatialBundle`].
+/// This is the floating origin equivalent of the `bevy` `SpatialBundle`.
 #[derive(Bundle, Default)]
 pub struct BigSpatialBundle<P: GridPrecision> {
     /// The visibility of the entity.
@@ -27,10 +27,10 @@ pub struct BigSpatialBundle<P: GridPrecision> {
     pub cell: GridCell<P>,
 }
 
-/// A [`SpatialBundle`] that also has a reference frame, allowing other high precision spatial
-/// bundles to be nested within that reference frame.
+/// A `SpatialBundle` that also has a reference frame, allowing other high precision spatial bundles
+/// to be nested within that reference frame.
 ///
-/// This is the floating origin equivalent of the [`SpatialBundle`].
+/// This is the floating origin equivalent of the `bevy` `SpatialBundle`.
 #[derive(Bundle, Default)]
 pub struct BigReferenceFrameBundle<P: GridPrecision> {
     /// The visibility of the entity.

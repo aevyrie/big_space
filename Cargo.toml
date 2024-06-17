@@ -10,7 +10,6 @@ documentation = "https://docs.rs/crate/big_space/latest"
 
 [dependencies]
 bevy_app = { version = "0.13", default_features = false }
-bevy_derive = { version = "0.13", default_features = false }
 bevy_ecs = { version = "0.13", default_features = false }
 bevy_hierarchy = { version = "0.13", default_features = false }
 bevy_log = { version = "0.13", default_features = false }
