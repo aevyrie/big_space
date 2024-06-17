@@ -15,13 +15,17 @@ bevy = { version = "0.13", default_features = false }
 
 [dev-dependencies]
 bevy = { version = "0.13", default-features = false, features = [
+    "bevy_scene",
+    "bevy_gltf",
     "bevy_winit",
     "default_font",
     "bevy_ui",
     "bevy_pbr",
     "x11",
     "tonemapping_luts",
+    "multi-threaded",
 ] }
+bevy-inspector-egui = "0.24"
 bevy_framepace = { version = "0.15", default-features = false }
 rand = "0.8.5"
 
@@ -58,5 +62,11 @@ doc-scrape-examples = true
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
+required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "split_screen"
+path = "examples/split_screen.rs"
 required-features = ["default"]
 doc-scrape-examples = true

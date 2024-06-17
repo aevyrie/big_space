@@ -28,17 +28,21 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
 pub fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos,
     reference_frames: ReferenceFrames<P>,
-    occupied_cells: Query<(Entity, &GridCell<P>), Without<FloatingOrigin>>,
+    occupied_cells: Query<(Entity, &GridCell<P>, Option<&FloatingOrigin>)>,
 ) {
-    for (cell_entity, cell) in occupied_cells.iter() {
-        let Some(frame) = reference_frames.get(cell_entity) else {
+    for (cell_entity, cell, origin) in occupied_cells.iter() {
+        let Some(frame) = reference_frames.parent_frame(cell_entity) else {
             continue;
         };
         let transform = frame.global_transform(
             cell,
             &Transform::from_scale(Vec3::splat(frame.cell_edge_length() * 0.999)),
         );
-        gizmos.cuboid(transform, Color::GREEN)
+        if origin.is_none() {
+            gizmos.cuboid(transform, Color::GREEN)
+        } else {
+            // gizmos.cuboid(transform, Color::rgba(0.0, 0.0, 1.0, 0.5))
+        }
     }
 }
 
@@ -49,7 +53,7 @@ pub fn update_reference_frame_axes<P: GridPrecision>(
 ) {
     for (transform, frame) in frames.iter() {
         let start = transform.translation();
-        let len = frame.cell_edge_length() * 1.0;
+        let len = frame.cell_edge_length() * 2.0;
         gizmos.ray(start, transform.right() * len, Color::RED);
         gizmos.ray(start, transform.up() * len, Color::GREEN);
         gizmos.ray(start, transform.back() * len, Color::BLUE);

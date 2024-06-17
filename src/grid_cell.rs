@@ -2,35 +2,18 @@
 
 use bevy::prelude::*;
 
-use crate::precision::GridPrecision;
+use crate::*;
 
-/// Defines the grid cell this entity's `Transform` is relative to.
+use self::{precision::GridPrecision, reference_frame::ReferenceFrame};
+
+/// The cell index an entity within a [`crate::ReferenceFrame`]'s grid. The [`Transform`] of an
+/// entity with this component is a transformation from the center of this cell.
 ///
-/// This component is generic over a few integer types to allow you to select the grid size you
-/// need. These correspond to a total usable volume of a cube with the following edge lengths:
-///
-/// **Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter**
-///
-/// - i8: 2,560 km = 74% of the diameter of the Moon
-/// - i16: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
-/// - i32: 0.0045 light years = ~4 times the width of the solar system
-/// - i64: 19.5 million light years = ~100 times the width of the milky way galaxy
-/// - i128: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
-///
-/// where
-///
-/// `usable_edge_length = 2^(integer_bits) * grid_cell_edge_length`
-///
-/// # Note
-///
-/// Be sure you are using the same grid index precision everywhere. It might be a good idea to
-/// define a type alias!
-///
-/// ```
-/// # use big_space::GridCell;
-/// type GalacticGrid = GridCell<i64>;
-/// ```
-///
+/// This component adds precision to the translation of an entity's [`Transform`]. In a
+/// high-precision [`BigSpace`] world, the position of an entity is described by a [`Transform`]
+/// *and* a [`GridCell`]. This component is the index of a cell inside a large grid defined by the
+/// [`ReferenceFrame`], and the transform is the position of the entity relative to the center of
+/// that cell.
 #[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 pub struct GridCell<P: GridPrecision> {
@@ -61,7 +44,32 @@ impl<P: GridPrecision> GridCell<P> {
         y: P::ONE,
         z: P::ONE,
     };
+
+    /// If an entity's transform translation becomes larger than the limit specified in its
+    /// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
+    /// transform.
+    pub fn recenter_large_transforms(
+        reference_frames: Query<&ReferenceFrame<P>>,
+        mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
+    ) {
+        changed_transform
+            .par_iter_mut()
+            .for_each(|(mut grid_pos, mut transform, parent)| {
+                let Ok(reference_frame) = reference_frames.get(parent.get()) else {
+                    return;
+                };
+                if transform.as_ref().translation.abs().max_element()
+                    > reference_frame.maximum_distance_from_origin()
+                {
+                    let (grid_cell_delta, translation) = reference_frame
+                        .imprecise_translation_to_grid(transform.as_ref().translation);
+                    *grid_pos += grid_cell_delta;
+                    transform.translation = translation;
+                }
+            });
+    }
 }
+
 impl<P: GridPrecision> std::ops::Add for GridCell<P> {
     type Output = GridCell<P>;
 
@@ -73,6 +81,7 @@ impl<P: GridPrecision> std::ops::Add for GridCell<P> {
         }
     }
 }
+
 impl<P: GridPrecision> std::ops::Sub for GridCell<P> {
     type Output = GridCell<P>;
 
@@ -84,6 +93,7 @@ impl<P: GridPrecision> std::ops::Sub for GridCell<P> {
         }
     }
 }
+
 impl<P: GridPrecision> std::ops::Add for &GridCell<P> {
     type Output = GridCell<P>;
 
@@ -91,6 +101,7 @@ impl<P: GridPrecision> std::ops::Add for &GridCell<P> {
         (*self).add(*rhs)
     }
 }
+
 impl<P: GridPrecision> std::ops::Sub for &GridCell<P> {
     type Output = GridCell<P>;
 
@@ -110,5 +121,25 @@ impl<P: GridPrecision> std::ops::SubAssign for GridCell<P> {
     fn sub_assign(&mut self, rhs: Self) {
         use std::ops::Sub;
         *self = self.sub(rhs);
+    }
+}
+
+impl<P: GridPrecision> std::ops::Mul<P> for GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn mul(self, rhs: P) -> Self::Output {
+        GridCell {
+            x: self.x.mul(rhs),
+            y: self.y.mul(rhs),
+            z: self.z.mul(rhs),
+        }
+    }
+}
+
+impl<P: GridPrecision> std::ops::Mul<P> for &GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn mul(self, rhs: P) -> Self::Output {
+        (*self).mul(rhs)
     }
 }

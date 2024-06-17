@@ -3,37 +3,32 @@
 //! orbiting a star.
 
 use bevy::{
-    ecs::{component::Component, system::Resource},
+    ecs::prelude::*,
     math::{Affine3A, DAffine3, DVec3, Vec3},
-    prelude::{Deref, DerefMut},
     reflect::Reflect,
-    transform::components::{GlobalTransform, Transform},
+    transform::prelude::*,
 };
 
-use crate::{GridCell, GridPrecision};
+use crate::{precision::GridPrecision, GridCell};
 
 use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
+pub mod propagation;
 
-/// All entities that have no parent are implicitly in the root [`ReferenceFrame`].
-///
-/// Because this relationship is implicit, it lives outside of the entity/component hierarchy, and
-/// is a singleton; this is why the root reference frame is a resource unlike all other
-/// [`ReferenceFrame`]s which are components.
-#[derive(Debug, Clone, Resource, Reflect, Deref, DerefMut)]
-pub struct RootReferenceFrame<P: GridPrecision>(pub(crate) ReferenceFrame<P>);
-
-/// A component that defines a reference frame for children of this entity with [`GridCell`]s.
-///
-/// Entities without a parent are implicitly in the [`RootReferenceFrame`].
+/// A component that defines a reference frame for children of this entity with [`GridCell`]s. All
+/// entities with a [`GridCell`] must be children of an entity with a [`ReferenceFrame`]. The
+/// reference frame *defines* the grid that the `GridCell` indexes into.
 ///
 /// ## Motivation
 ///
 /// Reference frames are hierarchical, allowing more precision for objects with similar relative
-/// velocities. Entities in the same reference frame as the [`crate::FloatingOrigin`] will be
-/// rendered with the most precision. Reference frames are transformed relative to each other
-/// using 64 bit float transforms.
+/// velocities. All entities in the same reference frame will move together, like standard transform
+/// propagation, but with much more precision. Entities in the same reference frame as the
+/// [`crate::FloatingOrigin`] will be rendered with the most precision. Transforms are propagated
+/// starting from the floating origin, ensuring that references frames in a similar point in the
+/// hierarchy have accumulated the least error. Reference frames are transformed relative to each
+/// other using 64 bit float transforms.
 ///
 /// ## Example
 ///

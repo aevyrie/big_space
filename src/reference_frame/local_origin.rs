@@ -1,5 +1,6 @@
 //! Describes how the floating origin's position is propagated through the hierarchy of reference
-//! frames, and used to compute the floating origin's position relative to each reference frame.
+//! frames, and used to compute the floating origin's position relative to each reference frame. See
+//! [`LocalFloatingOrigin`].
 
 use bevy::{
     ecs::{
@@ -15,10 +16,11 @@ use bevy::{
     transform::prelude::*,
 };
 
-use super::{ReferenceFrame, RootReferenceFrame};
-use crate::{FloatingOrigin, GridCell, GridPrecision};
-
 pub use inner::LocalFloatingOrigin;
+
+use crate::{precision::GridPrecision, BigSpace, GridCell};
+
+use super::ReferenceFrame;
 
 /// A module kept private to enforce use of setters and getters within the parent module.
 mod inner {
@@ -27,7 +29,7 @@ mod inner {
         reflect::prelude::*,
     };
 
-    use crate::{GridCell, GridPrecision};
+    use crate::{precision::GridPrecision, GridCell};
 
     /// An isometry that describes the location of the floating origin's grid cell's origin, in the
     /// local reference frame.
@@ -38,11 +40,11 @@ mod inner {
     /// transform every entity relative to the floating origin.
     ///
     /// If the floating origin is in this local reference frame, the `float` fields will be
-    /// identity. The `float` fields` will be non-identity when the floating origin is in a
-    /// different reference frame that does not perfectly align with this one. Different reference
-    /// frames can be rotated and offset from each other - consider the reference frame of a planet,
-    /// spinning about its axis and orbiting about a star, it will not align with the reference
-    /// frame of the star system!
+    /// identity. The `float` fields will be non-identity when the floating origin is in a different
+    /// reference frame that does not perfectly align with this one. Different reference frames can
+    /// be rotated and offset from each other - consider the reference frame of a planet, spinning
+    /// about its axis and orbiting about a star, it will not align with the reference frame of the
+    /// star system!
     #[derive(Default, Debug, Clone, PartialEq, Reflect)]
     pub struct LocalFloatingOrigin<P: GridPrecision> {
         /// The local cell that the floating origin's grid cell origin falls into.
@@ -132,159 +134,164 @@ mod inner {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash)]
-/// Use the [`ReferenceFrames`] [`SystemParam`] to do useful things with this handle.
-///
-/// A reference frame can either be a node in the entity hierarchy stored as a component, or will be
-/// the root reference frame, which is tracked with a resource. This handle is used to unify access
-/// to reference frames with a single lightweight type.
-pub enum ReferenceFrameHandle {
-    /// The reference frame is a node in the hierarchy, stored in a [`ReferenceFrame`] component.
-    Node(Entity),
-    /// The root reference frame, defined in the [`RootReferenceFrame`] resource.
-    Root,
+fn propagate_origin_to_parent<P: GridPrecision>(
+    this_frame_entity: Entity,
+    reference_frames: &mut ReferenceFramesMut<P>,
+    parent_frame_entity: Entity,
+) {
+    let (this_frame, this_cell, this_transform) = reference_frames.get(this_frame_entity);
+    let (parent_frame, _parent_cell, _parent_transform) = reference_frames.get(parent_frame_entity);
+
+    // Get this frame's double precision transform, relative to its cell. We ignore the grid
+    // cell here because we don't want to lose precision - we can do these calcs relative to
+    // this cell, then add the grid cell offset at the end.
+    let this_transform = DAffine3::from_rotation_translation(
+        this_transform.rotation.as_dquat(),
+        this_transform.translation.as_dvec3(),
+    );
+
+    // Get the origin's double position in this reference frame
+    let origin_translation = this_frame.grid_position_double(
+        &this_frame.local_floating_origin.cell(),
+        &Transform::from_translation(this_frame.local_floating_origin.translation()),
+    );
+    let this_local_origin_transform = DAffine3::from_rotation_translation(
+        this_frame.local_floating_origin.rotation(),
+        origin_translation,
+    );
+
+    // Multiply to move the origin into the parent's reference frame
+    let origin_affine = this_transform * this_local_origin_transform;
+
+    let (_, origin_rot, origin_trans) = origin_affine.to_scale_rotation_translation();
+    let (origin_cell_relative_to_this_cell, origin_translation_remainder) =
+        parent_frame.translation_to_grid(origin_trans);
+
+    // Up until now we have been computing as if this cell is located at the origin, to maximize
+    // precision. Now that we are done with floats, we can add the cell offset.
+    let parent_origin_cell = origin_cell_relative_to_this_cell + this_cell;
+
+    reference_frames.update_reference_frame(parent_frame_entity, |parent_frame, _, _| {
+        parent_frame.local_floating_origin.set(
+            parent_origin_cell,
+            origin_translation_remainder,
+            origin_rot,
+        );
+    });
 }
 
-impl ReferenceFrameHandle {
-    /// Propagate the local origin position from `self` to `child`.
-    ///
-    /// This is not a method on `References` to help prevent misuse when accidentally
-    /// swapping the position of arguments.
-    fn propagate_origin_to_child<P: GridPrecision>(
-        self,
-        reference_frames: &mut ReferenceFramesMut<P>,
-        child: ReferenceFrameHandle,
-    ) {
-        let (this_frame, _this_cell, _this_transform) = reference_frames.get(self);
-        let (child_frame, child_cell, child_transform) = reference_frames.get(child);
+fn propagate_origin_to_child<P: GridPrecision>(
+    this_frame_entity: Entity,
+    reference_frames: &mut ReferenceFramesMut<P>,
+    child_frame_entity: Entity,
+) {
+    let (this_frame, _this_cell, _this_transform) = reference_frames.get(this_frame_entity);
+    let (child_frame, child_cell, child_transform) = reference_frames.get(child_frame_entity);
 
-        // compute double precision translation of origin treating child as the origin grid cell. Add this to the origin's float translation in double,
-        let origin_cell_relative_to_child = this_frame.local_floating_origin.cell() - child_cell;
-        let origin_translation = this_frame.grid_position_double(
-            &origin_cell_relative_to_child,
-            &Transform::from_translation(this_frame.local_floating_origin.translation()),
+    // compute double precision translation of origin treating child as the origin grid cell. Add this to the origin's float translation in double,
+    let origin_cell_relative_to_child = this_frame.local_floating_origin.cell() - child_cell;
+    let origin_translation = this_frame.grid_position_double(
+        &origin_cell_relative_to_child,
+        &Transform::from_translation(this_frame.local_floating_origin.translation()),
+    );
+
+    // then combine with rotation to get a double transform from the child's cell origin to the origin.
+    let origin_rotation = this_frame.local_floating_origin.rotation();
+    let origin_transform_child_cell_local =
+        DAffine3::from_rotation_translation(origin_rotation, origin_translation);
+
+    // Take the inverse of the child's transform as double (this is the "view" transform of the child reference frame)
+    let child_view_child_cell_local = DAffine3::from_rotation_translation(
+        child_transform.rotation.as_dquat(),
+        child_transform.translation.as_dvec3(),
+    )
+    .inverse();
+
+    // then multiply this by the double transform we got of the origin. This is now a transform64 of the origin, wrt to the child.
+    let origin_child_affine = child_view_child_cell_local * origin_transform_child_cell_local;
+
+    //  We can decompose into translation (high precision) and rotation.
+    let (_, origin_child_rotation, origin_child_translation) =
+        origin_child_affine.to_scale_rotation_translation();
+    let (child_origin_cell, child_origin_translation_float) =
+        child_frame.translation_to_grid(origin_child_translation);
+
+    reference_frames.update_reference_frame(child_frame_entity, |child_frame, _, _| {
+        child_frame.local_floating_origin.set(
+            child_origin_cell,
+            child_origin_translation_float,
+            origin_child_rotation,
         );
-
-        // then combine with rotation to get a double transform from the child's cell origin to the origin.
-        let origin_rotation = this_frame.local_floating_origin.rotation();
-        let origin_transform_child_cell_local =
-            DAffine3::from_rotation_translation(origin_rotation, origin_translation);
-
-        // Take the inverse of the child's transform as double (this is the "view" transform of the child reference frame)
-        let child_view_child_cell_local = DAffine3::from_rotation_translation(
-            child_transform.rotation.as_dquat(),
-            child_transform.translation.as_dvec3(),
-        )
-        .inverse();
-
-        // then multiply this by the double transform we got of the origin. This is now a transform64 of the origin, wrt to the child.
-        let origin_child_affine = child_view_child_cell_local * origin_transform_child_cell_local;
-
-        //  We can decompose into translation (high precision) and rotation.
-        let (_, origin_child_rotation, origin_child_translation) =
-            origin_child_affine.to_scale_rotation_translation();
-        let (child_origin_cell, child_origin_translation_float) =
-            child_frame.translation_to_grid(origin_child_translation);
-
-        reference_frames.update(child, |child_frame, _, _| {
-            child_frame.local_floating_origin.set(
-                child_origin_cell,
-                child_origin_translation_float,
-                origin_child_rotation,
-            );
-        })
-    }
-
-    fn propagate_origin_to_parent<P: GridPrecision>(
-        self,
-        reference_frames: &mut ReferenceFramesMut<P>,
-        parent: ReferenceFrameHandle,
-    ) {
-        let (this_frame, this_cell, this_transform) = reference_frames.get(self);
-        let (parent_frame, _parent_cell, _parent_transform) = reference_frames.get(parent);
-
-        // Get this frame's double precision transform, relative to its cell. We ignore the grid
-        // cell here because we don't want to lose precision - we can do these calcs relative to
-        // this cell, then add the grid cell offset at the end.
-        let this_transform = DAffine3::from_rotation_translation(
-            this_transform.rotation.as_dquat(),
-            this_transform.translation.as_dvec3(),
-        );
-
-        // Get the origin's double position in this reference frame
-        let origin_translation = this_frame.grid_position_double(
-            &this_frame.local_floating_origin.cell(),
-            &Transform::from_translation(this_frame.local_floating_origin.translation()),
-        );
-        let this_local_origin_transform = DAffine3::from_rotation_translation(
-            this_frame.local_floating_origin.rotation(),
-            origin_translation,
-        );
-
-        // Multiply to move the origin into the parent's reference frame
-        let origin_affine = this_transform * this_local_origin_transform;
-
-        let (_, origin_rot, origin_trans) = origin_affine.to_scale_rotation_translation();
-        let (origin_cell_relative_to_this_cell, origin_translation_remainder) =
-            parent_frame.translation_to_grid(origin_trans);
-
-        // Up until now we have been computing as if this cell is located at the origin, to maximize
-        // precision. Now that we are done with floats, we can add the cell offset.
-        let parent_origin_cell = origin_cell_relative_to_this_cell + this_cell;
-
-        reference_frames.update(parent, |parent_frame, _, _| {
-            parent_frame.local_floating_origin.set(
-                parent_origin_cell,
-                origin_translation_remainder,
-                origin_rot,
-            );
-        });
-    }
+    })
 }
 
-/// Used to access a reference frame using a single system param. Needed because the reference frame
-/// could either be a component or a resource (if at the root of the hierarchy).
+/// A system param for more easily navigating a hierarchy of reference frames.
 #[derive(SystemParam)]
 pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
-    frame_root: Res<'w, RootReferenceFrame<P>>,
-    frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>)>,
+    children: Query<'w, 's, Read<Children>>,
+    // position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>), With<ReferenceFrame<P>>>,
+    frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
 
 impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
-    /// Get the reference frame from a handle.
-    pub fn resolve_handle(&self, handle: ReferenceFrameHandle) -> &ReferenceFrame<P> {
-        match handle {
-            ReferenceFrameHandle::Node(frame_entity) => self
-                .frame_query
-                .get(frame_entity)
-                .map(|(_entity, frame)| frame)
-                .unwrap_or_else(|e| {
-                    panic!("{} {handle:?} failed to resolve.\n\tEnsure all GridPrecision components are using the <{}> generic, and all required components are present.\n\tQuery Error: {e}", std::any::type_name::<ReferenceFrameHandle>(), std::any::type_name::<P>())
-                }),
-            ReferenceFrameHandle::Root => {
-                &self.frame_root
-            }
-        }
+    /// Get a [`ReferenceFrame`] from its `Entity`.
+    pub fn get(&self, frame_entity: Entity) -> &ReferenceFrame<P> {
+        self.frame_query
+            .get(frame_entity)
+            .map(|(_entity, frame, _parent)| frame)
+            .unwrap_or_else(|e| {
+                panic!("Reference frame entity missing ReferenceFrame component.\n\tError: {e}");
+            })
     }
 
-    /// Get a handle to this entity's reference frame, if it exists.
+    /// Get the [`ReferenceFrame`] that `this` `Entity` is a child of, if it exists.
+    pub fn parent_frame(&self, this: Entity) -> Option<&ReferenceFrame<P>> {
+        self.parent_frame_entity(this)
+            .map(|frame_entity| self.get(frame_entity))
+    }
+
+    /// Get the ID of the reference frame that `this` `Entity` is a child of, if it exists.
     #[inline]
-    pub fn get_handle(&self, this: Entity) -> Option<ReferenceFrameHandle> {
+    pub fn parent_frame_entity(&self, this: Entity) -> Option<Entity> {
         match self.parent.get(this).map(|parent| **parent) {
-            Err(_) => Some(ReferenceFrameHandle::Root),
+            Err(_) => None,
             Ok(parent) => match self.frame_query.contains(parent) {
-                true => Some(ReferenceFrameHandle::Node(parent)),
+                true => Some(parent),
                 false => None,
             },
         }
     }
 
-    /// Get a reference to this entity's reference frame, if it exists.
-    #[inline]
-    pub fn get(&self, this: Entity) -> Option<&ReferenceFrame<P>> {
-        self.get_handle(this)
-            .map(|handle| self.resolve_handle(handle))
+    /// Get handles to all reference frames that are children of this reference frame. Applies a
+    /// filter to the returned children.
+    fn child_frames_filtered(
+        &mut self,
+        this: Entity,
+        mut filter: impl FnMut(Entity) -> bool,
+    ) -> Vec<Entity> {
+        self.children
+            .get(this)
+            .iter()
+            .flat_map(|c| c.iter())
+            .filter(|entity| filter(**entity))
+            .filter(|child| self.frame_query.contains(**child))
+            .copied()
+            .collect()
+    }
+
+    /// Get IDs to all reference frames that are children of this reference frame.
+    pub fn child_frames(&mut self, this: Entity) -> Vec<Entity> {
+        self.child_frames_filtered(this, |_| true)
+    }
+
+    /// Get IDs to all reference frames that are siblings of this reference frame.
+    pub fn sibling_frames(&mut self, this_entity: Entity) -> Vec<Entity> {
+        if let Some(parent) = self.parent_frame_entity(this_entity) {
+            self.child_frames_filtered(parent, |e| e != this_entity)
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -294,18 +301,8 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
 pub struct ReferenceFramesMut<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
     children: Query<'w, 's, Read<Children>>,
-    frame_root: ResMut<'w, RootReferenceFrame<P>>,
-    frame_query: Query<
-        'w,
-        's,
-        (
-            Entity,
-            Read<GridCell<P>>,
-            Read<Transform>,
-            Write<ReferenceFrame<P>>,
-            Option<Read<Parent>>,
-        ),
-    >,
+    position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>)>,
+    frame_query: Query<'w, 's, (Entity, Write<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
 
 impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
@@ -314,7 +311,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
     ///
     /// ## Panics
     ///
-    /// This will panic if the handle passed in is invalid.
+    /// This will panic if the entity passed in is invalid.
     ///
     /// ## Why a closure?
     ///
@@ -327,114 +324,82 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
     /// I tried returning an enum or a boxed trait object, but ran into issues expressing the
     /// lifetimes. Worth revisiting if this turns out to be annoying, but seems pretty insignificant
     /// at the time of writing.
-    #[inline]
-    pub fn update<T>(
+    pub fn update_reference_frame<T>(
         &mut self,
-        handle: ReferenceFrameHandle,
+        frame_entity: Entity,
         mut func: impl FnMut(&mut ReferenceFrame<P>, &GridCell<P>, &Transform) -> T,
     ) -> T {
-        match handle {
-            ReferenceFrameHandle::Node(frame_entity) => self
-                .frame_query
-                .get_mut(frame_entity)
-                .map(|(_entity, cell, transform, mut frame, _parent)| {
-                    func(frame.as_mut(), cell, transform)
-                })
-                .expect("The supplied reference frame handle to node is no longer valid."),
-            ReferenceFrameHandle::Root => func(
-                &mut self.frame_root,
-                &GridCell::default(), // the reference frame itself is not within another.
-                &Transform::default(), // the reference frame itself is not within another.
-            ),
-        }
+        let (cell, transform) = self.position(frame_entity);
+        self.frame_query
+            .get_mut(frame_entity)
+            .map(|(_entity, mut frame, _parent)| func(frame.as_mut(), &cell, &transform))
+            .expect("The supplied reference frame handle to node is no longer valid.")
     }
 
-    /// Get the reference frame and the position of the reference frame from a handle.
-    pub fn get(
-        &self,
-        handle: ReferenceFrameHandle,
-    ) -> (&ReferenceFrame<P>, GridCell<P>, Transform) {
-        match handle {
-            ReferenceFrameHandle::Node(frame_entity) => self
-                .frame_query
-                .get(frame_entity)
-                .map(|(_entity, cell, transform, frame, _parent)| (frame, *cell, *transform))
-                .unwrap_or_else(|e| {
-                    panic!("{} {handle:?} failed to resolve.\n\tEnsure all GridPrecision components are using the <{}> generic, and all required components are present.\n\tQuery Error: {e}", std::any::type_name::<ReferenceFrameHandle>(), std::any::type_name::<P>())
-                }),
-            ReferenceFrameHandle::Root => {
-                (&self.frame_root, GridCell::default(), Transform::default())
-            }
-        }
+    /// Get the reference frame and the position of the reference frame from its `Entity`.
+    pub fn get(&self, frame_entity: Entity) -> (&ReferenceFrame<P>, GridCell<P>, Transform) {
+        let (cell, transform) = self.position(frame_entity);
+        self.frame_query
+            .get(frame_entity)
+            .map(|(_entity, frame, _parent)| (frame, cell, transform))
+            .unwrap_or_else(|e| {
+                panic!("Reference frame entity {frame_entity:?} missing ReferenceFrame component.\n\tError: {e}");
+            })
     }
 
-    /// Get a handle to this entity's reference frame, if it exists.
+    /// Get the position of this reference frame, including its grid cell and transform, or return
+    /// defaults if they are missing.
+    ///
+    /// Needed because the root reference frame should not have a grid cell or transform.
+    pub fn position(&self, frame_entity: Entity) -> (GridCell<P>, Transform) {
+        let (cell, transform) = (GridCell::default(), Transform::default());
+        let (cell, transform) = self.position.get(frame_entity).unwrap_or_else(|_| {
+        assert!(self.parent.get(frame_entity).is_err(), "Reference frame entity {frame_entity:?} is missing a GridCell and Transform. This is valid only if this is a root reference frame, but this is not.");
+            (&cell, &transform)
+        });
+        (*cell, *transform)
+    }
+
+    /// Get the ID of the reference frame that `this` `Entity` is a child of, if it exists.
     #[inline]
-    fn get_handle(&self, this: Entity) -> Option<ReferenceFrameHandle> {
+    pub fn parent_frame(&self, this: Entity) -> Option<Entity> {
         match self.parent.get(this).map(|parent| **parent) {
-            Err(_) => Some(ReferenceFrameHandle::Root),
+            Err(_) => None,
             Ok(parent) => match self.frame_query.contains(parent) {
-                true => Some(ReferenceFrameHandle::Node(parent)),
+                true => Some(parent),
                 false => None,
             },
         }
     }
 
-    /// Get a handle to the parent reference frame of this reference frame, if it exists.
-    #[inline]
-    fn parent(&mut self, this: ReferenceFrameHandle) -> Option<ReferenceFrameHandle> {
-        match this {
-            ReferenceFrameHandle::Node(this) => self.get_handle(this),
-            ReferenceFrameHandle::Root => None,
-        }
-    }
-
     /// Get handles to all reference frames that are children of this reference frame. Applies a
     /// filter to the returned children.
-    #[inline]
-    fn children_filtered(
+    fn child_frames_filtered(
         &mut self,
-        this: ReferenceFrameHandle,
+        this: Entity,
         mut filter: impl FnMut(Entity) -> bool,
-    ) -> Vec<ReferenceFrameHandle> {
-        match this {
-            ReferenceFrameHandle::Node(this) => self
-                .children
-                .get(this)
-                .iter()
-                .flat_map(|c| c.iter())
-                .filter(|entity| filter(**entity))
-                .filter(|child| self.frame_query.contains(**child))
-                .map(|child| ReferenceFrameHandle::Node(*child))
-                .collect(),
-            ReferenceFrameHandle::Root => self
-                .frame_query
-                .iter()
-                .filter(|(entity, ..)| filter(*entity))
-                .filter(|(.., parent)| parent.is_none())
-                .map(|(entity, ..)| ReferenceFrameHandle::Node(entity))
-                .collect(),
-        }
+    ) -> Vec<Entity> {
+        self.children
+            .get(this)
+            .iter()
+            .flat_map(|c| c.iter())
+            .filter(|entity| filter(**entity))
+            .filter(|child| self.frame_query.contains(**child))
+            .copied()
+            .collect()
     }
 
-    /// Get handles to all reference frames that are children of this reference frame.
-    #[inline]
-    fn children(&mut self, this: ReferenceFrameHandle) -> Vec<ReferenceFrameHandle> {
-        self.children_filtered(this, |_| true)
+    /// Get IDs to all reference frames that are children of this reference frame.
+    pub fn child_frames(&mut self, this: Entity) -> Vec<Entity> {
+        self.child_frames_filtered(this, |_| true)
     }
 
-    /// Get handles to all reference frames that are siblings of this reference frame.
-    #[inline]
-    fn siblings(&mut self, this: ReferenceFrameHandle) -> Vec<ReferenceFrameHandle> {
-        match this {
-            ReferenceFrameHandle::Node(this_entity) => {
-                if let Some(parent) = self.parent(this) {
-                    self.children_filtered(parent, |e| e != this_entity)
-                } else {
-                    Vec::new()
-                }
-            }
-            ReferenceFrameHandle::Root => Vec::new(),
+    /// Get IDs to all reference frames that are siblings of this reference frame.
+    pub fn sibling_frames(&mut self, this_entity: Entity) -> Vec<Entity> {
+        if let Some(parent) = self.parent_frame(this_entity) {
+            self.child_frames_filtered(parent, |e| e != this_entity)
+        } else {
+            Vec::new()
         }
     }
 }
@@ -446,78 +411,89 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// frame. This is all done in high precision if possible, however any loss in precision will
     /// only affect the rendering precision. The high precision coordinates ([`GridCell`] and
     /// [`Transform`]) are the source of truth and never mutated.
-    pub fn update(
-        origin: Query<(Entity, &GridCell<P>), With<FloatingOrigin>>,
+    pub fn compute_all(
         mut reference_frames: ReferenceFramesMut<P>,
-        mut frame_stack: Local<Vec<ReferenceFrameHandle>>,
+        mut frame_stack: Local<Vec<Entity>>,
+        cells: Query<(Entity, &GridCell<P>)>,
+        roots: Query<(Entity, &BigSpace)>,
+        parents: Query<&Parent>,
     ) {
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
         /// there is a degenerate hierarchy. It might take a while, but at least it's not forever?
-        const MAX_REFERENCE_FRAME_DEPTH: usize = usize::MAX;
+        const MAX_REFERENCE_FRAME_DEPTH: usize = 255;
 
-        let (origin_entity, origin_cell) = origin
-            .get_single()
-            .expect("There can only be one entity with the `FloatingOrigin` component.");
+        // TODO: because each tree under a root is disjoint, these updates can be done in parallel
+        // without aliasing. This will require unsafe, just like bevy's own transform propagation.
+        'outer: for (origin_entity, origin_cell) in roots
+            .iter() // TODO: If any of these checks fail, log to some diagnostic
+            .filter_map(|(root_entity, root)| root.validate_floating_origin(root_entity, &parents))
+            .filter_map(|origin| cells.get(origin).ok())
+        {
+            let Some(mut this_frame) = reference_frames.parent_frame(origin_entity) else {
+                error!("The floating origin is not in a valid reference frame. The floating origin entity must be a child of an entity with the `ReferenceFrame` component.");
+                continue;
+            };
 
-        let Some(mut this_frame) = reference_frames.get_handle(origin_entity) else {
-            error!("The floating origin is not in a valid reference frame. The floating origin entity must be a child of an entity with the `ReferenceFrame`, `GridCell`, and `Transform` components, or be at the root of the parent-child hierarchy.");
-            return;
-        };
+            // Prepare by resetting the `origin_transform` of the floating origin's reference frame.
+            // Because the floating origin is within this reference frame, there is no grid
+            // misalignment and thus no need for any floating offsets.
+            reference_frames.update_reference_frame(this_frame, |frame, _, _| {
+                frame
+                    .local_floating_origin
+                    .set(*origin_cell, Vec3::ZERO, DQuat::IDENTITY);
+            });
 
-        // Prepare by resetting the `origin_transform` of the floating origin's reference frame.
-        // Because the floating origin is within this reference frame, there is no grid misalignment
-        // and thus no need for any floating offsets.
-        reference_frames.update(this_frame, |frame, _, _| {
-            frame
-                .local_floating_origin
-                .set(*origin_cell, Vec3::ZERO, DQuat::IDENTITY);
-        });
+            // Seed the frame stack with the floating origin's reference frame. From this point out,
+            // we will only look at siblings and parents, which will allow us to visit the entire
+            // tree.
+            frame_stack.clear();
+            frame_stack.push(this_frame);
 
-        // Seed the frame stack with the floating origin's reference frame. From this point out, we
-        // will only look at siblings and parents, which will allow us to visit the entire tree.
-        frame_stack.clear();
-        frame_stack.push(this_frame);
+            // Recurse up and across the tree, updating siblings and their children.
+            for _ in 0..MAX_REFERENCE_FRAME_DEPTH {
+                // We start by propagating up to the parent of this frame, then propagating down to
+                // the siblings of this frame (children of the parent that are not this frame).
+                if let Some(parent_frame) = reference_frames.parent_frame(this_frame) {
+                    propagate_origin_to_parent(this_frame, &mut reference_frames, parent_frame);
+                    for sibling_frame in reference_frames.sibling_frames(this_frame) {
+                        // The siblings of this frame are also the children of the parent frame.
+                        propagate_origin_to_child(
+                            parent_frame,
+                            &mut reference_frames,
+                            sibling_frame,
+                        );
+                        frame_stack.push(sibling_frame); // We'll recurse through children next
+                    }
+                }
 
-        // Recurse up and across the tree, updating siblings and their children.
-        for _ in 0..MAX_REFERENCE_FRAME_DEPTH {
-            // We start by propagating up to the parent of this frame, then propagating down to the
-            // siblings of this frame (children of the parent that are not this frame).
-            if let Some(parent_frame) = reference_frames.parent(this_frame) {
-                this_frame.propagate_origin_to_parent(&mut reference_frames, parent_frame);
-                for sibling_frame in reference_frames.siblings(this_frame) {
-                    // The siblings of this frame are also the children of the parent frame.
-                    parent_frame.propagate_origin_to_child(&mut reference_frames, sibling_frame);
-                    frame_stack.push(sibling_frame); // We'll recurse through children next
+                // All of the reference frames pushed on the stack have been processed. We can now
+                // pop those off the stack and recursively process their children all the way out to
+                // the leaves of the tree.
+                while let Some(this_frame) = frame_stack.pop() {
+                    for child_frame in reference_frames.child_frames(this_frame) {
+                        propagate_origin_to_child(this_frame, &mut reference_frames, child_frame);
+                        frame_stack.push(child_frame) // Push processed child onto the stack
+                    }
+                }
+
+                // Finally, now that the siblings of this frame have been recursively processed, we
+                // process the parent and set it as the current reference frame. Note that every
+                // time we step to a parent, "this frame" and all descendants have already been
+                // processed, so we only need to process the siblings.
+                match reference_frames.parent_frame(this_frame) {
+                    Some(parent_frame) => this_frame = parent_frame,
+                    None => continue 'outer, // We have reached the root of the tree, and can exit.
                 }
             }
 
-            // All of the reference frames pushed on the stack have been processed. We can now pop
-            // those off the stack and recursively process their children all the way out to the
-            // leaves of the tree.
-            while let Some(this_frame) = frame_stack.pop() {
-                for child_frame in reference_frames.children(this_frame) {
-                    this_frame.propagate_origin_to_child(&mut reference_frames, child_frame);
-                    frame_stack.push(child_frame) // Push processed child onto the stack
-                }
-            }
-
-            // Finally, now that the siblings of this frame have been recursively processed, we
-            // process the parent and set it as the current reference frame. Note that every time we
-            // step to a parent, "this frame" and all descendants have already been processed, so we
-            // only need to process the siblings.
-            match reference_frames.parent(this_frame) {
-                Some(parent_frame) => this_frame = parent_frame,
-                None => return, // We have reached the root of the tree, and can exit.
-            }
+            error!("Reached the maximum reference frame depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
         }
-
-        error!("Reached the maximum reference frame depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use bevy::{ecs::system::SystemState, math::DVec3};
+    use bevy::{ecs::system::SystemState, math::DVec3, prelude::*};
 
     use super::*;
     use crate::*;
@@ -526,7 +502,7 @@ mod tests {
     #[test]
     fn frame_hierarchy_getters() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let frame_bundle = (
             Transform::default(),
@@ -537,54 +513,59 @@ mod tests {
         let child_1 = app.world.spawn(frame_bundle.clone()).id();
         let child_2 = app.world.spawn(frame_bundle.clone()).id();
         let parent = app.world.spawn(frame_bundle.clone()).id();
+        let root = app.world.spawn(frame_bundle.clone()).id();
+
+        app.world.entity_mut(root).push_children(&[parent]);
         app.world
             .entity_mut(parent)
             .push_children(&[child_1, child_2]);
 
         let mut state = SystemState::<ReferenceFramesMut<i32>>::new(&mut app.world);
-        let mut ref_frame = state.get_mut(&mut app.world);
+        let mut ref_frames = state.get_mut(&mut app.world);
 
         // Children
-        let result = ref_frame.children(ReferenceFrameHandle::Root);
-        assert_eq!(result, vec![ReferenceFrameHandle::Node(parent)]);
-        let result = ref_frame.children(ReferenceFrameHandle::Node(parent));
-        assert!(result.contains(&ReferenceFrameHandle::Node(child_1)));
-        assert!(result.contains(&ReferenceFrameHandle::Node(child_2)));
-        let result = ref_frame.children(ReferenceFrameHandle::Node(child_1));
+        let result = ref_frames.child_frames(root);
+        assert_eq!(result, vec![parent]);
+        let result = ref_frames.child_frames(parent);
+        assert!(result.contains(&child_1));
+        assert!(result.contains(&child_2));
+        let result = ref_frames.child_frames(child_1);
         assert_eq!(result, Vec::new());
 
         // Parent
-        let result = ref_frame.parent(ReferenceFrameHandle::Root);
+        let result = ref_frames.parent_frame(root);
         assert_eq!(result, None);
-        let result = ref_frame.parent(ReferenceFrameHandle::Node(parent));
-        assert_eq!(result, Some(ReferenceFrameHandle::Root));
-        let result = ref_frame.parent(ReferenceFrameHandle::Node(child_1));
-        assert_eq!(result, Some(ReferenceFrameHandle::Node(parent)));
+        let result = ref_frames.parent_frame(parent);
+        assert_eq!(result, Some(root));
+        let result = ref_frames.parent_frame(child_1);
+        assert_eq!(result, Some(parent));
 
         // Siblings
-        let result = ref_frame.siblings(ReferenceFrameHandle::Root);
+        let result = ref_frames.sibling_frames(root);
         assert_eq!(result, vec![]);
-        let result = ref_frame.siblings(ReferenceFrameHandle::Node(parent));
+        let result = ref_frames.sibling_frames(parent);
         assert_eq!(result, vec![]);
-        let result = ref_frame.siblings(ReferenceFrameHandle::Node(child_1));
-        assert_eq!(result, vec![ReferenceFrameHandle::Node(child_2)]);
+        let result = ref_frames.sibling_frames(child_1);
+        assert_eq!(result, vec![child_2]);
     }
 
     #[test]
     fn child_propagation() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
-        let root = ReferenceFrameHandle::Root;
-
-        app.insert_resource(RootReferenceFrame(ReferenceFrame {
+        let root_frame = ReferenceFrame {
             local_floating_origin: LocalFloatingOrigin::new(
                 GridCell::<i32>::new(1_000_000, -1, -1),
                 Vec3::ZERO,
                 DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
             ),
             ..default()
-        }));
+        };
+        let root = app
+            .world
+            .spawn((Transform::default(), GridCell::<i32>::default(), root_frame))
+            .id();
 
         let child = app
             .world
@@ -595,13 +576,14 @@ mod tests {
                 ReferenceFrame::<i32>::default(),
             ))
             .id();
-        let child = ReferenceFrameHandle::Node(child);
+
+        app.world.entity_mut(root).push_children(&[child]);
 
         let mut state = SystemState::<ReferenceFramesMut<i32>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
         // The function we are testing
-        root.propagate_origin_to_child(&mut reference_frames, child);
+        propagate_origin_to_child(root, &mut reference_frames, child);
 
         let (child_frame, ..) = reference_frames.get(child);
 
@@ -630,9 +612,14 @@ mod tests {
     #[test]
     fn parent_propagation() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i64>::default());
+        app.add_plugins(BigSpacePlugin::<i64>::default());
 
-        let root = ReferenceFrameHandle::Root;
+        let frame_bundle = (
+            Transform::default(),
+            GridCell::<i64>::default(),
+            ReferenceFrame::<i64>::default(),
+        );
+        let root = app.world.spawn(frame_bundle.clone()).id();
 
         let child = app
             .world
@@ -650,13 +637,14 @@ mod tests {
                 },
             ))
             .id();
-        let child = ReferenceFrameHandle::Node(child);
+
+        app.world.entity_mut(root).push_children(&[child]);
 
         let mut state = SystemState::<ReferenceFramesMut<i64>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
         // The function we are testing
-        child.propagate_origin_to_parent(&mut reference_frames, root);
+        propagate_origin_to_parent(child, &mut reference_frames, root);
 
         let (root_frame, ..) = reference_frames.get(root);
 
@@ -685,18 +673,23 @@ mod tests {
     #[test]
     fn origin_transform() {
         let mut app = App::new();
-        app.add_plugins(FloatingOriginPlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::<i32>::default());
 
-        let root = ReferenceFrameHandle::Root;
-
-        app.insert_resource(RootReferenceFrame(ReferenceFrame {
-            local_floating_origin: LocalFloatingOrigin::new(
-                GridCell::<i32>::new(0, 0, 0),
-                Vec3::new(1.0, 1.0, 0.0),
-                DQuat::from_rotation_z(0.0),
-            ),
-            ..default()
-        }));
+        let root = app
+            .world
+            .spawn((
+                Transform::default(),
+                GridCell::<i32>::default(),
+                ReferenceFrame {
+                    local_floating_origin: LocalFloatingOrigin::new(
+                        GridCell::<i32>::new(0, 0, 0),
+                        Vec3::new(1.0, 1.0, 0.0),
+                        DQuat::from_rotation_z(0.0),
+                    ),
+                    ..default()
+                },
+            ))
+            .id();
 
         let child = app
             .world
@@ -708,12 +701,13 @@ mod tests {
                 ReferenceFrame::<i32>::default(),
             ))
             .id();
-        let child = ReferenceFrameHandle::Node(child);
+
+        app.world.entity_mut(root).push_children(&[child]);
 
         let mut state = SystemState::<ReferenceFramesMut<i32>>::new(&mut app.world);
         let mut reference_frames = state.get_mut(&mut app.world);
 
-        root.propagate_origin_to_child(&mut reference_frames, child);
+        propagate_origin_to_child(root, &mut reference_frames, child);
 
         let (child_frame, ..) = reference_frames.get(child);
         let child_local_point = DVec3::new(5.0, 5.0, 0.0);
