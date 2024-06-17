@@ -1,6 +1,7 @@
 //! Component bundles for big_space.
 
-use crate::*;
+use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, GridCell};
+use bevy::prelude::*;
 
 /// Minimal bundle needed to position an entity in floating origin space.
 ///

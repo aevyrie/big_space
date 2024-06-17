@@ -11,7 +11,7 @@ use bevy::{
 };
 use big_space::{
     camera::{CameraController, CameraControllerPlugin},
-    commands::BigSpaceCommandExt,
+    commands::BigSpaceCommands,
     reference_frame::ReferenceFrame,
     world_query::{GridTransform, GridTransformReadOnly},
     BigSpacePlugin, FloatingOrigin,

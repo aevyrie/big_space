@@ -1,7 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use big_space::{commands::BigSpaceCommandExt, reference_frame::ReferenceFrame, FloatingOrigin};
+use big_space::{commands::BigSpaceCommands, reference_frame::ReferenceFrame, FloatingOrigin};
 
 fn main() {
     App::new()

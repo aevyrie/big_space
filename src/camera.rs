@@ -226,7 +226,7 @@ pub fn camera_controller<P: GridPrecision>(
     mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
 ) {
     for (camera, mut position, mut controller) in camera.iter_mut() {
-        let Some(frame) = frames.parent_frame(camera).map(|frame| frames.get(frame)) else {
+        let Some(frame) = frames.parent_frame(camera) else {
             continue;
         };
         let speed = match (controller.nearest_object, controller.slow_near_objects) {

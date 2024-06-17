@@ -1,8 +1,13 @@
 //! Tools for validating high-precision transform hierarchies
 
+use std::marker::PhantomData;
+
+use bevy::prelude::*;
 use bevy::utils::HashMap;
 
-use crate::*;
+use crate::{
+    precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, FloatingOrigin, GridCell,
+};
 
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
@@ -138,7 +143,7 @@ pub(super) mod sealed {
     }
 }
 
-/// The root hierarchy validation struct, used as a generic parameter in [`validation`].
+/// The root hierarchy validation struct, used as a generic parameter in [`crate::validation`].
 #[derive(Default, Clone)]
 pub struct SpatialHierarchyRoot<P: GridPrecision>(PhantomData<P>);
 

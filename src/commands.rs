@@ -1,9 +1,14 @@
 //! Adds `big_space`-specific commands to bevy's `Commands`.
 
-use crate::{reference_frame::ReferenceFrame, GridPrecision, *};
+use std::marker::PhantomData;
+
+use crate::{reference_frame::ReferenceFrame, *};
+use bevy::prelude::*;
+
+use self::precision::GridPrecision;
 
 /// Adds `big_space` commands to bevy's `Commands`.
-pub trait BigSpaceCommandExt<P: GridPrecision> {
+pub trait BigSpaceCommands<P: GridPrecision> {
     /// Spawn a root [`BigSpace`] [`ReferenceFrame`].
     fn spawn_big_space(
         &mut self,
@@ -12,7 +17,7 @@ pub trait BigSpaceCommandExt<P: GridPrecision> {
     );
 }
 
-impl<P: GridPrecision> BigSpaceCommandExt<P> for Commands<'_, '_> {
+impl<P: GridPrecision> BigSpaceCommands<P> for Commands<'_, '_> {
     fn spawn_big_space(
         &mut self,
         reference_frame: ReferenceFrame<P>,
@@ -45,7 +50,7 @@ pub struct ReferenceFrameCommands<'a, P: GridPrecision> {
 
 impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
     /// Get a reference to the current reference frame.
-    pub fn get_frame(&mut self) -> &ReferenceFrame<P> {
+    pub fn frame(&mut self) -> &ReferenceFrame<P> {
         &self.reference_frame
     }
 

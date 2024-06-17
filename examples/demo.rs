@@ -5,7 +5,7 @@ use bevy::{
 };
 use big_space::{
     camera::{CameraController, CameraInput},
-    commands::BigSpaceCommandExt,
+    commands::BigSpaceCommands,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     world_query::GridTransformReadOnly,
     FloatingOrigin,
@@ -181,7 +181,6 @@ fn ui_text_system(
     let Some(ref_frame) = ref_frames.parent_frame(origin_entity) else {
         return;
     };
-    let ref_frame = ref_frames.get(ref_frame);
 
     let real_position = ref_frame.grid_position_double(origin_pos.cell, origin_pos.transform);
     let real_position_f64_text = format!(

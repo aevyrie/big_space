@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 use big_space::{
-    commands::BigSpaceCommandExt,
+    commands::BigSpaceCommands,
     reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
     FloatingOrigin, GridCell,
 };
@@ -26,11 +26,11 @@ fn main() {
 /// You can put things really, really far away from the origin. The distance we use here is actually
 /// quite small, because we want the mesh to still be visible when the floating origin is far from
 /// the camera. If you go much further than this, the mesh will simply disappear in a *POOF* of
-/// floating point error.
+/// floating point error when we disable this plugin.
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
 /// 10_000_000_000_000_000_000_000_000_000_000_000_000
-const DISTANCE: i128 = 21_000_000;
+const DISTANCE: i128 = 2_000_000;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
 /// disabling the plugin. Normally you would make your active camera the floating origin to avoid
@@ -47,7 +47,6 @@ fn toggle_plugin(
     }
 
     let this_frame = ref_frames.parent_frame(floating_origin.single().0).unwrap();
-    let this_frame = ref_frames.get(this_frame);
 
     let mut origin_cell = floating_origin.single_mut().1;
     let index_max = DISTANCE / this_frame.cell_edge_length() as i128;
@@ -56,12 +55,17 @@ fn toggle_plugin(
     let msg = if *disabled {
         if origin_cell.x > 0 {
             origin_cell.x = 0.max(origin_cell.x - increment);
+            origin_cell.y = 0.max(origin_cell.y - increment);
+            origin_cell.z = 0.max(origin_cell.z - increment);
+
             "Disabling..."
         } else {
             "Floating Origin Disabled"
         }
     } else if origin_cell.x < index_max {
         origin_cell.x = index_max.min(origin_cell.x.saturating_add(increment));
+        origin_cell.y = index_max.min(origin_cell.y.saturating_add(increment));
+        origin_cell.z = index_max.min(origin_cell.z.saturating_add(increment));
         "Enabling..."
     } else {
         "Floating Origin Enabled"
@@ -89,7 +93,7 @@ struct Rotator;
 
 fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_x(time.delta_seconds());
+        transform.rotate_y(time.delta_seconds());
     }
 }
 
@@ -111,49 +115,29 @@ fn setup_ui(mut commands: Commands) {
     );
 }
 
-fn setup_scene(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mesh_handle = meshes.add(Sphere::new(1.5).mesh());
-    let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::rgb(0.8, 0.7, 0.6),
-        ..default()
-    });
-
+fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
-        let d = DISTANCE / root.get_frame().cell_edge_length() as i128;
+        let d = DISTANCE / root.frame().cell_edge_length() as i128;
         let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
         // Normally, we would put the floating origin on the camera. However in this example, we
         // want to show what happens as the camera is far from the origin, to emulate what
         // happens when this plugin isn't used.
-        root.spawn_spatial((
-            PbrBundle {
-                mesh: meshes.add(Sphere::default().mesh()),
-                material: materials.add(StandardMaterial::from(Color::RED)),
-                transform: Transform::from_scale(Vec3::splat(10000.0)),
-                ..default()
-            },
-            distant_grid_cell,
-            FloatingOrigin,
-        ));
+        root.spawn_spatial((distant_grid_cell, FloatingOrigin));
 
         root.spawn_spatial((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
+            SceneBundle {
+                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                transform: Transform::from_scale(Vec3::splat(0.2)),
                 ..default()
             },
             distant_grid_cell,
             Rotator,
         ))
         .with_children(|parent| {
-            parent.spawn(PbrBundle {
-                mesh: mesh_handle,
-                material: matl_handle,
-                transform: Transform::from_xyz(0.0, 0.0, 4.0),
+            parent.spawn(SceneBundle {
+                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                transform: Transform::from_xyz(0.0, 0.0, 20.0),
                 ..default()
             });
         });
@@ -168,7 +152,7 @@ fn setup_scene(
         // camera
         root.spawn_spatial((
             Camera3dBundle {
-                transform: Transform::from_xyz(8.0, -8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+                transform: Transform::from_xyz(8.0, 8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
                 ..default()
             },
             distant_grid_cell,

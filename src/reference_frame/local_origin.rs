@@ -1,5 +1,6 @@
 //! Describes how the floating origin's position is propagated through the hierarchy of reference
-//! frames, and used to compute the floating origin's position relative to each reference frame.
+//! frames, and used to compute the floating origin's position relative to each reference frame. See
+//! [`LocalFloatingOrigin`].
 
 use bevy::{
     ecs::{
@@ -15,10 +16,11 @@ use bevy::{
     transform::prelude::*,
 };
 
-use super::{BigSpace, ReferenceFrame};
-use crate::{GridCell, GridPrecision};
-
 pub use inner::LocalFloatingOrigin;
+
+use crate::{precision::GridPrecision, BigSpace, GridCell};
+
+use super::ReferenceFrame;
 
 /// A module kept private to enforce use of setters and getters within the parent module.
 mod inner {
@@ -27,7 +29,7 @@ mod inner {
         reflect::prelude::*,
     };
 
-    use crate::{GridCell, GridPrecision};
+    use crate::{precision::GridPrecision, GridCell};
 
     /// An isometry that describes the location of the floating origin's grid cell's origin, in the
     /// local reference frame.
@@ -38,11 +40,11 @@ mod inner {
     /// transform every entity relative to the floating origin.
     ///
     /// If the floating origin is in this local reference frame, the `float` fields will be
-    /// identity. The `float` fields` will be non-identity when the floating origin is in a
-    /// different reference frame that does not perfectly align with this one. Different reference
-    /// frames can be rotated and offset from each other - consider the reference frame of a planet,
-    /// spinning about its axis and orbiting about a star, it will not align with the reference
-    /// frame of the star system!
+    /// identity. The `float` fields will be non-identity when the floating origin is in a different
+    /// reference frame that does not perfectly align with this one. Different reference frames can
+    /// be rotated and offset from each other - consider the reference frame of a planet, spinning
+    /// about its axis and orbiting about a star, it will not align with the reference frame of the
+    /// star system!
     #[derive(Default, Debug, Clone, PartialEq, Reflect)]
     pub struct LocalFloatingOrigin<P: GridPrecision> {
         /// The local cell that the floating origin's grid cell origin falls into.
@@ -233,7 +235,7 @@ pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
 }
 
 impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
-    /// Get the reference frame and the position of the reference frame from its `Entity`.
+    /// Get a [`ReferenceFrame`] from its `Entity`.
     pub fn get(&self, frame_entity: Entity) -> &ReferenceFrame<P> {
         self.frame_query
             .get(frame_entity)
@@ -243,9 +245,15 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
             })
     }
 
+    /// Get the [`ReferenceFrame`] that `this` `Entity` is a child of, if it exists.
+    pub fn parent_frame(&self, this: Entity) -> Option<&ReferenceFrame<P>> {
+        self.parent_frame_entity(this)
+            .map(|frame_entity| self.get(frame_entity))
+    }
+
     /// Get the ID of the reference frame that `this` `Entity` is a child of, if it exists.
     #[inline]
-    pub fn parent_frame(&self, this: Entity) -> Option<Entity> {
+    pub fn parent_frame_entity(&self, this: Entity) -> Option<Entity> {
         match self.parent.get(this).map(|parent| **parent) {
             Err(_) => None,
             Ok(parent) => match self.frame_query.contains(parent) {
@@ -279,7 +287,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
 
     /// Get IDs to all reference frames that are siblings of this reference frame.
     pub fn sibling_frames(&mut self, this_entity: Entity) -> Vec<Entity> {
-        if let Some(parent) = self.parent_frame(this_entity) {
+        if let Some(parent) = self.parent_frame_entity(this_entity) {
             self.child_frames_filtered(parent, |e| e != this_entity)
         } else {
             Vec::new()
@@ -403,7 +411,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// frame. This is all done in high precision if possible, however any loss in precision will
     /// only affect the rendering precision. The high precision coordinates ([`GridCell`] and
     /// [`Transform`]) are the source of truth and never mutated.
-    pub fn update(
+    pub fn compute_all(
         mut reference_frames: ReferenceFramesMut<P>,
         mut frame_stack: Local<Vec<Entity>>,
         cells: Query<(Entity, &GridCell<P>)>,
@@ -485,7 +493,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
 
 #[cfg(test)]
 mod tests {
-    use bevy::{ecs::system::SystemState, math::DVec3};
+    use bevy::{ecs::system::SystemState, math::DVec3, prelude::*};
 
     use super::*;
     use crate::*;

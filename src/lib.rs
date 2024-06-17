@@ -18,7 +18,52 @@
 //! This is a great little tool to calculate how much precision a floating point value has at a
 //! given scale: <http://www.ehopkinson.com/floatprecision.html>.
 //!
+//! ### Possible Solutions
+//!
+//! There are many ways to solve this problem!
+//!
+//! - Periodic recentering: every time the camera moves far enough away from the origin, move it
+//!   back to the origin and apply the same offset to all other entities.
+//!   - Problem: Objects far from the camera will drift and accumulate error.
+//!   - Problem: No fixed reference frame.
+//!   - Problem: Recentering triggers change detection even for objects that did not move.
+//! - Camera-relative coordinates: don't move the camera, move the world around the camera.
+//!   - Problem: Objects far from the camera will drift and accumulate error.
+//!   - Problem: No fixed reference frame
+//!   - Problem: Math is more complex when everything is relative to the camera.
+//!   - Problem: Rotating the camera requires recomputing transforms for everything.
+//!   - Problem: Camera movement triggers change detection even for objects that did not move.
+//!   - Problem: Incompatible with existing plugins that use `Transform`.
+//! - Double precision coordinates: Store transforms in double precision
+//!   - Problem: Rendering still requires positions be in single precision, which either requires
+//!     using one of the above techniques, or emulating 64 bit precision in shaders.
+//!   - Problem: Updating double precision transforms is more expensive than single precision.
+//!   - Problem: Computing the `GlobalTransform` is more expensive than single precision.
+//!   - Problem: Size is limited to approximately the orbit of Saturn at human scales.
+//!   - Problem: Incompatible with existing plugins that use `Transform`.
+//! - Chunks: Place objects in a large grid, and track the grid cell they are in,
+//!   - Problem: Requires a component to track the grid cell, in addition to the `Transform`.
+//!   - Problem: Computing the `GlobalTransform` is more expensive than single precision.
+//!
 //! ### Solution
+//!
+//! This plugin uses the last solution listed above. The most significant benefits of this method
+//! over the others are:
+//! - Absolute high-precision positions in space that do not change when the camera moves. The only
+//!   component that is affected by precision loss is the `GlobalTransform` used for rendering. The
+//!   `GridCell` and `Transform` only change when an entity moves. This is especially useful for
+//!   multiplayer - the server needs a source of truth for position that doesn't drift over time.
+//! - Virtually limitless volume and scale; you can work at the scale of subatomic particles, across
+//!   the width of the observable universe. Double precision is downright suffocating in comparison.
+//! - Uniform precision across the play area. Unlike double precision, the available precision
+//!   does not decrease as you move to the edge of the play area, it is instead relative to the
+//!   distance from the origin of the current grid cell.
+//! - High precision coordinates are invisible if you don't need them. You can move objects using
+//!   their `Transform` alone, which results in decent ecosystem compatibility.
+//! - High precision is completely opt-in. If you don't add the `GridCell` component to an entity,
+//!   it behaves like a normal single precision transform, with the same performance cost, yet it
+//!   can exist in the high precision hierarchy. This allows you to load in GLTFs or other
+//!   low-precision entity hierarchies with no added effort or cost.
 //!
 //! While using the [`BigSpacePlugin`], the position of entities is now defined with the
 //! [`ReferenceFrame`], [`GridCell`], and [`Transform`] components. The `ReferenceFrame` is a large
@@ -50,12 +95,13 @@
 //! on opposite ends of the universe simultaneously.
 //!
 //! All of the above applies to the entity marked with the [`FloatingOrigin`] component. The
-//! floating origin can be any high-precision entity in a `BigSpace`. The only thing special about
-//! the entity marked as the floating origin, is that it used to compute the[`GlobalTransform`] of
-//! all other entities in that `BigSpace`. To an outside observer, every high-precision entity
-//! within a `BigSpace` is confined to a box the size of a grid cell - like a game of *Asteroids*.
-//! Only once you render the `BigSpace` from the point of view of the floating origin, by
-//! calculating their `GlobalTransform`s, do entities appear very distant from the floating origin.
+//! floating origin can be any high-precision entity in a `BigSpace`, it doesn't need to be a
+//! camera. The only thing special about the entity marked as the floating origin, is that it is
+//! used to compute the [`GlobalTransform`] of all other entities in that `BigSpace`. To an outside
+//! observer, every high-precision entity within a `BigSpace` is confined to a box the size of a
+//! grid cell - like a game of *Asteroids*. Only once you render the `BigSpace` from the point of
+//! view of the floating origin, by calculating their `GlobalTransform`s, do entities appear very
+//! distant from the floating origin.
 //!
 //! As described above. the `GlobalTransform` of all entities is computed relative to the floating
 //! origin's grid cell. Because of this, entities very far from the origin will have very large,
@@ -69,24 +115,30 @@
 //! # Usage
 //!
 //! To start using this plugin, you will first need to choose how big your world should be! Do you
-//! need an i8, or an i128? See [`GridPrecision`] for more details and documentation.
+//! need an i8, or an i128? See [`GridPrecision`](crate::precision::GridPrecision) for more details
+//! and documentation.
 //!
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
 //! 2. Add the [`BigSpacePlugin`] to your `App`
-//! 3. Spawn a [`BigSpace`] with [`spawn_big_space`](commands::BigSpaceCommandExt::spawn_big_space),
-//!    and spawn entities in it.
+//! 3. Spawn a [`BigSpace`] with [`spawn_big_space`](BigSpaceCommands::spawn_big_space), and spawn
+//!    entities in it.
 //! 4. Add the [`FloatingOrigin`] to your active camera in the [`BigSpace`].
 //!
 //! To add more levels to the hierarchy, you can use [`ReferenceFrame`]s, which themselves can
-//! contain high-precision spatial entities.
+//! contain high-precision spatial entities. Reference frames are useful when you want all objects
+//! to move together in space, for example, objects on the surface of a planet rotating on its axis
+//! and orbiting a star.
 //!
-//! Take a look at the [`ReferenceFrame`] component for some useful helper methods. Note that the
-//! root [`BigSpace`] also has a [`ReferenceFrame`] component.
+//! Take a look at the [`ReferenceFrame`] component for some useful helper methods. The component
+//! defines the scale of the grid, which is very important when computing distances between objects
+//! in different cells. Note that the root [`BigSpace`] also has a [`ReferenceFrame`] component.
 //!
 //! # Moving Entities
 //!
 //! For the most part, you can update the position of entities normally while using this plugin, and
-//! it will automatically handle the tricky bits. However, there is one big caveat:
+//! it will automatically handle the tricky bits. If you move an entity too far from the center of
+//! its grid cell, the plugin will automatically move it into the correct cell for you. However,
+//! there is one big caveat:
 //!
 //! **Avoid setting position absolutely, instead prefer applying a relative delta**
 //!
@@ -118,287 +170,37 @@
 //! However, if you have something that must not accumulate error, like the orbit of a planet, you
 //! can instead do the orbital calculation (position as a function of time) to compute the absolute
 //! position of the planet with high precision, then directly compute the [`GridCell`] and
-//! [`Transform`] of that entity using [`ReferenceFrame::translation_to_grid`]. If the star this
-//! planet is orbiting around is also moving through space, note that you can add/subtract grid
-//! cells. This means you can do each calculation in the reference frame of the moving body, and sum
-//! up the computed translations and grid cell offsets to get a more precise result.
+//! [`Transform`] of that entity using [`ReferenceFrame::translation_to_grid`].
+//!
+//! # Next Steps
+//!
+//! Take a look at the examples to see usage, as well as explanation of these use cases and topics.
 
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
 
-use bevy::{prelude::*, transform::TransformSystem};
-use propagation::propagate_reference_frame_transforms;
-use std::marker::PhantomData;
-use world_query::GridTransformReadOnly;
-
 pub mod bundles;
 pub mod commands;
+pub mod floating_origins;
 pub mod grid_cell;
+pub mod plugin;
 pub mod precision;
-pub mod propagation;
 pub mod reference_frame;
 pub mod validation;
 pub mod world_query;
-
-pub use bundles::*;
-pub use grid_cell::GridCell;
 
 #[cfg(feature = "camera")]
 pub mod camera;
 #[cfg(feature = "debug")]
 pub mod debug;
-
-use crate::precision::*;
-use crate::reference_frame::{local_origin::LocalFloatingOrigin, BigSpace, ReferenceFrame};
-
-/// Add this plugin to your [`App`] for floating origin functionality.
-pub struct BigSpacePlugin<P: GridPrecision> {
-    phantom: PhantomData<P>,
-    validate_hierarchies: bool,
-}
-
-impl<P: GridPrecision> BigSpacePlugin<P> {
-    /// Create a big space plugin, and specify whether hierarchy validation should be enabled.
-    pub fn new(validate_hierarchies: bool) -> Self {
-        Self {
-            phantom: PhantomData::<P>,
-            validate_hierarchies,
-        }
-    }
-}
-
-impl<P: GridPrecision> Default for BigSpacePlugin<P> {
-    fn default() -> Self {
-        #[cfg(debug_assertions)]
-        let validate_hierarchies = true;
-
-        #[cfg(not(debug_assertions))]
-        let validate_hierarchies = false;
-
-        Self {
-            phantom: Default::default(),
-            validate_hierarchies,
-        }
-    }
-}
-
-#[allow(missing_docs)]
-#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-pub enum FloatingOriginSet {
-    RecenterLargeTransforms,
-    LocalFloatingOrigins,
-    RootGlobalTransforms,
-    PropagateTransforms,
-}
-
-impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlugin<P> {
-    fn build(&self, app: &mut App) {
-        let system_set_config = || {
-            (
-                (
-                    recenter_transform_on_grid::<P>,
-                    BigSpace::update_floating_origin,
-                )
-                    .in_set(FloatingOriginSet::RecenterLargeTransforms),
-                LocalFloatingOrigin::<P>::update
-                    .in_set(FloatingOriginSet::LocalFloatingOrigins)
-                    .after(FloatingOriginSet::RecenterLargeTransforms),
-                update_grid_cell_global_transforms::<P>
-                    .in_set(FloatingOriginSet::RootGlobalTransforms)
-                    .after(FloatingOriginSet::LocalFloatingOrigins),
-                propagate_reference_frame_transforms::<P>
-                    .in_set(FloatingOriginSet::PropagateTransforms)
-                    .after(FloatingOriginSet::RootGlobalTransforms),
-            )
-                .in_set(TransformSystem::TransformPropagate)
-        };
-
-        app.register_type::<Transform>()
-            .register_type::<GlobalTransform>()
-            .register_type::<GridCell<P>>()
-            .register_type::<ReferenceFrame<P>>()
-            .register_type::<BigSpace>()
-            .register_type::<FloatingOrigin>()
-            .add_systems(PostStartup, system_set_config())
-            .add_systems(PostUpdate, system_set_config())
-            .add_systems(
-                PostUpdate,
-                validation::validate_hierarchy::<validation::SpatialHierarchyRoot<P>>
-                    .before(TransformSystem::TransformPropagate)
-                    .run_if({
-                        let run = self.validate_hierarchies;
-                        move || run
-                    }),
-            )
-            // These are the bevy transform propagation systems. Because these start from the root
-            // of the hierarchy, and BigSpace bundles (at the root) do not contain a Transform,
-            // these systems will not interact with any high precision entities in big space. These
-            // systems are added for ecosystem compatibility with bevy, although the rendered
-            // behavior might look strange if they share a camera with one using the floating
-            // origin.
-            //
-            // This is most useful for bevy_ui, which relies on the transform systems to work, or if
-            // you want to render a camera that only needs to render a low-precision scene.
-            .add_systems(
-                PostStartup,
-                (
-                    bevy::transform::systems::sync_simple_transforms,
-                    bevy::transform::systems::propagate_transforms,
-                )
-                    .in_set(TransformSystem::TransformPropagate),
-            )
-            .add_systems(
-                PostUpdate,
-                (
-                    bevy::transform::systems::sync_simple_transforms,
-                    bevy::transform::systems::propagate_transforms,
-                )
-                    .in_set(TransformSystem::TransformPropagate),
-            );
-    }
-}
-
-/// Marks the entity to use as the floating origin. The [`GlobalTransform`] of all entities within
-/// this [`BigSpace`] will be computed relative to this floating origin. There should always be
-/// exactly one entity marked with this component within a [`BigSpace`].
-#[derive(Component, Reflect)]
-pub struct FloatingOrigin;
-
-/// If an entity's transform translation becomes larger than the limit specified in its
-/// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
-/// transform.
-pub fn recenter_transform_on_grid<P: GridPrecision>(
-    reference_frames: Query<&ReferenceFrame<P>>,
-    mut changed_transform: Query<(&mut GridCell<P>, &mut Transform, &Parent), Changed<Transform>>,
-) {
-    changed_transform
-        .par_iter_mut()
-        .for_each(|(mut grid_pos, mut transform, parent)| {
-            let Ok(reference_frame) = reference_frames.get(parent.get()) else {
-                return;
-            };
-            if transform.as_ref().translation.abs().max_element()
-                > reference_frame.maximum_distance_from_origin()
-            {
-                let (grid_cell_delta, translation) =
-                    reference_frame.imprecise_translation_to_grid(transform.as_ref().translation);
-                *grid_pos += grid_cell_delta;
-                transform.translation = translation;
-            }
-        });
-}
-
-/// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`] the
-/// entity belongs to.
-pub fn update_grid_cell_global_transforms<P: GridPrecision>(
-    reference_frames: Query<&ReferenceFrame<P>>,
-    mut entities: Query<(GridTransformReadOnly<P>, &Parent, &mut GlobalTransform)>,
-) {
-    // Update the GlobalTransform of GridCell entities that are children of a ReferenceFrame
-    entities
-        .par_iter_mut()
-        .for_each(|(grid_transform, parent, mut global_transform)| {
-            if let Ok(frame) = reference_frames.get(parent.get()) {
-                *global_transform =
-                    frame.global_transform(grid_transform.cell, grid_transform.transform);
-            }
-        });
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    #[test]
-    fn changing_floating_origin_updates_global_transform() {
-        let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i32>::default());
+use bevy::prelude::*;
 
-        let first = app
-            .world
-            .spawn((
-                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                    150.0, 0.0, 0.0,
-                ))),
-                GridCell::<i32>::new(5, 0, 0),
-                FloatingOrigin,
-            ))
-            .id();
-
-        let second = app
-            .world
-            .spawn((
-                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                    0.0, 0.0, 300.0,
-                ))),
-                GridCell::<i32>::new(0, -15, 0),
-            ))
-            .id();
-
-        app.world
-            .spawn(bundles::BigSpaceRootBundle::<i32>::default())
-            .push_children(&[first, second]);
-
-        app.update();
-
-        app.world.entity_mut(first).remove::<FloatingOrigin>();
-        app.world.entity_mut(second).insert(FloatingOrigin);
-
-        app.update();
-
-        let second_global_transform = app.world.get::<GlobalTransform>(second).unwrap();
-
-        assert_eq!(
-            second_global_transform.translation(),
-            Vec3::new(0.0, 0.0, 300.0)
-        );
-    }
-
-    #[test]
-    fn child_global_transforms_are_updated_when_floating_origin_changes() {
-        let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i32>::default());
-
-        let first = app
-            .world
-            .spawn((
-                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                    150.0, 0.0, 0.0,
-                ))),
-                GridCell::<i32>::new(5, 0, 0),
-                FloatingOrigin,
-            ))
-            .id();
-
-        let second = app
-            .world
-            .spawn((
-                TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                    0.0, 0.0, 300.0,
-                ))),
-                GridCell::<i32>::new(0, -15, 0),
-            ))
-            .with_children(|parent| {
-                parent.spawn((TransformBundle::from_transform(
-                    Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)),
-                ),));
-            })
-            .id();
-
-        app.world
-            .spawn(bundles::BigSpaceRootBundle::<i32>::default())
-            .push_children(&[first, second]);
-
-        app.update();
-
-        app.world.entity_mut(first).remove::<FloatingOrigin>();
-        app.world.entity_mut(second).insert(FloatingOrigin);
-
-        app.update();
-
-        let child = app.world.get::<Children>(second).unwrap()[0];
-        let child_transform = app.world.get::<GlobalTransform>(child).unwrap();
-
-        assert_eq!(child_transform.translation(), Vec3::new(0.0, 0.0, 600.0));
-    }
-}
+pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
+pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};
+pub use floating_origins::{BigSpace, FloatingOrigin};
+pub use grid_cell::GridCell;
+pub use plugin::{BigSpacePlugin, FloatingOriginSet};
+pub use reference_frame::ReferenceFrame;

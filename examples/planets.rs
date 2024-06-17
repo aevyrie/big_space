@@ -13,7 +13,7 @@ use bevy::{
 };
 use big_space::{
     camera::{CameraController, CameraInput},
-    commands::BigSpaceCommandExt,
+    commands::BigSpaceCommands,
     reference_frame::ReferenceFrame,
     FloatingOrigin,
 };
@@ -42,7 +42,7 @@ fn main() {
                     .in_set(TransformSystem::TransformPropagate)
                     .after(bevy::transform::systems::sync_simple_transforms)
                     .after(bevy::transform::systems::propagate_transforms)
-                    .after(big_space::FloatingOriginSet::PropagateTransforms),
+                    .after(big_space::FloatingOriginSet::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
                     .after(big_space::camera::default_camera_inputs)
@@ -169,7 +169,7 @@ fn spawn_solar_system(
             ));
 
             let earth_pos = DVec3::Z * EARTH_ORBIT_RADIUS_M;
-            let (earth_cell, earth_pos) = sun.get_frame().translation_to_grid(earth_pos);
+            let (earth_cell, earth_pos) = sun.frame().translation_to_grid(earth_pos);
             sun.with_frame_default(|earth| {
                 earth.insert((
                     Name::new("Earth"),
@@ -191,7 +191,7 @@ fn spawn_solar_system(
 
                 let moon_orbit_radius_m = 385e6;
                 let moon_pos = DVec3::NEG_Z * moon_orbit_radius_m;
-                let (moon_cell, moon_pos) = earth.get_frame().translation_to_grid(moon_pos);
+                let (moon_cell, moon_pos) = earth.frame().translation_to_grid(moon_pos);
                 earth.spawn_spatial((
                     Name::new("Moon"),
                     PbrBundle {
@@ -210,7 +210,7 @@ fn spawn_solar_system(
 
                 let ball_pos =
                     DVec3::X * (EARTH_RADIUS_M + 1.0) + DVec3::NEG_Z * 30.0 + DVec3::Y * 10.0;
-                let (ball_cell, ball_pos) = earth.get_frame().translation_to_grid(ball_pos);
+                let (ball_cell, ball_pos) = earth.frame().translation_to_grid(ball_pos);
                 earth
                     .spawn_spatial((ball_cell, Transform::from_translation(ball_pos)))
                     .with_children(|children| {
@@ -238,7 +238,7 @@ fn spawn_solar_system(
                     });
 
                 let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
-                let (cam_cell, cam_pos) = earth.get_frame().translation_to_grid(cam_pos);
+                let (cam_cell, cam_pos) = earth.frame().translation_to_grid(cam_pos);
                 earth.with_frame_default(|camera| {
                     camera.insert((
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
