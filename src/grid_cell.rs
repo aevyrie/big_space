@@ -1,6 +1,7 @@
 //! Contains the grid cell implementation
 
-use bevy::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_reflect::prelude::*;
 
 use crate::*;
 

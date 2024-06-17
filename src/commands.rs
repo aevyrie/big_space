@@ -3,7 +3,6 @@
 use std::marker::PhantomData;
 
 use crate::{reference_frame::ReferenceFrame, *};
-use bevy::prelude::*;
 
 use self::precision::GridPrecision;
 
@@ -25,11 +24,11 @@ impl<P: GridPrecision> BigSpaceCommands<P> for Commands<'_, '_> {
     ) {
         let mut entity_commands = self.spawn((
             #[cfg(feature = "bevy_render")]
-            Visibility::default(),
+            bevy_render::view::Visibility::default(),
             #[cfg(feature = "bevy_render")]
-            InheritedVisibility::default(),
+            bevy_render::view::InheritedVisibility::default(),
             #[cfg(feature = "bevy_render")]
-            ViewVisibility::default(),
+            bevy_render::view::ViewVisibility::default(),
             BigSpace::default(),
         ));
         let mut cmd = ReferenceFrameCommands {
@@ -70,11 +69,11 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
         let entity = commands
             .spawn((
                 #[cfg(feature = "bevy_render")]
-                Visibility::default(),
+                bevy_render::view::Visibility::default(),
                 #[cfg(feature = "bevy_render")]
-                InheritedVisibility::default(),
+                bevy_render::view::InheritedVisibility::default(),
                 #[cfg(feature = "bevy_render")]
-                ViewVisibility::default(),
+                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
                 GlobalTransform::default(),
                 GridCell::<P>::default(),
@@ -136,11 +135,11 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
         let entity = commands
             .spawn((
                 #[cfg(feature = "bevy_render")]
-                Visibility::default(),
+                bevy_render::view::Visibility::default(),
                 #[cfg(feature = "bevy_render")]
-                InheritedVisibility::default(),
+                bevy_render::view::InheritedVisibility::default(),
                 #[cfg(feature = "bevy_render")]
-                ViewVisibility::default(),
+                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
                 GlobalTransform::default(),
                 GridCell::<P>::default(),

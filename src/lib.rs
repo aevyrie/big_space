@@ -179,6 +179,10 @@
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
 
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_transform::prelude::*;
+
 pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
@@ -195,8 +199,6 @@ pub mod camera;
 pub mod debug;
 #[cfg(test)]
 mod tests;
-
-use bevy::prelude::*;
 
 pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
 pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};

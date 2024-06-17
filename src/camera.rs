@@ -2,14 +2,16 @@
 
 use std::marker::PhantomData;
 
-use bevy::{
-    input::mouse::MouseMotion,
-    math::{DQuat, DVec3},
-    prelude::*,
-    render::{primitives::Aabb, view::RenderLayers},
-    transform::TransformSystem,
-    utils::hashbrown::HashSet,
-};
+use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_input::{mouse::MouseMotion, prelude::*};
+use bevy_math::{prelude::*, DQuat, DVec3};
+use bevy_reflect::prelude::*;
+use bevy_render::{primitives::Aabb, view::RenderLayers};
+use bevy_time::prelude::*;
+use bevy_transform::{prelude::*, TransformSystem};
+use bevy_utils::HashSet;
 
 use crate::{
     precision::GridPrecision, reference_frame::local_origin::ReferenceFrames,
@@ -130,7 +132,7 @@ impl CameraInput {
     pub fn reset(&mut self) {
         *self = CameraInput {
             defaults_disabled: self.defaults_disabled,
-            ..default()
+            ..Default::default()
         };
     }
 

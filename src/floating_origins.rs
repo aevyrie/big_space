@@ -1,6 +1,10 @@
 //! A floating origin for camera-relative rendering, to maximize precision when converting to f32.
 
-use bevy::{log::error, prelude::*, reflect::Reflect, utils::hashbrown::HashMap};
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_log::prelude::*;
+use bevy_reflect::prelude::*;
+use bevy_utils::HashMap;
 
 /// Marks the entity to use as the floating origin.
 ///
