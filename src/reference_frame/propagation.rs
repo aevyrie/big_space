@@ -2,7 +2,7 @@
 
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
-use bevy_transform::components::{GlobalTransform, Transform};
+use bevy_transform::prelude::*;
 
 use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
 
