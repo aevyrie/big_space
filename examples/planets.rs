@@ -4,6 +4,10 @@ use std::collections::VecDeque;
 /// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
 /// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{
+    color::palettes::{
+        basic::{BLUE, GRAY},
+        css::DARK_GREEN,
+    },
     core_pipeline::bloom::BloomSettings,
     math::DVec3,
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
@@ -51,7 +55,7 @@ fn main() {
         )
         .register_type::<Sun>()
         .register_type::<Rotates>()
-        .run()
+        .run();
 }
 
 const EARTH_ORBIT_RADIUS_M: f64 = 149.60e9;
@@ -129,7 +133,7 @@ fn spawn_solar_system(
     let earth_mesh_handle = meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap());
     let moon_mesh_handle = meshes.add(Sphere::new(MOON_RADIUS_M as f32).mesh().ico(15).unwrap());
     let ball_mesh_handle = meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap());
-    let plane_mesh_handle = meshes.add(Plane3d::new(Vec3::X));
+    let plane_mesh_handle = meshes.add(Plane3d::new(Vec3::X, Vec2::new(1.0, 1.0)));
 
     commands.spawn((
         PrimaryLight,
@@ -160,7 +164,7 @@ fn spawn_solar_system(
                     mesh: sun_mesh_handle,
                     material: materials.add(StandardMaterial {
                         base_color: Color::WHITE,
-                        emissive: Color::rgb_linear(100000000., 100000000., 100000000.),
+                        emissive: LinearRgba::rgb(100000000., 100000000., 100000000.),
                         ..default()
                     }),
                     ..default()
@@ -177,7 +181,7 @@ fn spawn_solar_system(
                     PbrBundle {
                         mesh: earth_mesh_handle,
                         material: materials.add(StandardMaterial {
-                            base_color: Color::BLUE,
+                            base_color: BLUE.into(),
                             perceptual_roughness: 0.8,
                             reflectance: 1.0,
                             ..default()
@@ -197,7 +201,7 @@ fn spawn_solar_system(
                     PbrBundle {
                         mesh: moon_mesh_handle,
                         material: materials.add(StandardMaterial {
-                            base_color: Color::GRAY,
+                            base_color: GRAY.into(),
                             perceptual_roughness: 1.0,
                             reflectance: 0.0,
                             ..default()
@@ -226,7 +230,7 @@ fn spawn_solar_system(
                         children.spawn((PbrBundle {
                             mesh: plane_mesh_handle,
                             material: materials.add(StandardMaterial {
-                                base_color: Color::DARK_GREEN,
+                                base_color: DARK_GREEN.into(),
                                 perceptual_roughness: 1.0,
                                 reflectance: 0.0,
                                 ..default()
@@ -282,7 +286,7 @@ fn spawn_solar_system(
 
         let star_mat = materials.add(StandardMaterial {
             base_color: Color::WHITE,
-            emissive: Color::rgb_linear(100000., 100000., 100000.),
+            emissive: LinearRgba::rgb(100000000., 100000000., 100000000.),
             ..default()
         });
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());

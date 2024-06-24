@@ -194,14 +194,14 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
     let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.get_single_mut() else {
         return;
     };
-    let cam_layer = cam_layer.copied().unwrap_or(RenderLayers::all());
+    let cam_layer = cam_layer.cloned().unwrap_or(RenderLayers::default());
     let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
 
     let nearest_object = objects
         .iter()
         .filter(|(entity, ..)| !cam_children.contains(entity))
         .filter(|(.., obj_layer)| {
-            let obj_layer = obj_layer.copied().unwrap_or(RenderLayers::layer(0));
+            let obj_layer = obj_layer.cloned().unwrap_or(RenderLayers::layer(0));
             cam_layer.intersects(&obj_layer)
         })
         .map(|(entity, object_local, obj_pos, aabb, _)| {
