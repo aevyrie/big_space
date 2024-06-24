@@ -1,4 +1,5 @@
 use bevy::{
+    color::palettes::basic::{BLUE, RED},
     prelude::*,
     transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow},
@@ -18,7 +19,6 @@ fn main() {
             big_space::BigSpacePlugin::<i128>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
             big_space::camera::CameraControllerPlugin::<i128>::default(),
-            bevy_framepace::FramepacePlugin,
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
@@ -27,7 +27,7 @@ fn main() {
             PostUpdate,
             highlight_nearest_sphere.after(TransformSystem::TransformPropagate),
         )
-        .run()
+        .run();
 }
 
 fn setup(
@@ -55,7 +55,7 @@ fn setup(
 
         let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
         let matl_handle = materials.add(StandardMaterial {
-            base_color: Color::BLUE,
+            base_color: BLUE.into(),
             perceptual_roughness: 0.8,
             reflectance: 1.0,
             ..default()
@@ -148,8 +148,8 @@ fn highlight_nearest_sphere(
     // Ignore rotation due to panicking in gizmos, as of bevy 0.13
     let (scale, rotation, translation) = transform.to_scale_rotation_translation();
     gizmos
-        .sphere(translation, rotation, scale.x * 0.505, Color::RED)
-        .circle_segments(128);
+        .sphere(translation, rotation, scale.x * 0.505, Color::Srgba(RED))
+        .resolution(128);
 }
 
 #[allow(clippy::type_complexity)]

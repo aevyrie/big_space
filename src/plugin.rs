@@ -1,6 +1,10 @@
 //! The bevy plugin for big_space.
 
-use bevy::{prelude::*, transform::TransformSystem};
+use bevy::{
+    prelude::*,
+    transform::TransformSystem,
+    reflect::GetTypeRegistration
+};
 use std::marker::PhantomData;
 
 use crate::{
@@ -49,7 +53,7 @@ pub enum FloatingOriginSet {
     PropagateLowPrecision,
 }
 
-impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlugin<P> {
+impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> Plugin for BigSpacePlugin<P> {
     fn build(&self, app: &mut App) {
         let system_set_config = || {
             (

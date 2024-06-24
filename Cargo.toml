@@ -11,10 +11,10 @@ documentation = "https://docs.rs/crate/big_space/latest"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.13", default_features = false }
+bevy = { version = "0.14.0-rc.3", default_features = false }
 
 [dev-dependencies]
-bevy = { version = "0.13", default-features = false, features = [
+bevy = { version = "0.14.0-rc.3", default-features = false, features = [
     "bevy_scene",
     "bevy_gltf",
     "bevy_winit",
@@ -23,10 +23,9 @@ bevy = { version = "0.13", default-features = false, features = [
     "bevy_pbr",
     "x11",
     "tonemapping_luts",
-    "multi-threaded",
 ] }
-bevy-inspector-egui = "0.24"
-bevy_framepace = { version = "0.15", default-features = false }
+# bevy-inspector-egui = "0.24"
+# bevy_framepace = { version = "0.15", default-features = false }
 rand = "0.8.5"
 
 [features]

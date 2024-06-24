@@ -510,18 +510,18 @@ mod tests {
             ReferenceFrame::<i32>::default(),
         );
 
-        let child_1 = app.world.spawn(frame_bundle.clone()).id();
-        let child_2 = app.world.spawn(frame_bundle.clone()).id();
-        let parent = app.world.spawn(frame_bundle.clone()).id();
-        let root = app.world.spawn(frame_bundle.clone()).id();
+        let child_1 = app.world_mut().spawn(frame_bundle.clone()).id();
+        let child_2 = app.world_mut().spawn(frame_bundle.clone()).id();
+        let parent = app.world_mut().spawn(frame_bundle.clone()).id();
+        let root = app.world_mut().spawn(frame_bundle.clone()).id();
 
-        app.world.entity_mut(root).push_children(&[parent]);
-        app.world
+        app.world_mut().entity_mut(root).push_children(&[parent]);
+        app.world_mut()
             .entity_mut(parent)
             .push_children(&[child_1, child_2]);
 
-        let mut state = SystemState::<ReferenceFramesMut<i32>>::new(&mut app.world);
-        let mut ref_frames = state.get_mut(&mut app.world);
+        let mut state = SystemState::<ReferenceFramesMut<i32>>::new(app.world_mut());
+        let mut ref_frames = state.get_mut(app.world_mut());
 
         // Children
         let result = ref_frames.child_frames(root);
@@ -563,12 +563,12 @@ mod tests {
             ..default()
         };
         let root = app
-            .world
+            .world_mut()
             .spawn((Transform::default(), GridCell::<i32>::default(), root_frame))
             .id();
 
         let child = app
-            .world
+            .world_mut()
             .spawn((
                 Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
@@ -577,10 +577,10 @@ mod tests {
             ))
             .id();
 
-        app.world.entity_mut(root).push_children(&[child]);
+        app.world_mut().entity_mut(root).push_children(&[child]);
 
-        let mut state = SystemState::<ReferenceFramesMut<i32>>::new(&mut app.world);
-        let mut reference_frames = state.get_mut(&mut app.world);
+        let mut state = SystemState::<ReferenceFramesMut<i32>>::new(app.world_mut());
+        let mut reference_frames = state.get_mut(app.world_mut());
 
         // The function we are testing
         propagate_origin_to_child(root, &mut reference_frames, child);
@@ -619,10 +619,10 @@ mod tests {
             GridCell::<i64>::default(),
             ReferenceFrame::<i64>::default(),
         );
-        let root = app.world.spawn(frame_bundle.clone()).id();
+        let root = app.world_mut().spawn(frame_bundle.clone()).id();
 
         let child = app
-            .world
+            .world_mut()
             .spawn((
                 Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
@@ -638,10 +638,10 @@ mod tests {
             ))
             .id();
 
-        app.world.entity_mut(root).push_children(&[child]);
+        app.world_mut().entity_mut(root).push_children(&[child]);
 
-        let mut state = SystemState::<ReferenceFramesMut<i64>>::new(&mut app.world);
-        let mut reference_frames = state.get_mut(&mut app.world);
+        let mut state = SystemState::<ReferenceFramesMut<i64>>::new(app.world_mut());
+        let mut reference_frames = state.get_mut(app.world_mut());
 
         // The function we are testing
         propagate_origin_to_parent(child, &mut reference_frames, root);
@@ -676,7 +676,7 @@ mod tests {
         app.add_plugins(BigSpacePlugin::<i32>::default());
 
         let root = app
-            .world
+            .world_mut()
             .spawn((
                 Transform::default(),
                 GridCell::<i32>::default(),
@@ -692,7 +692,7 @@ mod tests {
             .id();
 
         let child = app
-            .world
+            .world_mut()
             .spawn((
                 Transform::default()
                     .with_rotation(Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2))
@@ -702,10 +702,10 @@ mod tests {
             ))
             .id();
 
-        app.world.entity_mut(root).push_children(&[child]);
+        app.world_mut().entity_mut(root).push_children(&[child]);
 
-        let mut state = SystemState::<ReferenceFramesMut<i32>>::new(&mut app.world);
-        let mut reference_frames = state.get_mut(&mut app.world);
+        let mut state = SystemState::<ReferenceFramesMut<i32>>::new(app.world_mut());
+        let mut reference_frames = state.get_mut(app.world_mut());
 
         propagate_origin_to_child(root, &mut reference_frames, child);
 

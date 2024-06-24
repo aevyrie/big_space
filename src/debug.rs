@@ -1,8 +1,10 @@
 //! Contains tools for debugging the floating origin.
 
+use bevy::{
+    color::palettes::basic::{BLUE, GREEN, RED},
+    prelude::*,
+};
 use std::marker::PhantomData;
-
-use bevy::prelude::*;
 
 use crate::{
     precision::GridPrecision,
@@ -39,7 +41,7 @@ pub fn update_debug_bounds<P: GridPrecision>(
             &Transform::from_scale(Vec3::splat(frame.cell_edge_length() * 0.999)),
         );
         if origin.is_none() {
-            gizmos.cuboid(transform, Color::GREEN)
+            gizmos.cuboid(transform, GREEN)
         } else {
             // gizmos.cuboid(transform, Color::rgba(0.0, 0.0, 1.0, 0.5))
         }
@@ -54,8 +56,8 @@ pub fn update_reference_frame_axes<P: GridPrecision>(
     for (transform, frame) in frames.iter() {
         let start = transform.translation();
         let len = frame.cell_edge_length() * 2.0;
-        gizmos.ray(start, transform.right() * len, Color::RED);
-        gizmos.ray(start, transform.up() * len, Color::GREEN);
-        gizmos.ray(start, transform.back() * len, Color::BLUE);
+        gizmos.ray(start, transform.right() * len, RED);
+        gizmos.ray(start, transform.up() * len, GREEN);
+        gizmos.ray(start, transform.back() * len, BLUE);
     }
 }
