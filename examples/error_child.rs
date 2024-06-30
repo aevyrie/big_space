@@ -1,18 +1,19 @@
 //! This example demonstrates error accumulating from parent to children in nested reference frames.
 use bevy::{math::DVec3, prelude::*};
+use bevy_color::palettes;
 use big_space::{commands::BigSpaceCommands, reference_frame::ReferenceFrame, FloatingOrigin};
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
+            // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
             big_space::BigSpacePlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
         .add_systems(Startup, setup_scene)
-        .run()
+        .run();
 }
 
 // The nearby object is NEARBY meters away from us. The distance object is DISTANT meters away from
@@ -28,7 +29,7 @@ fn setup_scene(
 ) {
     let mesh_handle = meshes.add(Sphere::new(SPHERE_RADIUS).mesh());
     let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::rgb(0.8, 0.7, 0.6),
+        base_color: Color::srgb(0.8, 0.7, 0.6),
         ..default()
     });
 
@@ -37,7 +38,7 @@ fn setup_scene(
         |root_frame| {
             root_frame.spawn_spatial(PbrBundle {
                 mesh: mesh_handle.clone(),
-                material: materials.add(Color::BLUE),
+                material: materials.add(Color::from(palettes::css::BLUE)),
                 transform: Transform::from_translation(NEARBY),
                 ..default()
             });
@@ -46,8 +47,8 @@ fn setup_scene(
             root_frame.with_frame(
                 ReferenceFrame::new(SPHERE_RADIUS * 100.0, 0.0),
                 |parent_frame| {
-                    // This function introduces a small amount of error, because it can only work up to
-                    // double precision floats. (f64).
+                    // This function introduces a small amount of error, because it can only work up
+                    // to double precision floats. (f64).
                     let child = parent_frame
                         .frame()
                         .translation_to_grid(-DISTANT + NEARBY.as_dvec3());
@@ -60,16 +61,16 @@ fn setup_scene(
                     parent_frame.insert(parent.0);
 
                     parent_frame.with_children(|child_builder| {
-                        // A green sphere that is a child of the sphere very far from the origin. This
-                        // child is very far from its parent, and should be located exactly at the
-                        // origin (if there was no floating point error). The distance from the green
-                        // sphere to the red sphere is the error caused by float imprecision. Note that
-                        // the sphere does not have any rendering artifacts, its position just has a
-                        // fixed error.
+                        // A green sphere that is a child of the sphere very far from the origin.
+                        // This child is very far from its parent, and should be located exactly at
+                        // the origin (if there was no floating point error). The distance from the
+                        // green sphere to the red sphere is the error caused by float imprecision.
+                        // Note that the sphere does not have any rendering artifacts, its position
+                        // just has a fixed error.
                         child_builder.spawn((
                             PbrBundle {
                                 mesh: mesh_handle,
-                                material: materials.add(Color::GREEN),
+                                material: materials.add(Color::from(palettes::css::GREEN)),
                                 transform: Transform::from_translation(child.1),
                                 ..default()
                             },

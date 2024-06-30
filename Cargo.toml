@@ -1,6 +1,6 @@
 [package]
 name = "big_space"
-version = "0.6.0"
+version = "0.7.0-rc.0"
 edition = "2021"
 description = "A floating origin plugin for bevy"
 license = "MIT OR Apache-2.0"
@@ -9,22 +9,23 @@ repository = "https://github.com/aevyrie/big_space"
 documentation = "https://docs.rs/crate/big_space/latest"
 
 [dependencies]
-bevy_app = { version = "0.13", default_features = false }
-bevy_ecs = { version = "0.13", default_features = false }
-bevy_hierarchy = { version = "0.13", default_features = false }
-bevy_log = { version = "0.13", default_features = false }
-bevy_math = { version = "0.13", default_features = false }
-bevy_reflect = { version = "0.13", default_features = false }
-bevy_transform = { version = "0.13", default_features = false }
-bevy_utils = { version = "0.13", default_features = false }
+bevy_app = { version = "0.14.0-rc.4", default_features = false }
+bevy_ecs = { version = "0.14.0-rc.4", default_features = false }
+bevy_hierarchy = { version = "0.14.0-rc.4", default_features = false }
+bevy_log = { version = "0.14.0-rc.4", default_features = false }
+bevy_math = { version = "0.14.0-rc.4", default_features = false }
+bevy_reflect = { version = "0.14.0-rc.4", default_features = false }
+bevy_transform = { version = "0.14.0-rc.4", default_features = false }
+bevy_utils = { version = "0.14.0-rc.4", default_features = false }
 # Optional
-bevy_gizmos = { version = "0.13", default_features = false, optional = true }
-bevy_render = { version = "0.13", default_features = false, optional = true }
-bevy_input = { version = "0.13", default_features = false, optional = true }
-bevy_time = { version = "0.13", default_features = false, optional = true }
+bevy_color = { version = "0.14.0-rc.4", default_features = false, optional = true }
+bevy_gizmos = { version = "0.14.0-rc.4", default_features = false, optional = true }
+bevy_render = { version = "0.14.0-rc.4", default_features = false, optional = true }
+bevy_input = { version = "0.14.0-rc.4", default_features = false, optional = true }
+bevy_time = { version = "0.14.0-rc.4", default_features = false, optional = true }
 
 [dev-dependencies]
-bevy = { version = "0.13", default-features = false, features = [
+bevy = { version = "0.14.0-rc.4", default-features = false, features = [
     "bevy_scene",
     "bevy_gltf",
     "bevy_winit",
@@ -34,14 +35,14 @@ bevy = { version = "0.13", default-features = false, features = [
     "bevy_gizmos",
     "x11",
     "tonemapping_luts",
-    "multi-threaded",
+    "multi_threaded",
 ] }
-bevy-inspector-egui = "0.24"
+# bevy-inspector-egui = "0.24"
 rand = "0.8.5"
 
 [features]
 default = ["debug", "camera", "bevy_render"]
-debug = ["bevy_gizmos", "bevy_render"]
+debug = ["bevy_gizmos", "bevy_color"]
 camera = ["bevy_render", "bevy_time", "bevy_input"]
 
 [[example]]

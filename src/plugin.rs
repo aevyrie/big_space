@@ -2,7 +2,7 @@
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_reflect::prelude::*;
+use bevy_reflect::{prelude::*, GetTypeRegistration};
 use bevy_transform::{prelude::*, TransformSystem};
 use std::marker::PhantomData;
 
@@ -52,7 +52,9 @@ pub enum FloatingOriginSet {
     PropagateLowPrecision,
 }
 
-impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlugin<P> {
+impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> Plugin
+    for BigSpacePlugin<P>
+{
     fn build(&self, app: &mut App) {
         let system_set_config = || {
             (

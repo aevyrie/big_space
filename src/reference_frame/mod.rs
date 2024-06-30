@@ -34,7 +34,7 @@ pub mod propagation;
 /// the same rotating reference frame, instead of moving rapidly through space around a star, or
 /// worse, around the center of the galaxy.
 #[derive(Debug, Clone, Reflect, Component)]
-pub struct ReferenceFrame<P: GridPrecision> {
+pub struct ReferenceFrame<P: GridPrecision + Reflect> {
     /// The high-precision position of the floating origin's current grid cell local to this
     /// reference frame.
     local_floating_origin: LocalFloatingOrigin<P>,
