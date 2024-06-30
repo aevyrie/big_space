@@ -1,12 +1,16 @@
 //! A floating origin for camera-relative rendering, to maximize precision when converting to f32.
 
-use bevy::{log::error, prelude::*, reflect::Reflect, utils::hashbrown::HashMap};
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_log::prelude::*;
+use bevy_reflect::prelude::*;
+use bevy_utils::HashMap;
 
 /// Marks the entity to use as the floating origin.
 ///
-/// The [`GlobalTransform`] of all entities within this [`BigSpace`] will be computed relative to
-/// this floating origin. There should always be exactly one entity marked with this component
-/// within a [`BigSpace`].
+/// The [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all entities within this
+/// [`BigSpace`] will be computed relative to this floating origin. There should always be exactly
+/// one entity marked with this component within a [`BigSpace`].
 #[derive(Component, Reflect)]
 pub struct FloatingOrigin;
 
@@ -19,8 +23,9 @@ pub struct FloatingOrigin;
 /// `ReferenceFrame`s, but only one `BigSpace`, at the root.
 ///
 /// Your world can have multiple [`BigSpace`]s, and they will remain completely independent. Each
-/// big space uses the floating origin contained within it to compute the [`GlobalTransform`] of all
-/// spatial entities within that `BigSpace`.
+/// big space uses the floating origin contained within it to compute the
+/// [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all spatial entities within
+/// that `BigSpace`.
 #[derive(Debug, Default, Component, Reflect)]
 pub struct BigSpace {
     /// Set the entity to use as the floating origin within this high precision hierarchy.

@@ -2,7 +2,7 @@
 
 use std::{hash::Hash, ops::Add};
 
-use bevy::reflect::Reflect;
+use bevy_reflect::Reflect;
 
 /// Used to make the floating origin plugin generic over many grid sizes.
 ///

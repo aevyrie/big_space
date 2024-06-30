@@ -2,12 +2,10 @@
 //! through space together, like entities on a planet, rotating about the planet's axis, and,
 //! orbiting a star.
 
-use bevy::{
-    ecs::prelude::*,
-    math::{Affine3A, DAffine3, DVec3, Vec3},
-    reflect::Reflect,
-    transform::prelude::*,
-};
+use bevy_ecs::prelude::*;
+use bevy_math::{prelude::*, Affine3A, DAffine3, DVec3};
+use bevy_reflect::prelude::*;
+use bevy_transform::prelude::*;
 
 use crate::{precision::GridPrecision, GridCell};
 

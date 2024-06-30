@@ -2,19 +2,17 @@
 //! frames, and used to compute the floating origin's position relative to each reference frame. See
 //! [`LocalFloatingOrigin`].
 
-use bevy::{
-    ecs::{
-        prelude::*,
-        system::{
-            lifetimeless::{Read, Write},
-            SystemParam,
-        },
+use bevy_ecs::{
+    prelude::*,
+    system::{
+        lifetimeless::{Read, Write},
+        SystemParam,
     },
-    hierarchy::prelude::*,
-    log::prelude::*,
-    math::{prelude::*, DAffine3, DQuat},
-    transform::prelude::*,
 };
+use bevy_hierarchy::prelude::*;
+use bevy_log::prelude::*;
+use bevy_math::{prelude::*, DAffine3, DQuat};
+use bevy_transform::prelude::*;
 
 pub use inner::LocalFloatingOrigin;
 
@@ -24,17 +22,15 @@ use super::ReferenceFrame;
 
 /// A module kept private to enforce use of setters and getters within the parent module.
 mod inner {
-    use bevy::{
-        math::{prelude::*, DAffine3, DMat3, DQuat},
-        reflect::prelude::*,
-    };
+    use bevy_math::{prelude::*, DAffine3, DMat3, DQuat};
+    use bevy_reflect::prelude::*;
 
     use crate::{precision::GridPrecision, GridCell};
 
     /// An isometry that describes the location of the floating origin's grid cell's origin, in the
     /// local reference frame.
     ///
-    /// Used to compute the [`GlobalTransform`](bevy::transform::components::GlobalTransform) of
+    /// Used to compute the [`GlobalTransform`](bevy_transform::components::GlobalTransform) of
     /// every entity within a reference frame. Because this tells us where the floating origin cell
     /// is located in the local frame, we can compute the inverse transform once, then use it to
     /// transform every entity relative to the floating origin.
@@ -633,7 +629,7 @@ mod tests {
                         Vec3::new(5.0, 5.0, 0.0),
                         DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
                     ),
-                    ..default()
+                    ..Default::default()
                 },
             ))
             .id();

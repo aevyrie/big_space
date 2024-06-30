@@ -1,5 +1,5 @@
-//! This [`bevy`] plugin makes it possible to build high-precision worlds that exceed the size of
-//! the observable universe, with no added dependencies, while remaining largely compatible with the
+//! This `bevy` plugin makes it possible to build high-precision worlds that exceed the size of the
+//! observable universe, with no added dependencies, while remaining largely compatible with the
 //! rest of the Bevy ecosystem.
 //!
 //! The next section explains the problem this solves in more detail, how this plugin works, and a
@@ -55,9 +55,9 @@
 //!   multiplayer - the server needs a source of truth for position that doesn't drift over time.
 //! - Virtually limitless volume and scale; you can work at the scale of subatomic particles, across
 //!   the width of the observable universe. Double precision is downright suffocating in comparison.
-//! - Uniform precision across the play area. Unlike double precision, the available precision
-//!   does not decrease as you move to the edge of the play area, it is instead relative to the
-//!   distance from the origin of the current grid cell.
+//! - Uniform precision across the play area. Unlike double precision, the available precision does
+//!   not decrease as you move to the edge of the play area, it is instead relative to the distance
+//!   from the origin of the current grid cell.
 //! - High precision coordinates are invisible if you don't need them. You can move objects using
 //!   their `Transform` alone, which results in decent ecosystem compatibility.
 //! - High precision is completely opt-in. If you don't add the `GridCell` component to an entity,
@@ -179,6 +179,10 @@
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
 
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_transform::prelude::*;
+
 pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
@@ -195,8 +199,6 @@ pub mod camera;
 pub mod debug;
 #[cfg(test)]
 mod tests;
-
-use bevy::prelude::*;
 
 pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
 pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};

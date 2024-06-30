@@ -1,7 +1,10 @@
 //! Logic for propagating transforms through the hierarchy of reference frames.
 
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_transform::prelude::*;
+
 use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
-use bevy::prelude::*;
 
 impl<P: GridPrecision> ReferenceFrame<P> {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`]

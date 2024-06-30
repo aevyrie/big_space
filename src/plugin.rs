@@ -1,6 +1,9 @@
 //! The bevy plugin for big_space.
 
-use bevy::{prelude::*, transform::TransformSystem};
+use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_reflect::prelude::*;
+use bevy_transform::{prelude::*, TransformSystem};
 use std::marker::PhantomData;
 
 use crate::{
@@ -100,16 +103,16 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath> Plugin for BigSpacePlu
             .add_systems(
                 PostStartup,
                 (
-                    bevy::transform::systems::sync_simple_transforms,
-                    bevy::transform::systems::propagate_transforms,
+                    bevy_transform::systems::sync_simple_transforms,
+                    bevy_transform::systems::propagate_transforms,
                 )
                     .in_set(TransformSystem::TransformPropagate),
             )
             .add_systems(
                 PostUpdate,
                 (
-                    bevy::transform::systems::sync_simple_transforms,
-                    bevy::transform::systems::propagate_transforms,
+                    bevy_transform::systems::sync_simple_transforms,
+                    bevy_transform::systems::propagate_transforms,
                 )
                     .in_set(TransformSystem::TransformPropagate),
             );

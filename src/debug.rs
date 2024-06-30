@@ -2,7 +2,12 @@
 
 use std::marker::PhantomData;
 
-use bevy::prelude::*;
+use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_gizmos::prelude::*;
+use bevy_math::prelude::*;
+use bevy_render::prelude::*;
+use bevy_transform::prelude::*;
 
 use crate::{
     precision::GridPrecision,
@@ -19,7 +24,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
             PostUpdate,
             (update_debug_bounds::<P>, update_reference_frame_axes::<P>)
                 .chain()
-                .after(bevy::transform::TransformSystem::TransformPropagate),
+                .after(bevy_transform::TransformSystem::TransformPropagate),
         );
     }
 }
