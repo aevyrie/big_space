@@ -21,10 +21,6 @@ fn main() {
             big_space::camera::CameraControllerPlugin::<i128>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
-        .insert_resource(AmbientLight {
-            color: Color::WHITE,
-            brightness: 20.0,
-        })
         .add_systems(Startup, (setup, ui_setup))
         .add_systems(PreUpdate, (cursor_grab_system, ui_text_system))
         .add_systems(
