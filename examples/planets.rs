@@ -11,7 +11,6 @@ use bevy::{
     render::camera::Exposure,
     transform::TransformSystem,
 };
-use bevy_color::palettes;
 use big_space::{
     camera::{CameraController, CameraInput},
     commands::BigSpaceCommands,
@@ -52,7 +51,7 @@ fn main() {
         )
         .register_type::<Sun>()
         .register_type::<Rotates>()
-        .run();
+        .run()
 }
 
 const EARTH_ORBIT_RADIUS_M: f64 = 149.60e9;
@@ -130,7 +129,7 @@ fn spawn_solar_system(
     let earth_mesh_handle = meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap());
     let moon_mesh_handle = meshes.add(Sphere::new(MOON_RADIUS_M as f32).mesh().ico(15).unwrap());
     let ball_mesh_handle = meshes.add(Sphere::new(5.0).mesh().ico(5).unwrap());
-    let plane_mesh_handle = meshes.add(Plane3d::new(Vec3::X, Vec2::splat(0.5)));
+    let plane_mesh_handle = meshes.add(Plane3d::new(Vec3::X));
 
     commands.spawn((
         PrimaryLight,
@@ -161,7 +160,7 @@ fn spawn_solar_system(
                     mesh: sun_mesh_handle,
                     material: materials.add(StandardMaterial {
                         base_color: Color::WHITE,
-                        emissive: LinearRgba::rgb(100000., 100000., 100000.),
+                        emissive: Color::rgb_linear(100000000., 100000000., 100000000.),
                         ..default()
                     }),
                     ..default()
@@ -178,7 +177,7 @@ fn spawn_solar_system(
                     PbrBundle {
                         mesh: earth_mesh_handle,
                         material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::BLUE),
+                            base_color: Color::BLUE,
                             perceptual_roughness: 0.8,
                             reflectance: 1.0,
                             ..default()
@@ -198,7 +197,7 @@ fn spawn_solar_system(
                     PbrBundle {
                         mesh: moon_mesh_handle,
                         material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::GRAY),
+                            base_color: Color::GRAY,
                             perceptual_roughness: 1.0,
                             reflectance: 0.0,
                             ..default()
@@ -227,7 +226,7 @@ fn spawn_solar_system(
                         children.spawn((PbrBundle {
                             mesh: plane_mesh_handle,
                             material: materials.add(StandardMaterial {
-                                base_color: Color::Srgba(palettes::css::DARK_GREEN),
+                                base_color: Color::DARK_GREEN,
                                 perceptual_roughness: 1.0,
                                 reflectance: 0.0,
                                 ..default()
@@ -283,7 +282,7 @@ fn spawn_solar_system(
 
         let star_mat = materials.add(StandardMaterial {
             base_color: Color::WHITE,
-            emissive: LinearRgba::rgb(2., 2., 2.),
+            emissive: Color::rgb_linear(100000., 100000., 100000.),
             ..default()
         });
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());

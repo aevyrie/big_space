@@ -20,7 +20,7 @@ fn main() {
         ))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
-        .run();
+        .run()
 }
 
 /// You can put things really, really far away from the origin. The distance we use here is actually
