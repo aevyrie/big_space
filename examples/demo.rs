@@ -146,11 +146,11 @@ fn highlight_nearest_sphere(
         return;
     };
     // Ignore rotation due to panicking in gizmos, as of bevy 0.13
-    let (scale, rotation, translation) = transform.to_scale_rotation_translation();
+    let (scale, _, translation) = transform.to_scale_rotation_translation();
     gizmos
         .sphere(
             translation,
-            rotation,
+            Quat::IDENTITY, // Bevy likes to explode on non-normalized quats in gizmos,
             scale.x * 0.505,
             Color::Srgba(palettes::basic::RED),
         )
