@@ -3,6 +3,7 @@ use bevy::{
     transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow},
 };
+use bevy_color::palettes;
 use big_space::{
     camera::{CameraController, CameraInput},
     commands::BigSpaceCommands,
@@ -26,7 +27,7 @@ fn main() {
             PostUpdate,
             highlight_nearest_sphere.after(TransformSystem::TransformPropagate),
         )
-        .run()
+        .run();
 }
 
 fn setup(
@@ -54,7 +55,7 @@ fn setup(
 
         let mesh_handle = meshes.add(Sphere::new(0.5).mesh().ico(32).unwrap());
         let matl_handle = materials.add(StandardMaterial {
-            base_color: Color::BLUE,
+            base_color: Color::Srgba(palettes::basic::BLUE),
             perceptual_roughness: 0.8,
             reflectance: 1.0,
             ..default()
@@ -78,7 +79,7 @@ fn setup(
         // light
         root.spawn_spatial(DirectionalLightBundle {
             directional_light: DirectionalLight {
-                illuminance: 100_000.0,
+                illuminance: 10_000.0,
                 ..default()
             },
             ..default()
@@ -147,8 +148,13 @@ fn highlight_nearest_sphere(
     // Ignore rotation due to panicking in gizmos, as of bevy 0.13
     let (scale, rotation, translation) = transform.to_scale_rotation_translation();
     gizmos
-        .sphere(translation, rotation, scale.x * 0.505, Color::RED)
-        .circle_segments(128);
+        .sphere(
+            translation,
+            rotation,
+            scale.x * 0.505,
+            Color::Srgba(palettes::basic::RED),
+        )
+        .resolution(128);
 }
 
 #[allow(clippy::type_complexity)]
