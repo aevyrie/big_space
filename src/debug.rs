@@ -3,13 +3,10 @@
 use std::marker::PhantomData;
 
 use bevy_app::prelude::*;
-use bevy_color::{
-    palettes::css::{BLUE, GREEN, RED},
-    prelude::*,
-};
 use bevy_ecs::prelude::*;
 use bevy_gizmos::prelude::*;
 use bevy_math::prelude::*;
+use bevy_render::prelude::*;
 use bevy_transform::prelude::*;
 
 use crate::{
@@ -47,7 +44,7 @@ pub fn update_debug_bounds<P: GridPrecision>(
             &Transform::from_scale(Vec3::splat(frame.cell_edge_length() * 0.999)),
         );
         if origin.is_none() {
-            gizmos.cuboid(transform, Color::Srgba(GREEN))
+            gizmos.cuboid(transform, Color::GREEN)
         } else {
             // gizmos.cuboid(transform, Color::rgba(0.0, 0.0, 1.0, 0.5))
         }
@@ -62,8 +59,8 @@ pub fn update_reference_frame_axes<P: GridPrecision>(
     for (transform, frame) in frames.iter() {
         let start = transform.translation();
         let len = frame.cell_edge_length() * 2.0;
-        gizmos.ray(start, transform.right() * len, Color::Srgba(RED));
-        gizmos.ray(start, transform.up() * len, Color::Srgba(GREEN));
-        gizmos.ray(start, transform.back() * len, Color::Srgba(BLUE));
+        gizmos.ray(start, transform.right() * len, Color::RED);
+        gizmos.ray(start, transform.up() * len, Color::GREEN);
+        gizmos.ray(start, transform.back() * len, Color::BLUE);
     }
 }
