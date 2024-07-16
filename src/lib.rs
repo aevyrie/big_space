@@ -190,6 +190,7 @@ pub mod grid_cell;
 pub mod plugin;
 pub mod precision;
 pub mod reference_frame;
+pub mod spatial_hash;
 pub mod validation;
 pub mod world_query;
 

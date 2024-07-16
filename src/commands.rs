@@ -170,6 +170,11 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .with_children(|child_builder| spawn_children(child_builder));
         self
     }
+
+    /// Access the underlying commands.
+    pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
+        &mut self.commands
+    }
 }
 
 /// Insert the reference frame on drop.
@@ -206,5 +211,10 @@ impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
     /// Returns the [`Entity``] id of the entity.
     pub fn id(&self) -> Entity {
         self.entity
+    }
+
+    /// Access the underlying commands.
+    pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
+        &mut self.commands
     }
 }
