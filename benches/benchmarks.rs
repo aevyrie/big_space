@@ -58,7 +58,7 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let map = app.world.resource::<SpatialHashMap<i32>>();
+    let map = app.world().resource::<SpatialHashMap<i32>>();
     let first = map.iter().next().unwrap();
     group.bench_function("SpatialHashMap::get", |b| {
         b.iter(|| {

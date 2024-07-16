@@ -8,7 +8,7 @@ fn changing_floating_origin_updates_global_transform() {
     app.add_plugins(BigSpacePlugin::<i32>::default());
 
     let first = app
-        .world
+        .world_mut()
         .spawn((
             TransformBundle::from_transform(Transform::from_translation(Vec3::new(
                 150.0, 0.0, 0.0,
@@ -19,7 +19,7 @@ fn changing_floating_origin_updates_global_transform() {
         .id();
 
     let second = app
-        .world
+        .world_mut()
         .spawn((
             TransformBundle::from_transform(Transform::from_translation(Vec3::new(
                 0.0, 0.0, 300.0,
@@ -28,18 +28,18 @@ fn changing_floating_origin_updates_global_transform() {
         ))
         .id();
 
-    app.world
+    app.world_mut()
         .spawn(BigSpaceRootBundle::<i32>::default())
         .push_children(&[first, second]);
 
     app.update();
 
-    app.world.entity_mut(first).remove::<FloatingOrigin>();
-    app.world.entity_mut(second).insert(FloatingOrigin);
+    app.world_mut().entity_mut(first).remove::<FloatingOrigin>();
+    app.world_mut().entity_mut(second).insert(FloatingOrigin);
 
     app.update();
 
-    let second_global_transform = app.world.get::<GlobalTransform>(second).unwrap();
+    let second_global_transform = app.world_mut().get::<GlobalTransform>(second).unwrap();
 
     assert_eq!(
         second_global_transform.translation(),
@@ -53,7 +53,7 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
     app.add_plugins(BigSpacePlugin::<i32>::default());
 
     let first = app
-        .world
+        .world_mut()
         .spawn((
             TransformBundle::from_transform(Transform::from_translation(Vec3::new(
                 150.0, 0.0, 0.0,
@@ -64,7 +64,7 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
         .id();
 
     let second = app
-        .world
+        .world_mut()
         .spawn((
             TransformBundle::from_transform(Transform::from_translation(Vec3::new(
                 0.0, 0.0, 300.0,
@@ -78,19 +78,19 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
         })
         .id();
 
-    app.world
+    app.world_mut()
         .spawn(BigSpaceRootBundle::<i32>::default())
         .push_children(&[first, second]);
 
     app.update();
 
-    app.world.entity_mut(first).remove::<FloatingOrigin>();
-    app.world.entity_mut(second).insert(FloatingOrigin);
+    app.world_mut().entity_mut(first).remove::<FloatingOrigin>();
+    app.world_mut().entity_mut(second).insert(FloatingOrigin);
 
     app.update();
 
-    let child = app.world.get::<Children>(second).unwrap()[0];
-    let child_transform = app.world.get::<GlobalTransform>(child).unwrap();
+    let child = app.world_mut().get::<Children>(second).unwrap()[0];
+    let child_transform = app.world_mut().get::<GlobalTransform>(child).unwrap();
 
     assert_eq!(child_transform.translation(), Vec3::new(0.0, 0.0, 600.0));
 }

@@ -9,6 +9,7 @@ use bevy::{
     render::{camera::Viewport, view::RenderLayers},
     transform::TransformSystem,
 };
+use bevy_color::palettes;
 use big_space::{
     camera::{CameraController, CameraControllerPlugin},
     commands::BigSpaceCommands,
@@ -33,7 +34,7 @@ fn main() {
                 .after(big_space::camera::camera_controller::<i32>)
                 .before(TransformSystem::TransformPropagate),
         )
-        .run()
+        .run();
 }
 
 #[derive(Component)]
@@ -58,7 +59,7 @@ fn setup(
             transform: Transform::default().looking_to(Vec3::NEG_ONE, Vec3::Y),
             ..default()
         },
-        RenderLayers::all(),
+        RenderLayers::from_layers(&[1, 2]),
     ));
 
     // Big Space 1
@@ -80,7 +81,7 @@ fn setup(
                     PbrBundle {
                         mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
                         material: materials.add(StandardMaterial {
-                            base_color: Color::YELLOW,
+                            base_color: Color::Srgba(palettes::css::YELLOW),
                             ..default()
                         }),
                         ..default()
@@ -94,7 +95,7 @@ fn setup(
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::PINK,
+                    base_color: Color::Srgba(palettes::css::FUCHSIA),
                     ..default()
                 }),
                 ..default()
@@ -106,7 +107,7 @@ fn setup(
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::BLUE,
+                    base_color: Color::Srgba(palettes::css::BLUE),
                     ..default()
                 }),
                 transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
@@ -120,7 +121,7 @@ fn setup(
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::GREEN,
+                    base_color: Color::Srgba(palettes::css::GREEN),
                     ..default()
                 }),
                 transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
@@ -154,7 +155,7 @@ fn setup(
                     PbrBundle {
                         mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
                         material: materials.add(StandardMaterial {
-                            base_color: Color::PINK,
+                            base_color: Color::Srgba(palettes::css::PINK),
                             ..default()
                         }),
                         ..default()
@@ -168,7 +169,7 @@ fn setup(
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::YELLOW,
+                    base_color: Color::Srgba(palettes::css::YELLOW),
                     ..default()
                 }),
                 ..default()
@@ -180,7 +181,7 @@ fn setup(
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::BLUE,
+                    base_color: Color::Srgba(palettes::css::BLUE),
                     ..default()
                 }),
                 transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
@@ -194,7 +195,7 @@ fn setup(
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
-                    base_color: Color::GREEN,
+                    base_color: Color::Srgba(palettes::css::GREEN),
                     ..default()
                 }),
                 transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)

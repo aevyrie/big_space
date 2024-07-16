@@ -183,45 +183,45 @@ mod tests {
 
         app.update();
 
-        let mut spatial_hashes = app.world.query::<&SpatialHash<i32>>();
+        let mut spatial_hashes = app.world_mut().query::<&SpatialHash<i32>>();
 
-        let parent = app.world.resource::<ParentSet>().clone();
-        let child = app.world.resource::<ChildSet>().clone();
+        let parent = app.world().resource::<ParentSet>().clone();
+        let child = app.world().resource::<ChildSet>().clone();
 
         assert_eq!(
-            spatial_hashes.get(&app.world, parent.a).unwrap(),
-            spatial_hashes.get(&app.world, parent.b).unwrap(),
+            spatial_hashes.get(app.world(), parent.a).unwrap(),
+            spatial_hashes.get(app.world(), parent.b).unwrap(),
             "Same parent, same cell"
         );
 
         assert_ne!(
-            spatial_hashes.get(&app.world, parent.a).unwrap(),
-            spatial_hashes.get(&app.world, parent.c).unwrap(),
+            spatial_hashes.get(app.world(), parent.a).unwrap(),
+            spatial_hashes.get(app.world(), parent.c).unwrap(),
             "Same parent, different cell"
         );
 
         assert_eq!(
-            spatial_hashes.get(&app.world, child.x).unwrap(),
-            spatial_hashes.get(&app.world, child.y).unwrap(),
+            spatial_hashes.get(app.world(), child.x).unwrap(),
+            spatial_hashes.get(app.world(), child.y).unwrap(),
             "Same parent, same cell"
         );
 
         assert_ne!(
-            spatial_hashes.get(&app.world, child.x).unwrap(),
-            spatial_hashes.get(&app.world, child.z).unwrap(),
+            spatial_hashes.get(app.world(), child.x).unwrap(),
+            spatial_hashes.get(app.world(), child.z).unwrap(),
             "Same parent, different cell"
         );
 
         assert_ne!(
-            spatial_hashes.get(&app.world, parent.a).unwrap(),
-            spatial_hashes.get(&app.world, child.x).unwrap(),
+            spatial_hashes.get(app.world(), parent.a).unwrap(),
+            spatial_hashes.get(app.world(), child.x).unwrap(),
             "Same cell, different parent"
         );
 
         let entities = app
-            .world
+            .world()
             .resource::<SpatialHashMap<i32>>()
-            .get(spatial_hashes.get(&app.world, parent.a).unwrap())
+            .get(spatial_hashes.get(app.world(), parent.a).unwrap())
             .unwrap();
 
         assert!(entities.contains(&parent.a));

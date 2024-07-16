@@ -8,7 +8,10 @@ use bevy_hierarchy::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
 use bevy_reflect::prelude::*;
-use bevy_render::{primitives::Aabb, view::RenderLayers};
+use bevy_render::{
+    primitives::Aabb,
+    view::{InheritedVisibility, RenderLayers},
+};
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
 use bevy_utils::HashSet;
@@ -45,6 +48,12 @@ pub struct CameraController {
     pub rotational_smoothness: f64,
     /// Base speed.
     pub speed: f64,
+    /// Rotational yaw speed multiplier.
+    pub speed_yaw: f64,
+    /// Rotational pitch speed multiplier.
+    pub speed_pitch: f64,
+    /// Rotational roll speed multiplier.
+    pub speed_roll: f64,
     /// Minimum and maximum speed.
     pub speed_bounds: [f64; 2],
     /// Whether the camera should slow down when approaching an entity's [`Aabb`].
@@ -73,6 +82,25 @@ impl CameraController {
         self.speed = speed;
         self
     }
+
+    /// Sets the yaw angular velocity of the controller, and returns the modified result.
+    pub fn with_speed_yaw(mut self, speed: f64) -> Self {
+        self.speed_yaw = speed;
+        self
+    }
+
+    /// Sets the pitch angular velocity of the controller, and returns the modified result.
+    pub fn with_speed_pitch(mut self, speed: f64) -> Self {
+        self.speed_pitch = speed;
+        self
+    }
+
+    /// Sets the pitch angular velocity of the controller, and returns the modified result.
+    pub fn with_speed_roll(mut self, speed: f64) -> Self {
+        self.speed_roll = speed;
+        self
+    }
+
     /// Sets the speed of the controller, and returns the modified result.
     pub fn with_speed_bounds(mut self, speed_limits: [f64; 2]) -> Self {
         self.speed_bounds = speed_limits;
@@ -96,6 +124,9 @@ impl Default for CameraController {
             smoothness: 0.8,
             rotational_smoothness: 0.5,
             speed: 1.0,
+            speed_pitch: 1.0,
+            speed_yaw: 1.0,
+            speed_roll: 1.0,
             speed_bounds: [1e-17, 1e30],
             slow_near_objects: true,
             nearest_object: None,
@@ -137,12 +168,17 @@ impl CameraInput {
     }
 
     /// Returns the desired velocity transform.
-    pub fn target_velocity(&self, speed: f64, dt: f64) -> (DVec3, DQuat) {
+    pub fn target_velocity(
+        &self,
+        controller: &CameraController,
+        speed: f64,
+        dt: f64,
+    ) -> (DVec3, DQuat) {
         let rotation = DQuat::from_euler(
             EulerRot::XYZ,
-            self.pitch * dt,
-            self.yaw * dt,
-            self.roll * dt,
+            self.pitch * dt * controller.speed_pitch,
+            self.yaw * dt * controller.speed_yaw,
+            self.roll * dt * controller.speed_roll,
         );
 
         let translation = DVec3::new(self.right, self.up, self.forward) * speed * dt;
@@ -184,6 +220,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
         &GlobalTransform,
         &Aabb,
         Option<&RenderLayers>,
+        Option<&InheritedVisibility>,
     )>,
     mut camera: Query<(
         Entity,
@@ -196,17 +233,21 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
     let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.get_single_mut() else {
         return;
     };
-    let cam_layer = cam_layer.copied().unwrap_or(RenderLayers::all());
+    let cam_layer = cam_layer.to_owned().unwrap_or_default();
     let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
 
     let nearest_object = objects
         .iter()
         .filter(|(entity, ..)| !cam_children.contains(entity))
-        .filter(|(.., obj_layer)| {
-            let obj_layer = obj_layer.copied().unwrap_or(RenderLayers::layer(0));
-            cam_layer.intersects(&obj_layer)
+        .filter(|(.., obj_layer, _)| {
+            let obj_layer = obj_layer.unwrap_or_default();
+            cam_layer.intersects(obj_layer)
         })
-        .map(|(entity, object_local, obj_pos, aabb, _)| {
+        .filter(|(.., visibility)| {
+            let visibility = visibility.copied().unwrap_or(InheritedVisibility::VISIBLE);
+            visibility.get()
+        })
+        .map(|(entity, object_local, obj_pos, aabb, ..)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
             let nearest_distance = center_distance.length()
@@ -243,7 +284,8 @@ pub fn camera_controller<P: GridPrecision>(
         let lerp_rotation = 1.0 - controller.rotational_smoothness.clamp(0.0, 0.999);
 
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
-        let (vel_t_target, vel_r_target) = input.target_velocity(speed, time.delta_seconds_f64());
+        let (vel_t_target, vel_r_target) =
+            input.target_velocity(&controller, speed, time.delta_seconds_f64());
 
         let cam_rot = position.transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
