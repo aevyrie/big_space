@@ -8,7 +8,10 @@ use bevy_hierarchy::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
 use bevy_reflect::prelude::*;
-use bevy_render::{primitives::Aabb, view::RenderLayers};
+use bevy_render::{
+    primitives::Aabb,
+    view::{InheritedVisibility, RenderLayers},
+};
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
 use bevy_utils::HashSet;
@@ -217,6 +220,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
         &GlobalTransform,
         &Aabb,
         Option<&RenderLayers>,
+        Option<&InheritedVisibility>,
     )>,
     mut camera: Query<(
         Entity,
@@ -235,11 +239,15 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
     let nearest_object = objects
         .iter()
         .filter(|(entity, ..)| !cam_children.contains(entity))
-        .filter(|(.., obj_layer)| {
+        .filter(|(.., obj_layer, _)| {
             let obj_layer = obj_layer.unwrap_or_default();
             cam_layer.intersects(obj_layer)
         })
-        .map(|(entity, object_local, obj_pos, aabb, _)| {
+        .filter(|(.., visibility)| {
+            let visibility = visibility.copied().unwrap_or(InheritedVisibility::VISIBLE);
+            visibility.get()
+        })
+        .map(|(entity, object_local, obj_pos, aabb, ..)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
             let nearest_distance = center_distance.length()
