@@ -18,7 +18,7 @@ fn spatial_hashing(c: &mut Criterion) {
 
     const WIDTH: i32 = 50;
     const N_SPAWN: usize = 10_000;
-    const N_MOVE: usize = 10_000;
+    const N_MOVE: usize = 1_000;
 
     let setup = |mut commands: Commands| {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
@@ -92,6 +92,8 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
+    app.update();
+
     let parent = app
         .world_mut()
         .query::<&Parent>()
@@ -115,6 +117,16 @@ fn spatial_hashing(c: &mut Criterion) {
         b.iter(|| {
             black_box(
                 map.neighbors(WIDTH as u8, parent, GridCell::new(0, 0, 0))
+                    .count(),
+            );
+        });
+    });
+
+    group.bench_function("Neighbors flood 1", |b| {
+        b.iter(|| {
+            black_box(
+                map.neighbors_flood(1, parent, GridCell::ZERO)
+                    .iter()
                     .count(),
             );
         });
