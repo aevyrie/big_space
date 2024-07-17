@@ -1,6 +1,7 @@
 //! Contains the grid cell implementation
 
 use bevy_ecs::prelude::*;
+use bevy_math::IVec3;
 use bevy_reflect::prelude::*;
 
 use crate::*;
@@ -83,6 +84,18 @@ impl<P: GridPrecision> std::ops::Add for GridCell<P> {
     }
 }
 
+impl<P: GridPrecision> std::ops::Add<IVec3> for GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn add(self, rhs: IVec3) -> Self::Output {
+        GridCell {
+            x: self.x.wrapping_add_i32(rhs.x),
+            y: self.y.wrapping_add_i32(rhs.y),
+            z: self.z.wrapping_add_i32(rhs.z),
+        }
+    }
+}
+
 impl<P: GridPrecision> std::ops::Sub for GridCell<P> {
     type Output = GridCell<P>;
 
@@ -100,6 +113,14 @@ impl<P: GridPrecision> std::ops::Add for &GridCell<P> {
 
     fn add(self, rhs: Self) -> Self::Output {
         (*self).add(*rhs)
+    }
+}
+
+impl<P: GridPrecision> std::ops::Add<IVec3> for &GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn add(self, rhs: IVec3) -> Self::Output {
+        (*self).add(rhs)
     }
 }
 
@@ -130,9 +151,9 @@ impl<P: GridPrecision> std::ops::Mul<P> for GridCell<P> {
 
     fn mul(self, rhs: P) -> Self::Output {
         GridCell {
-            x: self.x.mul(rhs),
-            y: self.y.mul(rhs),
-            z: self.z.mul(rhs),
+            x: GridPrecision::mul(self.x, rhs),
+            y: GridPrecision::mul(self.y, rhs),
+            z: GridPrecision::mul(self.z, rhs),
         }
     }
 }

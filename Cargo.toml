@@ -38,7 +38,7 @@ bevy = { version = "0.14.0", default-features = false, features = [
     "multi_threaded",
 ] }
 # bevy-inspector-egui = "0.24"
-rand = "0.8.5"
+turborand = "0.10"
 criterion = "0.5"
 
 [[bench]]

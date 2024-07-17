@@ -6,7 +6,8 @@ use big_space::{
     *,
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use rand::Rng;
+use std::iter::repeat_with;
+use turborand::prelude::*;
 
 criterion_group!(benches, spatial_hashing,);
 criterion_main!(benches);
@@ -15,28 +16,46 @@ criterion_main!(benches);
 fn spatial_hashing(c: &mut Criterion) {
     let mut group = c.benchmark_group("spatial_hashing");
 
-    const WIDTH: i32 = 5;
-    const N_SPAWN: usize = 100_000;
+    const WIDTH: i32 = 50;
+    const N_SPAWN: usize = 10_000;
     const N_MOVE: usize = 10_000;
 
     let setup = |mut commands: Commands| {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
-            let mut rng = rand::thread_rng();
-            let mut new_coord = || rng.gen_range(-WIDTH..=WIDTH);
-            for _i in 0..N_SPAWN {
-                root.spawn_spatial(GridCell::new(new_coord(), new_coord(), new_coord()));
+            let rng = Rng::new();
+            let values: Vec<_> = repeat_with(|| {
+                IVec3::new(
+                    rng.i32(-WIDTH..=WIDTH),
+                    rng.i32(-WIDTH..=WIDTH),
+                    rng.i32(-WIDTH..=WIDTH),
+                )
+            })
+            .take(N_SPAWN)
+            .collect();
+
+            for pos in values {
+                root.spawn_spatial(GridCell::new(pos.x, pos.y, pos.z));
             }
         });
     };
 
     let translate = |mut cells: Query<&mut GridCell<i32>>| {
-        let new_coord = || rand::thread_rng().gen_range(-WIDTH..=WIDTH);
+        let rng = Rng::new();
+        let values: Vec<_> = repeat_with(|| {
+            IVec3::new(
+                rng.i32(-WIDTH..=WIDTH),
+                rng.i32(-WIDTH..=WIDTH),
+                rng.i32(-WIDTH..=WIDTH),
+            )
+        })
+        .take(N_MOVE)
+        .collect();
         cells
             .iter_mut()
             .enumerate()
             .take(N_MOVE)
-            .for_each(|(_, mut cell)| {
-                *cell = GridCell::new(new_coord(), new_coord(), new_coord());
+            .for_each(|(i, mut cell)| {
+                *cell = GridCell::ZERO + values[i];
             })
     };
 
@@ -66,10 +85,38 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let ent = first.1.iter().next().unwrap();
+    let ent = *first.1.iter().next().unwrap();
     group.bench_function("Find entity", |b| {
         b.iter(|| {
-            black_box(map.get(first.0).map(|set| set.get(ent)));
+            black_box(map.get(first.0).map(|set| set.get(&ent)));
+        });
+    });
+
+    let parent = app
+        .world_mut()
+        .query::<&Parent>()
+        .get(app.world(), ent)
+        .unwrap();
+    let map = app.world().resource::<SpatialHashMap<i32>>();
+
+    group.bench_function("Neighbors radius 1", |b| {
+        b.iter(|| {
+            black_box(map.neighbors(1, parent, GridCell::new(0, 0, 0)).count());
+        });
+    });
+
+    group.bench_function("Neighbors radius 4", |b| {
+        b.iter(|| {
+            black_box(map.neighbors(4, parent, GridCell::new(0, 0, 0)).count());
+        });
+    });
+
+    group.bench_function("Neighbors radius all", |b| {
+        b.iter(|| {
+            black_box(
+                map.neighbors(WIDTH as u8, parent, GridCell::new(0, 0, 0))
+                    .count(),
+            );
         });
     });
 }
