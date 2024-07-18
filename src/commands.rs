@@ -62,11 +62,8 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
     /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, and insert the
     /// provided bundle.
     pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
-        let mut entity_commands = self.commands.entity(self.entity);
-        let parent = entity_commands.id();
-        let mut commands = entity_commands.commands();
-
-        let entity = commands
+        let entity = self
+            .commands
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
@@ -81,7 +78,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .insert(bundle)
             .id();
 
-        commands.entity(entity).set_parent(parent);
+        self.commands.entity(self.entity).add_child(entity);
 
         SpatialEntityCommands {
             entity,
@@ -163,7 +160,8 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
         self.spawn_frame(ReferenceFrame::default(), bundle)
     }
 
-    /// Takes a closure which provides this reference frame and a [`ChildBuilder`].
+    /// Takes a closure which provides this reference frame and a [`ChildBuilder`]. This is often
+    /// much faster than other methods for spawning large numbers of entities.
     pub fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
         self.commands
             .entity(self.entity)

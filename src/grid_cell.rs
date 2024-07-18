@@ -108,6 +108,18 @@ impl<P: GridPrecision> std::ops::Sub for GridCell<P> {
     }
 }
 
+impl<P: GridPrecision> std::ops::Sub<IVec3> for GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn sub(self, rhs: IVec3) -> Self::Output {
+        GridCell {
+            x: self.x.wrapping_add_i32(-rhs.x),
+            y: self.y.wrapping_add_i32(-rhs.y),
+            z: self.z.wrapping_add_i32(-rhs.z),
+        }
+    }
+}
+
 impl<P: GridPrecision> std::ops::Add for &GridCell<P> {
     type Output = GridCell<P>;
 
@@ -132,6 +144,14 @@ impl<P: GridPrecision> std::ops::Sub for &GridCell<P> {
     }
 }
 
+impl<P: GridPrecision> std::ops::Sub<IVec3> for &GridCell<P> {
+    type Output = GridCell<P>;
+
+    fn sub(self, rhs: IVec3) -> Self::Output {
+        (*self).sub(rhs)
+    }
+}
+
 impl<P: GridPrecision> std::ops::AddAssign for GridCell<P> {
     fn add_assign(&mut self, rhs: Self) {
         use std::ops::Add;
@@ -139,8 +159,22 @@ impl<P: GridPrecision> std::ops::AddAssign for GridCell<P> {
     }
 }
 
+impl<P: GridPrecision> std::ops::AddAssign<IVec3> for GridCell<P> {
+    fn add_assign(&mut self, rhs: IVec3) {
+        use std::ops::Add;
+        *self = self.add(rhs);
+    }
+}
+
 impl<P: GridPrecision> std::ops::SubAssign for GridCell<P> {
     fn sub_assign(&mut self, rhs: Self) {
+        use std::ops::Sub;
+        *self = self.sub(rhs);
+    }
+}
+
+impl<P: GridPrecision> std::ops::SubAssign<IVec3> for GridCell<P> {
+    fn sub_assign(&mut self, rhs: IVec3) {
         use std::ops::Sub;
         *self = self.sub(rhs);
     }

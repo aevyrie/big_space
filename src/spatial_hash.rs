@@ -1,4 +1,4 @@
-//! Spatial hashing acceleration structure.
+//! Spatial hashing acceleration structure. See [`SpatialHashPlugin`].
 
 use std::{
     hash::{Hash, Hasher},
@@ -9,7 +9,7 @@ use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
 use bevy_hierarchy::Parent;
 use bevy_math::IVec3;
-use bevy_reflect::Reflect;
+use bevy_reflect::{Reflect, TypePath};
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},
     AHasher, PassHash,
@@ -23,18 +23,63 @@ use crate::{precision::GridPrecision, GridCell};
 /// You can optionally add a filter to this plugin, to only run the spatial hashing on entities that
 /// match the supplied query filter. This is useful if you only want to, say, compute hashes and
 /// insert in the [`SpatialHashMap`] for `Player` entities. If you are adding multiple copies of
-/// this plugin, take care not to overlap the queries to avoid duplicating work.
-#[derive(Default)]
+/// this plugin, there are optimizations in place to avoid duplicating work. If you add multiple
+/// copies of this plugin, the [`SpatialHash`] components will still only be updated once per frame,
+/// and the [`SpatialHashMap`] for each plugin will only be updated with entities with a changed
+/// spatial hash that match the filter.
 pub struct SpatialHashPlugin<P: GridPrecision, F: QueryFilter = ()>(PhantomData<(P, F)>);
 
-impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> Plugin for SpatialHashPlugin<P, F> {
+impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashPlugin<P, F> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<P: GridPrecision + TypePath, F: QueryFilter + Send + Sync + 'static> Plugin
+    for SpatialHashPlugin<P, F>
+{
     fn build(&self, app: &mut App) {
-        app.init_resource::<SpatialHashMap<P, F>>().add_systems(
-            PostUpdate,
-            SpatialHashMap::<P, F>::update_spatial_hash
-                .after(crate::FloatingOriginSet::RecenterLargeTransforms)
-                .in_set(bevy_transform::TransformSystem::TransformPropagate),
-        );
+        app.init_resource::<SpatialHashMap<P, F>>()
+            .init_resource::<SpatialHashUpdated<P>>()
+            .register_type::<SpatialHash<P>>()
+            .add_systems(
+                PostUpdate,
+                (
+                    SpatialHashUpdated::<P>::reset.in_set(SpatialHashSet::Init),
+                    SpatialHash::<P>::update
+                        .in_set(SpatialHashSet::UpdateHash)
+                        .after(crate::FloatingOriginSet::RecenterLargeTransforms)
+                        .after(SpatialHashSet::Init),
+                    SpatialHashMap::<P, F>::update
+                        .in_set(SpatialHashSet::UpdateMap)
+                        .after(SpatialHashSet::UpdateHash),
+                )
+                    .in_set(bevy_transform::TransformSystem::TransformPropagate),
+            );
+    }
+}
+
+/// System sets for [`SpatialHashPlugin`].
+#[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
+pub enum SpatialHashSet {
+    /// Reset [`SpatialHashUpdated`].
+    Init,
+    /// [`SpatialHash`] updated.
+    UpdateHash,
+    /// [`SpatialHashMap`] updated.
+    UpdateMap,
+}
+
+/// Used to track if [`SpatialHash<P>`] has been updated this frame. Because multiple
+/// [`SpatialHashPlugin`]s may be added with different filters, but the same underlying
+/// `SpatialHash` component, we can avoid updating the spatial hash component multiple times in the
+/// same frame with this tracking resource.
+#[derive(Resource, Default, PartialEq, Eq)]
+struct SpatialHashUpdated<P: GridPrecision>(bool, PhantomData<P>);
+
+impl<P: GridPrecision> SpatialHashUpdated<P> {
+    fn reset(mut flag: ResMut<Self>) {
+        flag.0 = false;
     }
 }
 
@@ -77,7 +122,7 @@ impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashMap<P, F> {
 /// that could not possibly overlap; if the spatial hashes do not match, you can be certain they are
 /// not in the same cell.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
-pub struct SpatialHash<P: GridPrecision>(u64, PhantomData<P>);
+pub struct SpatialHash<P: GridPrecision>(u64, #[reflect(ignore)] PhantomData<P>);
 
 impl<P: GridPrecision> PartialEq for SpatialHash<P> {
     fn eq(&self, other: &Self) -> bool {
@@ -100,9 +145,46 @@ impl<P: GridPrecision> SpatialHash<P> {
     pub fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
         PartialSpatialHash::new(parent).generate(cell)
     }
+
+    /// Effectively the same as [`Self::new`], but uses `Entity` instead of `Parent` as the input.
+    ///
+    /// We use `Parent` on the "happy path" to help prevent errors when passing in the wrong entity.
+    /// Using `Parent` also makes it obvious that when you are querying the `GridCell` of the
+    /// entity, you should add `Parent` to the query, *not* the `Entity`.
+    #[inline]
+    pub fn from_parent(parent: Entity, cell: &GridCell<P>) -> Self {
+        PartialSpatialHash::from_parent(parent).generate(cell)
+    }
+
+    fn update(
+        mut commands: Commands,
+        mut update_flag: ResMut<SpatialHashUpdated<P>>,
+        changed_entities: Query<
+            (Entity, &Parent, &GridCell<P>, Option<&Self>),
+            Or<(Changed<Parent>, Changed<GridCell<P>>)>,
+        >,
+    ) {
+        // Only run if `SpatialHash<P>` hasn't already been updated this frame.
+        if !update_flag.0 {
+            update_flag.0 = true
+        } else {
+            return;
+        }
+
+        // This simple sequential impl is faster than the parallel versions I've tried.
+        for (entity, parent, cell, old_hash) in &changed_entities {
+            let spatial_hash = SpatialHash::new(parent, cell);
+            // This check has a 40% savings in cases where the grid cell is mutated (change
+            // detection triggered), but it has not actually changed, this also helps if multiple
+            // plugins are updating the spatial hash, and it is already correct.
+            if old_hash.ne(&Some(&spatial_hash)) {
+                commands.entity(entity).insert(spatial_hash);
+            }
+        }
+    }
 }
 
-impl<P: GridPrecision, F: QueryFilter> SpatialHashMap<P, F> {
+impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P, F> {
     fn insert(&mut self, entity: Entity, hash: SpatialHash<P>) {
         // If this entity is already in the maps, we need to remove and update it.
         if let Some(old_hash) = self.reverse_map.get_mut(&entity) {
@@ -207,25 +289,12 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashMap<P, F> {
         result
     }
 
-    fn update_spatial_hash(
-        mut commands: Commands,
-        mut spatial: ResMut<SpatialHashMap<P>>,
-        changed_entities: Query<
-            (Entity, &Parent, &GridCell<P>, Option<&SpatialHash<P>>),
-            (Or<(Changed<Parent>, Changed<GridCell<P>>)>, F),
-        >,
+    fn update(
+        mut spatial: ResMut<SpatialHashMap<P, F>>,
+        changed_entities: Query<(Entity, &SpatialHash<P>), (Changed<SpatialHash<P>>, F)>,
     ) {
-        // This simple sequential impl is faster than the parallel versions I've tried.
-        for (entity, parent, cell, old_hash) in &changed_entities {
-            let spatial_hash = SpatialHash::new(parent, cell);
-            // Although spatial.insert checks for equality as well, this check has a 40% savings in
-            // cases where the grid cell is mutated (change detection triggered), but it has not
-            // actually changed, this also helps if multiple plugins are updating the spatial hash,
-            // and it is already correct.
-            if old_hash.ne(&Some(&spatial_hash)) {
-                commands.entity(entity).insert(spatial_hash);
-                spatial.insert(entity, spatial_hash);
-            }
+        for (entity, spatial_hash) in &changed_entities {
+            spatial.insert(entity, *spatial_hash);
         }
     }
 }
@@ -241,6 +310,12 @@ pub struct PartialSpatialHash<P: GridPrecision> {
 impl<P: GridPrecision> PartialSpatialHash<P> {
     /// Create a partial spatial hash from the parent of the hashed entity.
     pub fn new(parent: &Parent) -> Self {
+        Self::from_parent(**parent)
+    }
+
+    /// When you don't have access to the `Parent`, but you do have the `Entity`. Careful not to use
+    /// the wrong `Entity`!
+    pub fn from_parent(parent: Entity) -> Self {
         let mut hasher = AHasher::default();
         hasher.write_u64(parent.to_bits());
         PartialSpatialHash {
@@ -261,6 +336,8 @@ impl<P: GridPrecision> PartialSpatialHash<P> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::OnceLock;
+
     use bevy_utils::hashbrown::HashSet;
 
     use crate::{
@@ -411,5 +488,58 @@ mod tests {
         assert!(flooded.contains(&entities.a));
         assert!(flooded.contains(&entities.b));
         assert!(flooded.contains(&entities.c));
+    }
+
+    #[test]
+    fn query_filters() {
+        use bevy::prelude::*;
+
+        #[derive(Component)]
+        struct Player;
+
+        static ROOT: OnceLock<Entity> = OnceLock::new();
+
+        let setup = |mut commands: Commands| {
+            commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+                root.spawn_spatial((GridCell::<i32>::ZERO, Player));
+                root.spawn_spatial(GridCell::<i32>::ZERO);
+                root.spawn_spatial(GridCell::<i32>::ZERO);
+                ROOT.set(root.id()).ok();
+            });
+        };
+
+        let mut app = App::new();
+        app.add_plugins((
+            SpatialHashPlugin::<i32>::default(),
+            SpatialHashPlugin::<i32, With<Player>>::default(),
+            SpatialHashPlugin::<i32, Without<Player>>::default(),
+        ))
+        .add_systems(Update, setup)
+        .update();
+
+        let zero_hash = SpatialHash::from_parent(*ROOT.get().unwrap(), &GridCell::ZERO);
+
+        let map = app.world().resource::<SpatialHashMap<i32>>();
+        assert_eq!(
+            map.get(&zero_hash).unwrap().iter().count(),
+            3,
+            "There are a total of 3 spatial entities"
+        );
+
+        let map = app.world().resource::<SpatialHashMap<i32, With<Player>>>();
+        assert_eq!(
+            map.get(&zero_hash).unwrap().iter().count(),
+            1,
+            "There is only one entity with the Player component"
+        );
+
+        let map = app
+            .world()
+            .resource::<SpatialHashMap<i32, Without<Player>>>();
+        assert_eq!(
+            map.get(&zero_hash).unwrap().iter().count(),
+            2,
+            "There are two entities without the player component"
+        );
     }
 }
