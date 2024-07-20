@@ -24,9 +24,7 @@ use crate::{precision::GridPrecision, GridCell};
 /// match the supplied query filter. This is useful if you only want to, say, compute hashes and
 /// insert in the [`SpatialHashMap`] for `Player` entities. If you are adding multiple copies of
 /// this plugin, there are optimizations in place to avoid duplicating work. If you add multiple
-/// copies of this plugin, the [`SpatialHash`] components will still only be updated once per frame,
-/// and the [`SpatialHashMap`] for each plugin will only be updated with entities with a changed
-/// spatial hash that match the filter.
+/// copies of this plugin, take care to avoid overlapping filters and duplicating work.
 pub struct SpatialHashPlugin<P: GridPrecision, F: QueryFilter = ()>(PhantomData<(P, F)>);
 
 impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashPlugin<P, F> {
@@ -40,13 +38,11 @@ impl<P: GridPrecision + TypePath, F: QueryFilter + Send + Sync + 'static> Plugin
 {
     fn build(&self, app: &mut App) {
         app.init_resource::<SpatialHashMap<P, F>>()
-            .init_resource::<SpatialHashUpdated<P>>()
             .register_type::<SpatialHash<P>>()
             .add_systems(
                 PostUpdate,
                 (
-                    SpatialHashUpdated::<P>::reset.in_set(SpatialHashSet::Init),
-                    SpatialHash::<P>::update
+                    Self::update_spatial_hashes
                         .in_set(SpatialHashSet::UpdateHash)
                         .after(crate::FloatingOriginSet::RecenterLargeTransforms)
                         .after(SpatialHashSet::Init),
@@ -59,6 +55,27 @@ impl<P: GridPrecision + TypePath, F: QueryFilter + Send + Sync + 'static> Plugin
     }
 }
 
+impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
+    fn update_spatial_hashes(
+        mut commands: Commands,
+        changed_entities: Query<
+            (Entity, &Parent, &GridCell<P>, Option<&SpatialHash<P>>),
+            (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
+        >,
+    ) {
+        // This simple sequential impl is faster than the parallel versions I've tried.
+        for (entity, parent, cell, old_hash) in &changed_entities {
+            let spatial_hash = SpatialHash::new(parent, cell);
+            // This check has a 40% savings in cases where the grid cell is mutated (change
+            // detection triggered), but it has not actually changed, this also helps if multiple
+            // plugins are updating the spatial hash, and it is already correct.
+            if old_hash.ne(&Some(&spatial_hash)) {
+                commands.entity(entity).insert(spatial_hash);
+            }
+        }
+    }
+}
+
 /// System sets for [`SpatialHashPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
 pub enum SpatialHashSet {
@@ -68,19 +85,6 @@ pub enum SpatialHashSet {
     UpdateHash,
     /// [`SpatialHashMap`] updated.
     UpdateMap,
-}
-
-/// Used to track if [`SpatialHash<P>`] has been updated this frame. Because multiple
-/// [`SpatialHashPlugin`]s may be added with different filters, but the same underlying
-/// `SpatialHash` component, we can avoid updating the spatial hash component multiple times in the
-/// same frame with this tracking resource.
-#[derive(Resource, Default, PartialEq, Eq)]
-struct SpatialHashUpdated<P: GridPrecision>(bool, PhantomData<P>);
-
-impl<P: GridPrecision> SpatialHashUpdated<P> {
-    fn reset(mut flag: ResMut<Self>) {
-        flag.0 = false;
-    }
 }
 
 /// A global spatial hash map for quickly finding entities in a grid cell.
@@ -101,7 +105,8 @@ impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashMap<P, F> {
     }
 }
 
-/// An automatically updated `Component` that uniquely identifies an entity's cell.
+/// A`Component` storing an automatically-updated hash of this entity's high-precision position,
+/// derived from its [`GridCell`] and [`Parent`].
 ///
 /// Once computed, a spatial hash can be used to rapidly check if any two entities are in the same
 /// cell, by comparing their spatial hashes. You can also get a list of all entities within a cell
@@ -154,33 +159,6 @@ impl<P: GridPrecision> SpatialHash<P> {
     #[inline]
     pub fn from_parent(parent: Entity, cell: &GridCell<P>) -> Self {
         PartialSpatialHash::from_parent(parent).generate(cell)
-    }
-
-    fn update(
-        mut commands: Commands,
-        mut update_flag: ResMut<SpatialHashUpdated<P>>,
-        changed_entities: Query<
-            (Entity, &Parent, &GridCell<P>, Option<&Self>),
-            Or<(Changed<Parent>, Changed<GridCell<P>>)>,
-        >,
-    ) {
-        // Only run if `SpatialHash<P>` hasn't already been updated this frame.
-        if !update_flag.0 {
-            update_flag.0 = true
-        } else {
-            return;
-        }
-
-        // This simple sequential impl is faster than the parallel versions I've tried.
-        for (entity, parent, cell, old_hash) in &changed_entities {
-            let spatial_hash = SpatialHash::new(parent, cell);
-            // This check has a 40% savings in cases where the grid cell is mutated (change
-            // detection triggered), but it has not actually changed, this also helps if multiple
-            // plugins are updating the spatial hash, and it is already correct.
-            if old_hash.ne(&Some(&spatial_hash)) {
-                commands.entity(entity).insert(spatial_hash);
-            }
-        }
     }
 }
 
@@ -291,7 +269,7 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P,
 
     fn update(
         mut spatial: ResMut<SpatialHashMap<P, F>>,
-        changed_entities: Query<(Entity, &SpatialHash<P>), (Changed<SpatialHash<P>>, F)>,
+        changed_entities: Query<(Entity, &SpatialHash<P>), (F, Changed<SpatialHash<P>>)>,
     ) {
         for (entity, spatial_hash) in &changed_entities {
             spatial.insert(entity, *spatial_hash);

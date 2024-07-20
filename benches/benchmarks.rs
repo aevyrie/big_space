@@ -16,7 +16,7 @@ criterion_main!(benches);
 fn spatial_hashing(c: &mut Criterion) {
     let mut group = c.benchmark_group("spatial_hashing");
 
-    const WIDTH: i32 = 50;
+    const WIDTH: i32 = 100;
     /// Total number of entities to spawn
     const N_SPAWN: usize = 10_000;
     /// Number of entities that move into a different cell each update
@@ -24,7 +24,7 @@ fn spatial_hashing(c: &mut Criterion) {
 
     let setup = |mut commands: Commands| {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
-            let rng = Rng::new();
+            let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 IVec3::new(
                     rng.i32(-WIDTH..=WIDTH),
@@ -47,23 +47,9 @@ fn spatial_hashing(c: &mut Criterion) {
     };
 
     let translate = |mut cells: Query<&mut GridCell<i32>>| {
-        let rng = Rng::new();
-        let values: Vec<_> = repeat_with(|| {
-            IVec3::new(
-                rng.i32(-WIDTH..=WIDTH),
-                rng.i32(-WIDTH..=WIDTH),
-                rng.i32(-WIDTH..=WIDTH),
-            )
+        cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
+            *cell += IVec3::ONE;
         })
-        .take(N_MOVE)
-        .collect();
-        cells
-            .iter_mut()
-            .enumerate()
-            .take(N_MOVE)
-            .for_each(|(i, mut cell)| {
-                *cell = GridCell::ZERO + values[i];
-            })
     };
 
     let mut app = App::new();
@@ -118,7 +104,7 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    group.bench_function("Neighbors radius all", |b| {
+    group.bench_function(format!("Neighbors radius all {WIDTH}"), |b| {
         b.iter(|| {
             black_box(
                 map.neighbors(WIDTH as u8, parent, GridCell::new(0, 0, 0))
@@ -142,7 +128,9 @@ fn spatial_hashing(c: &mut Criterion) {
 fn hash_filtering(c: &mut Criterion) {
     let mut group = c.benchmark_group("hash_filtering");
 
-    const N_ENTITIES: usize = 10_000;
+    const N_ENTITIES: usize = 100_000;
+    const N_FILTERED: usize = 100;
+    const N_MOVE: usize = 1_000;
 
     #[derive(Component)]
     struct Player;
@@ -150,10 +138,10 @@ fn hash_filtering(c: &mut Criterion) {
     fn setup(mut commands: Commands) {
         commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
             root.with_children(|root| {
-                for _ in 0..N_ENTITIES / 2 {
+                for _ in 0..N_ENTITIES - N_FILTERED {
                     root.spawn(BigSpatialBundle::<i32>::default());
                 }
-                for _ in 0..N_ENTITIES / 2 {
+                for _ in 0..N_FILTERED {
                     root.spawn((BigSpatialBundle::<i32>::default(), Player));
                 }
             });
@@ -161,7 +149,7 @@ fn hash_filtering(c: &mut Criterion) {
     }
 
     fn translate(mut cells: Query<&mut GridCell<i32>>) {
-        cells.iter_mut().for_each(|mut cell| {
+        cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += IVec3::ONE;
         });
     }
@@ -170,6 +158,7 @@ fn hash_filtering(c: &mut Criterion) {
     app.add_systems(Startup, setup)
         .add_systems(Update, translate)
         .update();
+    app.update();
     app.add_plugins((SpatialHashPlugin::<i32>::default(),));
     group.bench_function("No Filter Plugin", |b| {
         b.iter(|| {
@@ -181,6 +170,7 @@ fn hash_filtering(c: &mut Criterion) {
     app.add_systems(Startup, setup)
         .add_systems(Update, translate)
         .update();
+    app.update();
     app.add_plugins((SpatialHashPlugin::<i32, With<Player>>::default(),));
     group.bench_function("With Player Plugin", |b| {
         b.iter(|| {
@@ -192,6 +182,7 @@ fn hash_filtering(c: &mut Criterion) {
     app.add_systems(Startup, setup)
         .add_systems(Update, translate)
         .update();
+    app.update();
     app.add_plugins((SpatialHashPlugin::<i32, Without<Player>>::default(),));
     group.bench_function("Without Player Plugin", |b| {
         b.iter(|| {
@@ -203,6 +194,7 @@ fn hash_filtering(c: &mut Criterion) {
     app.add_systems(Startup, setup)
         .add_systems(Update, translate)
         .update();
+    app.update();
     app.add_plugins((SpatialHashPlugin::<i32>::default(),))
         .add_plugins((SpatialHashPlugin::<i32, With<Player>>::default(),))
         .add_plugins((SpatialHashPlugin::<i32, Without<Player>>::default(),));
