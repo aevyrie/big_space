@@ -16,20 +16,20 @@ criterion_main!(benches);
 fn spatial_hashing(c: &mut Criterion) {
     let mut group = c.benchmark_group("spatial_hashing");
 
-    const WIDTH: i32 = 100;
+    const HALF_WIDTH: i32 = 100;
     /// Total number of entities to spawn
     const N_SPAWN: usize = 10_000;
     /// Number of entities that move into a different cell each update
     const N_MOVE: usize = 1_000;
 
-    let setup = |mut commands: Commands| {
+    fn setup(mut commands: Commands) {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 IVec3::new(
-                    rng.i32(-WIDTH..=WIDTH),
-                    rng.i32(-WIDTH..=WIDTH),
-                    rng.i32(-WIDTH..=WIDTH),
+                    rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i32(-HALF_WIDTH..=HALF_WIDTH),
                 )
             })
             .take(N_SPAWN)
@@ -44,13 +44,13 @@ fn spatial_hashing(c: &mut Criterion) {
                 }
             });
         });
-    };
+    }
 
-    let translate = |mut cells: Query<&mut GridCell<i32>>| {
+    fn translate(mut cells: Query<&mut GridCell<i32>>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += IVec3::ONE;
         })
-    };
+    }
 
     let mut app = App::new();
     app.add_plugins(SpatialHashPlugin::<i32>::default())
@@ -71,10 +71,10 @@ fn spatial_hashing(c: &mut Criterion) {
     });
 
     let map = app.world().resource::<SpatialHashMap<i32>>();
-    let first = map.iter().next().unwrap();
+    let first = map.iter().find(|(_, set)| !set.is_empty()).unwrap();
     group.bench_function("SpatialHashMap::get", |b| {
         b.iter(|| {
-            black_box(map.get(first.0));
+            black_box(map.get(first.0).unwrap());
         });
     });
 
@@ -92,35 +92,34 @@ fn spatial_hashing(c: &mut Criterion) {
         .unwrap();
     let map = app.world().resource::<SpatialHashMap<i32>>();
 
-    group.bench_function("Neighbors radius 1", |b| {
+    group.bench_function("Neighbors radius: 1", |b| {
         b.iter(|| {
             black_box(map.neighbors(1, parent, GridCell::new(0, 0, 0)).count());
         });
     });
 
-    group.bench_function("Neighbors radius 4", |b| {
+    group.bench_function("Neighbors radius: 4", |b| {
         b.iter(|| {
             black_box(map.neighbors(4, parent, GridCell::new(0, 0, 0)).count());
         });
     });
 
-    group.bench_function(format!("Neighbors radius all {WIDTH}"), |b| {
+    group.bench_function(format!("Neighbors radius: {}", HALF_WIDTH), |b| {
         b.iter(|| {
             black_box(
-                map.neighbors(WIDTH as u8, parent, GridCell::new(0, 0, 0))
+                map.neighbors(HALF_WIDTH as u8, parent, GridCell::new(0, 0, 0))
                     .count(),
             );
         });
     });
 
+    let flood = || {
+        map.neighbors_contiguous(1, parent, GridCell::ZERO)
+            .iter()
+            .count()
+    };
     group.bench_function("Neighbors flood 1", |b| {
-        b.iter(|| {
-            black_box(
-                map.neighbors_flood(1, parent, GridCell::ZERO)
-                    .iter()
-                    .count(),
-            );
-        });
+        b.iter(|| black_box(flood()));
     });
 }
 
@@ -129,20 +128,35 @@ fn hash_filtering(c: &mut Criterion) {
     let mut group = c.benchmark_group("hash_filtering");
 
     const N_ENTITIES: usize = 100_000;
-    const N_FILTERED: usize = 100;
+    const N_PLAYERS: usize = 100;
     const N_MOVE: usize = 1_000;
+    const HALF_WIDTH: i32 = 100;
 
     #[derive(Component)]
     struct Player;
 
     fn setup(mut commands: Commands) {
+        let rng = Rng::with_seed(342525);
+        let values: Vec<_> = repeat_with(|| {
+            IVec3::new(
+                rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+            )
+        })
+        .take(N_ENTITIES)
+        .collect();
+
         commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
             root.with_children(|root| {
-                for _ in 0..N_ENTITIES - N_FILTERED {
-                    root.spawn(BigSpatialBundle::<i32>::default());
-                }
-                for _ in 0..N_FILTERED {
-                    root.spawn((BigSpatialBundle::<i32>::default(), Player));
+                for (i, pos) in values.iter().enumerate() {
+                    let mut cmd = root.spawn(BigSpatialBundle {
+                        cell: GridCell::new(pos.x, pos.y, pos.z),
+                        ..Default::default()
+                    });
+                    if i < N_PLAYERS {
+                        cmd.insert(Player);
+                    }
                 }
             });
         });
