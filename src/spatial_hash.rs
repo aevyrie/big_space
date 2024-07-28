@@ -87,38 +87,6 @@ pub enum SpatialHashSet {
     UpdateMap,
 }
 
-/// A global spatial hash map for quickly finding entities in a grid cell.
-#[derive(Resource, Clone)]
-pub struct SpatialHashMap<P: GridPrecision, F: QueryFilter = ()> {
-    map: HashMap<SpatialHash<P>, HashSet<Entity, PassHash>, PassHash>,
-    reverse_map: HashMap<Entity, SpatialHash<P>, PassHash>,
-    /// Allocation is expensive. To reduce time spent allocating, we save any hash sets that would
-    /// otherwise be thrown away. The next time we need to construct a new hash set of entities, we
-    /// can grab one here.
-    preallocated_sets: Vec<HashSet<Entity, PassHash>>,
-    spooky: PhantomData<F>,
-}
-
-impl<P: GridPrecision, F: QueryFilter> std::fmt::Debug for SpatialHashMap<P, F> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SpatialHashMap")
-            .field("map", &self.map)
-            .field("reverse_map", &self.reverse_map)
-            .finish()
-    }
-}
-
-impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashMap<P, F> {
-    fn default() -> Self {
-        Self {
-            map: Default::default(),
-            reverse_map: Default::default(),
-            preallocated_sets: Default::default(),
-            spooky: PhantomData,
-        }
-    }
-}
-
 /// A`Component` storing an automatically-updated hash of this entity's high-precision position,
 /// derived from its [`GridCell`] and [`Parent`].
 ///
@@ -176,19 +144,61 @@ impl<P: GridPrecision> SpatialHash<P> {
     }
 }
 
+/// A global spatial hash map for quickly finding entities in a grid cell.
+#[derive(Resource, Clone)]
+pub struct SpatialHashMap<P: GridPrecision, F: QueryFilter = ()> {
+    map: HashMap<SpatialHash<P>, HashSet<Entity, PassHash>, PassHash>,
+    reverse_map: HashMap<Entity, SpatialHash<P>, PassHash>,
+    /// Creating and freeing hash sets is expensive. To reduce time spent allocating and running
+    /// destructors, we save any hash sets that would otherwise be thrown away. The next time we
+    /// need to construct a new hash set of entities, we can grab one here.
+    ///
+    /// <https://en.wikipedia.org/wiki/Object_pool_pattern>.
+    hash_set_pool: Vec<HashSet<Entity, PassHash>>,
+    spooky: PhantomData<F>,
+}
+
+impl<P: GridPrecision, F: QueryFilter> std::fmt::Debug for SpatialHashMap<P, F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SpatialHashMap")
+            .field("map", &self.map)
+            .field("reverse_map", &self.reverse_map)
+            .finish()
+    }
+}
+
+impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashMap<P, F> {
+    fn default() -> Self {
+        Self {
+            map: Default::default(),
+            reverse_map: Default::default(),
+            hash_set_pool: Default::default(),
+            spooky: PhantomData,
+        }
+    }
+}
+
 impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P, F> {
+    fn update(
+        mut spatial_map: ResMut<SpatialHashMap<P, F>>,
+        changed_entities: Query<(Entity, &SpatialHash<P>), (F, Changed<SpatialHash<P>>)>,
+        mut removed: RemovedComponents<SpatialHash<P>>,
+    ) {
+        for (entity, spatial_hash) in &changed_entities {
+            spatial_map.insert_or_update(entity, *spatial_hash);
+        }
+        for entity in removed.read() {
+            spatial_map.remove(entity)
+        }
+    }
+
     fn insert_or_update(&mut self, entity: Entity, hash: SpatialHash<P>) {
         // If this entity is already in the maps, we need to remove and update it.
         if let Some(old_hash) = self.reverse_map.get_mut(&entity) {
             if hash.eq(old_hash) {
                 return; // If the spatial hash is unchanged, early exit.
             }
-            Self::remove_and_cleanup(
-                entity,
-                *old_hash,
-                &mut self.map,
-                &mut self.preallocated_sets,
-            );
+            Self::remove_and_cleanup(entity, *old_hash, &mut self.map, &mut self.hash_set_pool);
             *old_hash = hash;
         } else {
             self.reverse_map.insert(entity, hash);
@@ -200,7 +210,7 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P,
                 set.insert(entity);
             })
             .or_insert_with(|| {
-                let mut hs = self.preallocated_sets.pop().unwrap_or_default();
+                let mut hs = self.hash_set_pool.pop().unwrap_or_default();
                 hs.insert(entity);
                 hs
             });
@@ -209,7 +219,7 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P,
     /// Remove an entity from the [`SpatialHashMap`].
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
-            Self::remove_and_cleanup(entity, old_hash, &mut self.map, &mut self.preallocated_sets)
+            Self::remove_and_cleanup(entity, old_hash, &mut self.map, &mut self.hash_set_pool)
         }
     }
 
@@ -267,9 +277,9 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P,
         let center = -radius;
         let hash = PartialSpatialHash::new(parent);
         (0..search_volume).filter_map(move |i| {
-            let x = center + i; //  % search_width.pow(0)
-            let y = center + i % search_width; // .pow(1)
-            let z = center + i % search_width.pow(2);
+            let x = center + (i/* / search_width.pow(0) */) % search_width;
+            let y = center + (i / search_width/*.pow(1) */) % search_width;
+            let z = center + (i / search_width.pow(2)) % search_width;
             let offset = IVec3::new(x, y, z);
             let neighbor_cell = cell + offset;
             let neighbor_hash = hash.generate(&neighbor_cell);
@@ -309,19 +319,6 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> SpatialHashMap<P,
                 });
         }
         result
-    }
-
-    fn update(
-        mut spatial_map: ResMut<SpatialHashMap<P, F>>,
-        changed_entities: Query<(Entity, &SpatialHash<P>), (F, Changed<SpatialHash<P>>)>,
-        mut removed: RemovedComponents<SpatialHash<P>>,
-    ) {
-        for (entity, spatial_hash) in &changed_entities {
-            spatial_map.insert_or_update(entity, *spatial_hash);
-        }
-        for entity in removed.read() {
-            spatial_map.remove(entity)
-        }
     }
 }
 

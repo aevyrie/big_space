@@ -160,7 +160,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
         self.spawn_frame(ReferenceFrame::default(), bundle)
     }
 
-    /// Takes a closure which provides this reference frame and a [`ChildBuilder`]. This is often
+    /// Takes a closure which provides a [`ChildBuilder`] for this reference frame. This is often
     /// much faster than other methods for spawning large numbers of entities.
     pub fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
         self.commands

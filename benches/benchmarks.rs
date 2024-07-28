@@ -9,8 +9,88 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::iter::repeat_with;
 use turborand::prelude::*;
 
-criterion_group!(benches, spatial_hashing, hash_filtering);
+criterion_group!(
+    benches,
+    spatial_hashing,
+    hash_filtering,
+    deep_hierarchy,
+    wide_hierarchy
+);
 criterion_main!(benches);
+
+#[allow(clippy::unit_arg)]
+fn deep_hierarchy(c: &mut Criterion) {
+    let mut group = c.benchmark_group("deep_hierarchy");
+
+    /// Total number of entities to spawn
+    const N_SPAWN: usize = 10_000;
+
+    fn setup(mut commands: Commands) {
+        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+            let mut parent = root.spawn_frame_default(()).id();
+            for _ in 0..N_SPAWN {
+                let child = root
+                    .commands()
+                    .spawn(BigReferenceFrameBundle::<i32>::default())
+                    .id();
+                root.commands().entity(parent).add_child(child);
+                parent = child;
+            }
+        });
+    }
+
+    fn translate(mut cells: Query<&mut GridCell<i32>>) {
+        cells.iter_mut().for_each(|mut cell| {
+            *cell += IVec3::ONE;
+        })
+    }
+
+    let mut app = App::new();
+    app.add_plugins(SpatialHashPlugin::<i32>::default())
+        .add_systems(Startup, setup)
+        .add_systems(Update, translate)
+        .update();
+
+    group.bench_function("Baseline", |b| {
+        b.iter(|| {
+            black_box(app.update());
+        });
+    });
+}
+
+#[allow(clippy::unit_arg)]
+fn wide_hierarchy(c: &mut Criterion) {
+    let mut group = c.benchmark_group("wide_hierarchy");
+
+    /// Total number of entities to spawn
+    const N_SPAWN: usize = 10_000;
+
+    fn setup(mut commands: Commands) {
+        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+            for _ in 0..N_SPAWN {
+                root.spawn_spatial(());
+            }
+        });
+    }
+
+    fn translate(mut cells: Query<&mut GridCell<i32>>) {
+        cells.iter_mut().for_each(|mut cell| {
+            *cell += IVec3::ONE;
+        })
+    }
+
+    let mut app = App::new();
+    app.add_plugins(SpatialHashPlugin::<i32>::default())
+        .add_systems(Startup, setup)
+        .add_systems(Update, translate)
+        .update();
+
+    group.bench_function("Baseline", |b| {
+        b.iter(|| {
+            black_box(app.update());
+        });
+    });
+}
 
 #[allow(clippy::unit_arg)]
 fn spatial_hashing(c: &mut Criterion) {

@@ -156,7 +156,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             if changed {
                 *global_transform = parent.mul_transform(*transform);
             }
-            (*global_transform, children)
+            (global_transform, children)
         };
 
         let Some(children) = children else { return };
@@ -172,7 +172,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             // entire hierarchy.
             unsafe {
                 Self::propagate_recursive(
-                    &global_matrix,
+                    global_matrix.as_ref(),
                     transform_query,
                     parent_query,
                     child,
