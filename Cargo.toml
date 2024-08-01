@@ -37,6 +37,7 @@ bevy = { version = "0.14.0", default-features = false, features = [
     "tonemapping_luts",
     "multi_threaded",
 ] }
+noise = "0.9"
 # bevy-inspector-egui = "0.24"
 turborand = "0.10"
 criterion = "0.5"

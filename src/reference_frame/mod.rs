@@ -138,6 +138,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Compute the [`GlobalTransform`] of an entity in this reference frame.
+    #[inline]
     pub fn global_transform(
         &self,
         local_cell: &GridCell<P>,
@@ -150,6 +151,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         // reference frame.
         let cell_origin_relative = *local_cell - self.local_floating_origin().cell();
         let grid_offset = self.grid_to_float(&cell_origin_relative);
+
         let local_transform = DAffine3::from_scale_rotation_translation(
             local_transform.scale.as_dvec3(),
             local_transform.rotation.as_dquat(),

@@ -13,7 +13,6 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         reference_frames: Query<&ReferenceFrame<P>>,
         mut entities: Query<(&GridCell<P>, &Transform, &Parent, &mut GlobalTransform)>,
     ) {
-        // Update the GlobalTransform of GridCell entities that are children of a ReferenceFrame
         entities
             .par_iter_mut()
             .for_each(|(grid, transform, parent, mut global_transform)| {

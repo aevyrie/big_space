@@ -151,17 +151,20 @@ fn spatial_hashing(c: &mut Criterion) {
     });
 
     let map = app.world().resource::<SpatialHashMap<i32>>();
-    let first = map.iter().find(|(_, set)| !set.is_empty()).unwrap();
+    let first = map
+        .iter()
+        .find(|(_, entry)| !entry.entities.is_empty())
+        .unwrap();
     group.bench_function("SpatialHashMap::get", |b| {
         b.iter(|| {
             black_box(map.get(first.0).unwrap());
         });
     });
 
-    let ent = *first.1.iter().next().unwrap();
+    let ent = *first.1.entities.iter().next().unwrap();
     group.bench_function("Find entity", |b| {
         b.iter(|| {
-            black_box(map.get(first.0).map(|set| set.get(&ent)));
+            black_box(map.get(first.0).map(|entry| entry.entities.get(&ent)));
         });
     });
 
@@ -193,11 +196,7 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let flood = || {
-        map.neighbors_contiguous(1, parent, GridCell::ZERO)
-            .iter()
-            .count()
-    };
+    let flood = || map.neighbors_contiguous(1, parent, GridCell::ZERO).count();
     group.bench_function("Neighbors flood 1", |b| {
         b.iter(|| black_box(flood()));
     });
