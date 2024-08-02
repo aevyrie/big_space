@@ -15,7 +15,7 @@ use self::local_origin::LocalFloatingOrigin;
 pub mod local_origin;
 pub mod propagation;
 
-/// Aggregate runtime statistics across all [`SpatialHashPlugin`]s.
+/// Aggregate runtime statistics for transform propagation.
 #[derive(Resource, Debug, Clone, Default, Reflect)]
 pub struct PropagationStats {
     local_origin_propagation: Duration,
