@@ -170,7 +170,7 @@ pub enum SpatialHashSet {
 /// cells.
 ///
 /// This means you should only use spatial hashes to accelerate checks by filtering out entities
-/// that could not possibly overlap; if the spatial hashes do not match, you can be certain they are
+/// that could not possibly overlap: if the spatial hashes do not match, you can be certain they are
 /// not in the same cell.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct SpatialHash<P: GridPrecision>(u64, #[reflect(ignore)] PhantomData<P>);
@@ -280,17 +280,21 @@ where
         >,
         mut removed: RemovedComponents<SpatialHash<P>>,
         mut stats: ResMut<SpatialHashStats>,
+        mut destroy_list: Local<Vec<SpatialHash<P>>>,
     ) {
         let mut n_entities = 0;
         let start = Instant::now();
+
+        for entity in removed.read() {
+            spatial_map.remove(entity)
+        }
 
         for (entity, spatial_hash, parent, cell) in &changed_entities {
             spatial_map.insert_or_update(entity, *spatial_hash, parent, cell);
             n_entities += 1;
         }
-        for entity in removed.read() {
-            spatial_map.remove(entity)
-        }
+
+        spatial_map.clean_up_empty_sets(&mut destroy_list);
 
         stats.map_changed_entities += n_entities;
         stats.map_update_duration += start.elapsed();
@@ -309,7 +313,7 @@ where
             if hash.eq(old_hash) {
                 return; // If the spatial hash is unchanged, early exit.
             }
-            Self::remove_and_cleanup(entity, *old_hash, &mut self.map, &mut self.hash_set_pool);
+            Self::remove_from_map(entity, *old_hash, &mut self.map);
             *old_hash = hash;
         } else {
             self.reverse_map.insert(entity, hash);
@@ -335,29 +339,34 @@ where
     #[inline]
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
-            Self::remove_and_cleanup(entity, old_hash, &mut self.map, &mut self.hash_set_pool)
+            Self::remove_from_map(entity, old_hash, &mut self.map)
         }
     }
 
     #[inline]
-    fn remove_and_cleanup(
+    fn remove_from_map(
         entity: Entity,
         old_hash: SpatialHash<P>,
         map: &mut HashMap<SpatialHash<P>, SpatialHashEntry<P>, PassHash>,
-        preallocated_sets: &mut Vec<HashSet<Entity, PassHash>>,
     ) {
-        let is_empty = map
-            .get_mut(&old_hash)
-            .map(|entry| {
-                entry.entities.remove(&entity);
-                entry.entities.is_empty()
-            })
-            .unwrap_or_default();
-        if is_empty {
-            if let Some(old_entry) = map.remove(&old_hash) {
-                preallocated_sets.push(old_entry.entities);
+        if let Some(entry) = map.get_mut(&old_hash) {
+            entry.entities.remove(&entity);
+        }
+    }
+
+    fn clean_up_empty_sets(&mut self, destroy_list: &mut Local<Vec<SpatialHash<P>>>) {
+        **destroy_list = self
+            .map
+            .iter()
+            .filter(|(_k, v)| v.entities.is_empty())
+            .map(|(k, _v)| *k)
+            .collect();
+        for empty_key in destroy_list.iter() {
+            if let Some(old_entry) = self.map.remove(empty_key) {
+                self.hash_set_pool.push(old_entry.entities);
             }
         }
+        destroy_list.clear();
     }
 
     /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].

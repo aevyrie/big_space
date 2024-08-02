@@ -62,7 +62,7 @@ fn setup(
 ) {
     let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
     let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::Srgba(palettes::basic::YELLOW),
+        base_color: Color::Srgba(palettes::basic::WHITE),
         ..default()
     });
 

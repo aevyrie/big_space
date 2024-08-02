@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::{
     precision::GridPrecision,
-    reference_frame::{local_origin::LocalFloatingOrigin, ReferenceFrame},
+    reference_frame::{local_origin::LocalFloatingOrigin, PropagationStats, ReferenceFrame},
     validation, BigSpace, FloatingOrigin, GridCell,
 };
 
@@ -56,6 +56,9 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> 
     for BigSpacePlugin<P>
 {
     fn build(&self, app: &mut App) {
+        // Silence bevy's built-in error spam about GLobalTransforms in the hierarchy
+        app.insert_resource(bevy_hierarchy::ReportHierarchyIssue::<GlobalTransform>::new(false));
+
         let system_set_config = || {
             (
                 (
@@ -82,6 +85,8 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> 
             .register_type::<ReferenceFrame<P>>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
+            .register_type::<PropagationStats>()
+            .init_resource::<PropagationStats>()
             .add_systems(PostStartup, system_set_config())
             .add_systems(PostUpdate, system_set_config())
             .add_systems(

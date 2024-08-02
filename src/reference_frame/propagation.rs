@@ -6,20 +6,41 @@ use bevy_transform::prelude::*;
 
 use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
 
+use super::PropagationStats;
+
 impl<P: GridPrecision> ReferenceFrame<P> {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`]
     /// the entity belongs to.
     pub fn propagate_high_precision(
+        mut stats: ResMut<PropagationStats>,
         reference_frames: Query<&ReferenceFrame<P>>,
-        mut entities: Query<(&GridCell<P>, &Transform, &Parent, &mut GlobalTransform)>,
+        mut entities: Query<(
+            Ref<GridCell<P>>,
+            Ref<Transform>,
+            Ref<Parent>,
+            &mut GlobalTransform,
+        )>,
     ) {
+        let start = bevy_utils::Instant::now();
         entities
             .par_iter_mut()
             .for_each(|(grid, transform, parent, mut global_transform)| {
                 if let Ok(frame) = reference_frames.get(parent.get()) {
-                    *global_transform = frame.global_transform(grid, transform);
+                    // Optimization: we don't need to recompute the transforms if the entity hasn't
+                    // moved, and the floating origin's local origin in that reference frame hasn't
+                    // changed.
+                    if frame.local_floating_origin().is_local_origin_unchanged()
+                        && !grid.is_changed()
+                        && !transform.is_changed()
+                        && !parent.is_changed()
+                    {
+                        return;
+                    }
+
+                    *global_transform = frame.global_transform(&grid, &transform);
                 }
             });
+        stats.high_precision_propagation = start.elapsed();
     }
 
     /// Update the [`GlobalTransform`] of entities with a [`Transform`] that are children of a
@@ -27,6 +48,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     /// [`GridCell`]s. This will recursively propagate entities that only have low-precision
     /// [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
+        mut stats: ResMut<PropagationStats>,
         frames: Query<&Children, With<ReferenceFrame<P>>>,
         frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
         transform_query: Query<
@@ -39,12 +61,13 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         >,
         parent_query: Query<(Entity, Ref<Parent>)>,
     ) {
+        let start = bevy_utils::Instant::now();
         let update_transforms = |(entity, children, global_transform)| {
             for (child, actual_parent) in parent_query.iter_many(children) {
                 assert_eq!(
-                actual_parent.get(), entity,
-                "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
-            );
+                    actual_parent.get(), entity,
+                    "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
+                );
 
                 // Unlike bevy's transform propagation, change detection is much more complex, because
                 // it is relative to the floating origin, *and* whether entities are moving.
@@ -88,6 +111,8 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 .filter_map(|child| frame_child_query.get(*child).ok())
                 .for_each(|(e, c, g)| update_transforms((e, c, *g)))
         });
+
+        stats.low_precision_propagation = start.elapsed();
     }
 
     /// COPIED FROM BEVY

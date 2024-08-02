@@ -18,7 +18,7 @@ pub use inner::LocalFloatingOrigin;
 
 use crate::{precision::GridPrecision, BigSpace, GridCell};
 
-use super::ReferenceFrame;
+use super::{PropagationStats, ReferenceFrame};
 
 /// A module kept private to enforce use of setters and getters within the parent module.
 mod inner {
@@ -70,6 +70,12 @@ mod inner {
         /// The above requirements help to ensure this transform has a small magnitude, maximizing
         /// precision, and minimizing floating point error.
         reference_frame_transform: DAffine3,
+        /// Returns `true` iff this is the reference frame containing the floating origin, and the
+        /// floating origin has not moved between grid cells.
+        ///
+        /// When true, this means that any entities in this reference frame that have not moved do
+        /// not need to have their `GlobalTransform` recomputed.
+        is_local_origin_unchanged: bool,
     }
 
     impl<P: GridPrecision> LocalFloatingOrigin<P> {
@@ -101,15 +107,17 @@ mod inner {
             translation_float: Vec3,
             rotation_float: DQuat,
         ) {
+            let prev = self.clone();
+
             self.cell = translation_grid;
             self.translation = translation_float;
             self.rotation = rotation_float;
-
             self.reference_frame_transform = DAffine3 {
                 matrix3: DMat3::from_quat(self.rotation),
                 translation: self.translation.as_dvec3(),
             }
-            .inverse()
+            .inverse();
+            self.is_local_origin_unchanged = prev.eq(self);
         }
 
         /// Create a new [`LocalFloatingOrigin`].
@@ -125,7 +133,13 @@ mod inner {
                 translation,
                 rotation,
                 reference_frame_transform,
+                is_local_origin_unchanged: false,
             }
+        }
+
+        /// Returns true iff the local origin has not changed relative to the floating origin.
+        pub fn is_local_origin_unchanged(&self) -> bool {
+            self.is_local_origin_unchanged
         }
     }
 }
@@ -291,8 +305,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
     }
 }
 
-/// Used to access a reference frame. Needed because the reference frame could either be a
-/// component, or a resource if at the root of the hierarchy.
+/// A system param for more easily navigating a hierarchy of reference frames mutably.
 #[derive(SystemParam)]
 pub struct ReferenceFramesMut<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
@@ -308,18 +321,6 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
     /// ## Panics
     ///
     /// This will panic if the entity passed in is invalid.
-    ///
-    /// ## Why a closure?
-    ///
-    /// This expects a closure because the reference frame could be stored as a component or a
-    /// resource, making it difficult (impossible?) to return a mutable reference to the reference
-    /// frame when the types involved are different. The main issue seems to be that the component
-    /// is returned as a `Mut<T>`; getting a mutable reference to the internal value requires that
-    /// this function return a reference to a value owned by the function.
-    ///
-    /// I tried returning an enum or a boxed trait object, but ran into issues expressing the
-    /// lifetimes. Worth revisiting if this turns out to be annoying, but seems pretty insignificant
-    /// at the time of writing.
     pub fn update_reference_frame<T>(
         &mut self,
         frame_entity: Entity,
@@ -408,15 +409,18 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// only affect the rendering precision. The high precision coordinates ([`GridCell`] and
     /// [`Transform`]) are the source of truth and never mutated.
     pub fn compute_all(
+        mut stats: ResMut<PropagationStats>,
         mut reference_frames: ReferenceFramesMut<P>,
         mut frame_stack: Local<Vec<Entity>>,
-        cells: Query<(Entity, &GridCell<P>)>,
+        cells: Query<(Entity, Ref<GridCell<P>>)>,
         roots: Query<(Entity, &BigSpace)>,
         parents: Query<&Parent>,
     ) {
+        let start = bevy_utils::Instant::now();
+
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
         /// there is a degenerate hierarchy. It might take a while, but at least it's not forever?
-        const MAX_REFERENCE_FRAME_DEPTH: usize = 255;
+        const MAX_REFERENCE_FRAME_DEPTH: usize = 512;
 
         // TODO: because each tree under a root is disjoint, these updates can be done in parallel
         // without aliasing. This will require unsafe, just like bevy's own transform propagation.
@@ -484,6 +488,8 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
 
             error!("Reached the maximum reference frame depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
         }
+
+        stats.local_origin_propagation = start.elapsed();
     }
 }
 

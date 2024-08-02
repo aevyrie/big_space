@@ -9,6 +9,7 @@ use big_space::{
     *,
 };
 use noise::{NoiseFn, Perlin};
+use reference_frame::PropagationStats;
 
 fn main() {
     App::new()
@@ -26,7 +27,7 @@ fn main() {
 }
 
 const HALF_WIDTH: f32 = 100.0;
-const N_ENTITIES: usize = 50_000;
+const N_ENTITIES: usize = 1_000_000;
 
 #[derive(Component)]
 struct Player;
@@ -72,6 +73,7 @@ fn move_player(
     material_presets: Res<MaterialPresets>,
     mut text: Query<(&mut Text, &mut StatsText)>,
     hash_stats: Res<SpatialHashStats>,
+    prop_stats: Res<PropagationStats>,
 ) {
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
@@ -80,7 +82,7 @@ fn move_player(
     }
 
     let t = time.elapsed_seconds() * 3.0;
-    let scale = N_ENTITIES as f32 * 2e-7;
+    let scale = 1e5 / (N_ENTITIES as f32 * HALF_WIDTH);
     for (mut transform, _, _) in non_player.iter_mut() {
         transform.translation.x += t.sin() * scale;
         transform.translation.y += t.cos() * scale;
@@ -138,14 +140,21 @@ fn move_player(
 Neighboring Entities: {}
 
 Spatial Hashing Update Cost:
-Update Hashes: {: >6.2} us  ({} Entities)
-Update Maps: {: >6.2} us    ({} Entities)",
+Update Hashes: {: >8.2} us  ({} Entities)
+Update Maps: {: >10.2} us  ({} Entities)
+
+Local Origin Propagation: {: >10.2?} us
+Low Precision Propagation: {: >9.2?} us
+High Precision Propagation: {: >8.2?} us",
         avg * 1e6,
         total,
         hash_stats.hash_update_duration().as_secs_f32() * 1e6,
         hash_stats.hash_update_entities(),
         hash_stats.map_update_duration().as_secs_f32() * 1e6,
         hash_stats.map_changed_entities(),
+        prop_stats.local_origin_propagation().as_secs_f32() * 1e6,
+        prop_stats.low_precision_propagation().as_secs_f32() * 1e6,
+        prop_stats.high_precision_propagation().as_secs_f32() * 1e6,
     )
     .into();
 }
