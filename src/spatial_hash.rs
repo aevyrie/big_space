@@ -3,7 +3,6 @@
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::atomic::AtomicU32,
 };
 
 use bevy_app::prelude::*;
@@ -75,7 +74,6 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
         )>,
         mut stats: ResMut<SpatialHashStats>,
     ) {
-        let n_entities = AtomicU32::new(0);
         let start = Instant::now();
 
         // Create new
@@ -95,11 +93,9 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
                 // multiple plugins are updating the spatial hash, and it is already correct.
                 if old_hash.ne(&spatial_hash) {
                     *old_hash = spatial_hash;
-                    n_entities.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
             });
 
-        stats.hash_update_entities += n_entities.into_inner() as usize;
         stats.hash_update_duration += start.elapsed();
     }
 }
@@ -107,9 +103,7 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
 /// Aggregate runtime statistics across all [`SpatialHashPlugin`]s.
 #[derive(Resource, Debug, Clone, Default, Reflect)]
 pub struct SpatialHashStats {
-    hash_update_entities: usize,
     hash_update_duration: Duration,
-    map_changed_entities: usize,
     map_update_duration: Duration,
 }
 
@@ -118,20 +112,9 @@ impl SpatialHashStats {
         *stats = Self::default();
     }
 
-    /// Number of entities with a changed parent or grid cell, and needed their hash updated.
-    pub fn hash_update_entities(&self) -> usize {
-        self.hash_update_entities
-    }
-
     /// Time to update all entity hashes.
     pub fn hash_update_duration(&self) -> Duration {
         self.hash_update_duration
-    }
-
-    /// Number of entities that were queried when updating spatial hash maps. This should match
-    /// [`Self::hash_update_entities`].
-    pub fn map_changed_entities(&self) -> usize {
-        self.map_changed_entities
     }
 
     /// Time to update all spatial hash maps.
@@ -282,7 +265,6 @@ where
         mut stats: ResMut<SpatialHashStats>,
         mut destroy_list: Local<Vec<SpatialHash<P>>>,
     ) {
-        let mut n_entities = 0;
         let start = Instant::now();
 
         for entity in removed.read() {
@@ -291,12 +273,10 @@ where
 
         for (entity, spatial_hash, parent, cell) in &changed_entities {
             spatial_map.insert_or_update(entity, *spatial_hash, parent, cell);
-            n_entities += 1;
         }
 
         spatial_map.clean_up_empty_sets(&mut destroy_list);
 
-        stats.map_changed_entities += n_entities;
         stats.map_update_duration += start.elapsed();
     }
 

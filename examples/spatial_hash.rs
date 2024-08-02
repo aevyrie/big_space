@@ -140,8 +140,8 @@ fn move_player(
 Neighboring Entities: {}
 
 Spatial Hashing Update Cost:
-Update Hashes: {: >8.2} us  ({} Entities)
-Update Maps: {: >10.2} us  ({} Entities)
+Update Hashes: {: >8.2} us
+Update Maps: {: >10.2} us
 
 Local Origin Propagation: {: >10.2?} us
 Low Precision Propagation: {: >9.2?} us
@@ -149,9 +149,7 @@ High Precision Propagation: {: >8.2?} us",
         avg * 1e6,
         total,
         hash_stats.hash_update_duration().as_secs_f32() * 1e6,
-        hash_stats.hash_update_entities(),
         hash_stats.map_update_duration().as_secs_f32() * 1e6,
-        hash_stats.map_changed_entities(),
         prop_stats.local_origin_propagation().as_secs_f32() * 1e6,
         prop_stats.low_precision_propagation().as_secs_f32() * 1e6,
         prop_stats.high_precision_propagation().as_secs_f32() * 1e6,
