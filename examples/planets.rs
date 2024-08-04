@@ -18,7 +18,7 @@ use big_space::{
     reference_frame::ReferenceFrame,
     FloatingOrigin,
 };
-use rand::Rng;
+use turborand::{rng::Rng, TurboRand};
 
 fn main() {
     App::new()
@@ -287,15 +287,15 @@ fn spawn_solar_system(
             ..default()
         });
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());
-        let mut rng = rand::thread_rng();
+        let rng = Rng::new();
         (0..1000).for_each(|_| {
             root_frame.spawn_spatial((
                 star_mesh_handle.clone(),
                 star_mat.clone(),
                 Transform::from_xyz(
-                    (rng.gen::<f32>() - 0.5) * 1e14,
-                    (rng.gen::<f32>() - 0.5) * 1e14,
-                    (rng.gen::<f32>() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
                 ),
             ));
         });

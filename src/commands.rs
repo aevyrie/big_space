@@ -22,15 +22,7 @@ impl<P: GridPrecision> BigSpaceCommands<P> for Commands<'_, '_> {
         reference_frame: ReferenceFrame<P>,
         root_frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
     ) {
-        let mut entity_commands = self.spawn((
-            #[cfg(feature = "bevy_render")]
-            bevy_render::view::Visibility::default(),
-            #[cfg(feature = "bevy_render")]
-            bevy_render::view::InheritedVisibility::default(),
-            #[cfg(feature = "bevy_render")]
-            bevy_render::view::ViewVisibility::default(),
-            BigSpace::default(),
-        ));
+        let mut entity_commands = self.spawn(BigSpaceRootBundle::<P>::default());
         let mut cmd = ReferenceFrameCommands {
             entity: entity_commands.id(),
             commands: entity_commands.commands(),
@@ -62,11 +54,8 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
     /// Add a high-precision spatial entity ([`GridCell`]) to this reference frame, and insert the
     /// provided bundle.
     pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
-        let mut entity_commands = self.commands.entity(self.entity);
-        let parent = entity_commands.id();
-        let mut commands = entity_commands.commands();
-
-        let entity = commands
+        let entity = self
+            .commands
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
@@ -81,7 +70,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .insert(bundle)
             .id();
 
-        commands.entity(entity).set_parent(parent);
+        self.commands.entity(self.entity).add_child(entity);
 
         SpatialEntityCommands {
             entity,
@@ -163,12 +152,18 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
         self.spawn_frame(ReferenceFrame::default(), bundle)
     }
 
-    /// Takes a closure which provides this reference frame and a [`ChildBuilder`].
+    /// Takes a closure which provides a [`ChildBuilder`] for this reference frame. This is often
+    /// much faster than other methods for spawning large numbers of entities.
     pub fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
         self.commands
             .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
         self
+    }
+
+    /// Access the underlying commands.
+    pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
+        &mut self.commands
     }
 }
 
@@ -206,5 +201,10 @@ impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
     /// Returns the [`Entity``] id of the entity.
     pub fn id(&self) -> Entity {
         self.entity
+    }
+
+    /// Access the underlying commands.
+    pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
+        &mut self.commands
     }
 }

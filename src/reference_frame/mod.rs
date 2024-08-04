@@ -6,6 +6,7 @@ use bevy_ecs::prelude::*;
 use bevy_math::{prelude::*, Affine3A, DAffine3, DVec3};
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
+use bevy_utils::Duration;
 
 use crate::{precision::GridPrecision, GridCell};
 
@@ -13,6 +14,31 @@ use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
 pub mod propagation;
+
+/// Aggregate runtime statistics for transform propagation.
+#[derive(Resource, Debug, Clone, Default, Reflect)]
+pub struct PropagationStats {
+    local_origin_propagation: Duration,
+    high_precision_propagation: Duration,
+    low_precision_propagation: Duration,
+}
+
+impl PropagationStats {
+    /// How long it took to run [`LocalFloatingOrigin`] propagation this update.
+    pub fn local_origin_propagation(&self) -> Duration {
+        self.local_origin_propagation
+    }
+
+    /// How long it took to run high precision [`Transform`]+[`GridCell`] propagation this update.
+    pub fn high_precision_propagation(&self) -> Duration {
+        self.high_precision_propagation
+    }
+
+    /// How long it took to run low precision [`Transform`] propagation this update.
+    pub fn low_precision_propagation(&self) -> Duration {
+        self.low_precision_propagation
+    }
+}
 
 /// A component that defines a reference frame for children of this entity with [`GridCell`]s. All
 /// entities with a [`GridCell`] must be children of an entity with a [`ReferenceFrame`]. The
@@ -138,6 +164,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Compute the [`GlobalTransform`] of an entity in this reference frame.
+    #[inline]
     pub fn global_transform(
         &self,
         local_cell: &GridCell<P>,
@@ -150,6 +177,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         // reference frame.
         let cell_origin_relative = *local_cell - self.local_floating_origin().cell();
         let grid_offset = self.grid_to_float(&cell_origin_relative);
+
         let local_transform = DAffine3::from_scale_rotation_translation(
             local_transform.scale.as_dvec3(),
             local_transform.rotation.as_dquat(),
