@@ -70,7 +70,7 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
                 (&Parent, &GridCell<P>, &mut SpatialHash<P>),
                 (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
             >,
-            Query<(Entity, &Parent, &GridCell<P>), Without<SpatialHash<P>>>,
+            Query<(Entity, &Parent, &GridCell<P>), (F, Without<SpatialHash<P>>)>,
         )>,
         mut stats: ResMut<SpatialHashStats>,
     ) {
@@ -87,13 +87,7 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
             .p0()
             .par_iter_mut()
             .for_each(|(parent, cell, mut old_hash)| {
-                let spatial_hash = SpatialHash::new(parent, cell);
-                // This check has a 40% savings in cases where the grid cell is mutated (change
-                // detection triggered), but it has not actually changed, this also helps if
-                // multiple plugins are updating the spatial hash, and it is already correct.
-                if old_hash.ne(&spatial_hash) {
-                    *old_hash = spatial_hash;
-                }
+                let _ = old_hash.replace_if_neq(SpatialHash::new(parent, cell));
             });
 
         stats.hash_update_duration += start.elapsed();

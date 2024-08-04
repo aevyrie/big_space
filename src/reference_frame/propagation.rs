@@ -1,10 +1,10 @@
 //! Logic for propagating transforms through the hierarchy of reference frames.
 
-use bevy_ecs::prelude::*;
+use bevy_ecs::{batching::BatchingStrategy, prelude::*};
 use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 
-use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, GridCell};
+use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, GridCell};
 
 use super::PropagationStats;
 
@@ -14,43 +14,75 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     pub fn propagate_high_precision(
         mut stats: ResMut<PropagationStats>,
         reference_frames: Query<&ReferenceFrame<P>>,
-        mut entities: Query<(
-            Ref<GridCell<P>>,
-            Ref<Transform>,
-            Ref<Parent>,
-            &mut GlobalTransform,
+        mut entities: ParamSet<(
+            Query<(
+                Ref<GridCell<P>>,
+                Ref<Transform>,
+                Ref<Parent>,
+                &mut GlobalTransform,
+            )>,
+            Query<(&ReferenceFrame<P>, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
         let start = bevy_utils::Instant::now();
+
         entities
+            .p0()
             .par_iter_mut()
+            .batching_strategy(BatchingStrategy::fixed(10_000)) // Better scaling than default
             .for_each(|(grid, transform, parent, mut global_transform)| {
                 if let Ok(frame) = reference_frames.get(parent.get()) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
-                    // moved, and the floating origin's local origin in that reference frame hasn't
+                    // moved and the floating origin's local origin in that reference frame hasn't
                     // changed.
                     if frame.local_floating_origin().is_local_origin_unchanged()
-                        && !grid.is_changed()
                         && !transform.is_changed()
+                        && !grid.is_changed()
                         && !parent.is_changed()
                     {
                         return;
                     }
-
                     *global_transform = frame.global_transform(&grid, &transform);
                 }
             });
+
+        // Root reference frames
+        //
+        // These are handled separately because the root reference frame doesn't have a
+        // Transform or GridCell - it wouldn't make sense because it is the root, and these
+        // components are relative to their parent. Due to floating origins, it *is* possible
+        // for the root reference frame to have a GlobalTransform - this is what makes it
+        // possible to place a low precision (Transform only) entity in a root transform - it is
+        // relative to the origin of the root frame.
+        entities
+            .p1()
+            .iter_mut()
+            .for_each(|(frame, mut global_transform)| {
+                if frame.local_floating_origin().is_local_origin_unchanged() {
+                    return; // By definition, this means the frame has not moved
+                }
+                // The global transform of the root frame is the same as the transform of an entity
+                // at the origin - it is determined entirely by the local origin position:
+                *global_transform =
+                    frame.global_transform(&GridCell::default(), &Transform::IDENTITY);
+            });
+
         stats.high_precision_propagation = start.elapsed();
     }
 
-    /// Update the [`GlobalTransform`] of entities with a [`Transform`] that are children of a
-    /// [`ReferenceFrame`] and do not have a [`GridCell`] component, or that are children of
-    /// [`GridCell`]s. This will recursively propagate entities that only have low-precision
-    /// [`Transform`]s, just like bevy's built in systems.
+    /// Update the [`GlobalTransform`] of entities with a [`Transform`], without a [`GridCell`], and
+    /// that are children of an entity with a [`GlobalTransform`]. This will recursively propagate
+    /// entities that only have low-precision [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
         mut stats: ResMut<PropagationStats>,
-        frames: Query<&Children, With<ReferenceFrame<P>>>,
-        frame_child_query: Query<(Entity, &Children, &GlobalTransform), With<GridCell<P>>>,
+        roots: Query<
+            (Entity, &Children, Ref<GlobalTransform>),
+            (
+                // A root big space does not have a grid cell, and not all high precision entities
+                // have a reference frame
+                Or<(With<ReferenceFrame<P>>, With<GridCell<P>>)>,
+            ),
+        >,
         transform_query: Query<
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
@@ -59,40 +91,40 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 Without<ReferenceFrame<P>>,
             ),
         >,
-        parent_query: Query<(Entity, Ref<Parent>)>,
+        parent_query: Query<
+            (Entity, Ref<Parent>),
+            (
+                With<Transform>,
+                With<GlobalTransform>,
+                Without<GridCell<P>>,
+                Without<ReferenceFrame<P>>,
+            ),
+        >,
     ) {
         let start = bevy_utils::Instant::now();
-        let update_transforms = |(entity, children, global_transform)| {
+        let update_transforms = |entity, children, global_transform: Ref<GlobalTransform>| {
             for (child, actual_parent) in parent_query.iter_many(children) {
                 assert_eq!(
                     actual_parent.get(), entity,
                     "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
                 );
 
-                // Unlike bevy's transform propagation, change detection is much more complex, because
-                // it is relative to the floating origin, *and* whether entities are moving.
-                // - If the floating origin changes grid cells, everything needs to update
-                // - If the floating origin's reference frame moves (translation, rotation), every
-                //   entity outside of the reference frame subtree that the floating origin is in must
-                //   update.
-                // - All entities or reference frame subtrees that move within the same frame as the
-                //   floating origin must be updated.
-                //
-                // Instead of adding this complexity and computation, is it much simpler to update
-                // everything every frame.
-                let changed = true;
+                // High precision global transforms are change-detected, and are only updated if
+                // that entity has moved relative to the floating origin's grid cell.
+                let changed = global_transform.is_changed();
 
                 // SAFETY:
-                // - `child` must have consistent parentage, or the above assertion would panic. Since
-                // `child` is parented to a root entity, the entire hierarchy leading to it is
+                // - `child` must have consistent parentage, or the above assertion would panic.
+                // Since `child` is parented to a root entity, the entire hierarchy leading to it is
                 // consistent.
-                // - We may operate as if all descendants are consistent, since `propagate_recursive`
-                //   will panic before continuing to propagate if it encounters an entity with
-                //   inconsistent parentage.
-                // - Since each root entity is unique and the hierarchy is consistent and forest-like,
-                //   other root entities' `propagate_recursive` calls will not conflict with this one.
-                // - Since this is the only place where `transform_query` gets used, there will be no
-                //   conflicting fetches elsewhere.
+                // - We may operate as if all descendants are consistent, since
+                //   `propagate_recursive` will panic before continuing to propagate if it
+                //   encounters an entity with inconsistent parentage.
+                // - Since each root entity is unique and the hierarchy is consistent and
+                //   forest-like, other root entities' `propagate_recursive` calls will not conflict
+                //   with this one.
+                // - Since this is the only place where `transform_query` gets used, there will be
+                //   no conflicting fetches elsewhere.
                 unsafe {
                     Self::propagate_recursive(
                         &global_transform,
@@ -105,12 +137,9 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             }
         };
 
-        frames.par_iter().for_each(|children| {
-            children
-                .iter()
-                .filter_map(|child| frame_child_query.get(*child).ok())
-                .for_each(|(e, c, g)| update_transforms((e, c, *g)))
-        });
+        roots
+            .par_iter()
+            .for_each(|(e, c, g)| update_transforms(e, c, g));
 
         stats.low_precision_propagation = start.elapsed();
     }
@@ -140,7 +169,15 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 Without<ReferenceFrame<P>>, // ***ADDED*** Only recurse low-precision entities
             ),
         >,
-        parent_query: &Query<(Entity, Ref<Parent>)>,
+        parent_query: &Query<
+            (Entity, Ref<Parent>),
+            (
+                With<Transform>,
+                With<GlobalTransform>,
+                Without<GridCell<P>>,
+                Without<ReferenceFrame<P>>,
+            ),
+        >,
         entity: Entity,
         mut changed: bool,
     ) {

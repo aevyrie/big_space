@@ -189,9 +189,9 @@ impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
         query
             .with::<BigSpace>()
             .with::<ReferenceFrame<P>>()
+            .with::<GlobalTransform>()
             .without::<GridCell<P>>()
             .without::<Transform>()
-            .without::<GlobalTransform>()
             .without::<Parent>()
             .without::<FloatingOrigin>();
     }

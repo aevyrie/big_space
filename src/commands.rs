@@ -22,15 +22,7 @@ impl<P: GridPrecision> BigSpaceCommands<P> for Commands<'_, '_> {
         reference_frame: ReferenceFrame<P>,
         root_frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
     ) {
-        let mut entity_commands = self.spawn((
-            #[cfg(feature = "bevy_render")]
-            bevy_render::view::Visibility::default(),
-            #[cfg(feature = "bevy_render")]
-            bevy_render::view::InheritedVisibility::default(),
-            #[cfg(feature = "bevy_render")]
-            bevy_render::view::ViewVisibility::default(),
-            BigSpace::default(),
-        ));
+        let mut entity_commands = self.spawn(BigSpaceRootBundle::<P>::default());
         let mut cmd = ReferenceFrameCommands {
             entity: entity_commands.id(),
             commands: entity_commands.commands(),

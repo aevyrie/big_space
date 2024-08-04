@@ -27,7 +27,7 @@ fn main() {
 }
 
 const HALF_WIDTH: f32 = 100.0;
-const N_ENTITIES: usize = 1_000_000;
+const N_ENTITIES: usize = 100_000;
 
 #[derive(Component)]
 struct Player;
@@ -135,26 +135,26 @@ fn move_player(
     stats.0.truncate(0);
     stats.0.push_front(elapsed);
     let avg = stats.0.iter().sum::<f32>() / stats.0.len() as f32;
-    text.sections[0] = format!(
-        "Neighbor Lookup: {: >5.2} us
+    text.sections[0].value = format!(
+        "\
+Neighbor Lookup: {: >5.2}us
 Neighboring Entities: {}
 
 Spatial Hashing Update Cost:
-Update Hashes: {: >8.2} us
-Update Maps: {: >10.2} us
+Update Hashes: {: >8.2?}
+Update Maps: {: >10.2?}
 
-Local Origin Propagation: {: >10.2?} us
-Low Precision Propagation: {: >9.2?} us
-High Precision Propagation: {: >8.2?} us",
+Local Origin Propagation: {: >10.2?}
+Low Precision Propagation: {: >9.2?}
+High Precision Propagation: {: >8.2?}",
         avg * 1e6,
         total,
-        hash_stats.hash_update_duration().as_secs_f32() * 1e6,
-        hash_stats.map_update_duration().as_secs_f32() * 1e6,
-        prop_stats.local_origin_propagation().as_secs_f32() * 1e6,
-        prop_stats.low_precision_propagation().as_secs_f32() * 1e6,
-        prop_stats.high_precision_propagation().as_secs_f32() * 1e6,
-    )
-    .into();
+        hash_stats.hash_update_duration(),
+        hash_stats.map_update_duration(),
+        prop_stats.local_origin_propagation(),
+        prop_stats.low_precision_propagation(),
+        prop_stats.high_precision_propagation(),
+    );
 }
 
 fn spawn(
@@ -193,12 +193,14 @@ fn spawn(
                 let mut child_commands = root_builder.spawn((
                     BigSpatialBundle::<i32> {
                         transform: Transform::from_xyz(value.x, value.y, value.z),
-                        // visibility: Visibility::Hidden,
                         ..default()
                     },
                     material_presets.default.clone_weak(),
                     sphere.clone(),
                 ));
+                // child_commands.remove::<Visibility>();
+                // child_commands.remove::<InheritedVisibility>();
+                // child_commands.remove::<ViewVisibility>();
                 if i == 0 {
                     let mut matl: StandardMaterial =
                         Color::from(Srgba::new(1.0, 1.0, 0.0, 1.0)).into();
@@ -216,13 +218,13 @@ fn spawn(
 #[derive(Component)]
 struct StatsText(VecDeque<f32>);
 
-fn setup_ui(mut commands: Commands) {
+fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn((NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Percent(100.),
-                padding: UiRect::all(Val::Px(20.)),
+                padding: UiRect::all(Val::Px(24.)),
                 ..default()
             },
             ..default()
@@ -232,11 +234,11 @@ fn setup_ui(mut commands: Commands) {
                 TextBundle::from_section(
                     "",
                     TextStyle {
-                        font_size: 20.0,
+                        font: asset_server.load("fonts/FiraMono-Regular.ttf"),
+                        font_size: 18.0,
                         ..default()
                     },
-                )
-                .with_style(Style { ..default() }),
+                ),
                 StatsText(Default::default()),
             ));
         });

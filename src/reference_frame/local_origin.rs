@@ -70,8 +70,8 @@ mod inner {
         /// The above requirements help to ensure this transform has a small magnitude, maximizing
         /// precision, and minimizing floating point error.
         reference_frame_transform: DAffine3,
-        /// Returns `true` iff this is the reference frame containing the floating origin, and the
-        /// floating origin has not moved between grid cells.
+        /// Returns `true` iff the position of the floating origin's grid origin has not moved
+        /// relative to this reference frame.
         ///
         /// When true, this means that any entities in this reference frame that have not moved do
         /// not need to have their `GlobalTransform` recomputed.
@@ -239,7 +239,6 @@ fn propagate_origin_to_child<P: GridPrecision>(
 #[derive(SystemParam)]
 pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
-    children: Query<'w, 's, Read<Children>>,
     // position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>), With<ReferenceFrame<P>>>,
     frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
@@ -280,13 +279,20 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
         this: Entity,
         mut filter: impl FnMut(Entity) -> bool,
     ) -> Vec<Entity> {
-        self.children
-            .get(this)
+        // This is intentionally formulated to query reference frames, and filter those, as opposed
+        // to iterating through the children of the current reference frame. The latter is extremely
+        // inefficient with wide hierarchies (many entities in a reference frame, which is a common
+        // case), and it is generally better to be querying fewer entities by using a more
+        // restrictive query - e.g. only querying reference frames.
+        self.frame_query
             .iter()
-            .flat_map(|c| c.iter())
-            .filter(|entity| filter(**entity))
-            .filter(|child| self.frame_query.contains(**child))
-            .copied()
+            .filter_map(|(entity, _, parent)| {
+                parent
+                    .map(|p| p.get())
+                    .filter(|parent| *parent == this)
+                    .map(|_| entity)
+            })
+            .filter(|entity| filter(*entity))
             .collect()
     }
 
@@ -309,7 +315,6 @@ impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
 #[derive(SystemParam)]
 pub struct ReferenceFramesMut<'w, 's, P: GridPrecision> {
     parent: Query<'w, 's, Read<Parent>>,
-    children: Query<'w, 's, Read<Children>>,
     position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>)>,
     frame_query: Query<'w, 's, (Entity, Write<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
@@ -376,13 +381,20 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
         this: Entity,
         mut filter: impl FnMut(Entity) -> bool,
     ) -> Vec<Entity> {
-        self.children
-            .get(this)
+        // This is intentionally formulated to query reference frames, and filter those, as opposed
+        // to iterating through the children of the current reference frame. The latter is extremely
+        // inefficient with wide hierarchies (many entities in a reference frame, which is a common
+        // case), and it is generally better to be querying fewer entities by using a more
+        // restrictive query - e.g. only querying reference frames.
+        self.frame_query
             .iter()
-            .flat_map(|c| c.iter())
-            .filter(|entity| filter(**entity))
-            .filter(|child| self.frame_query.contains(**child))
-            .copied()
+            .filter_map(|(entity, _, parent)| {
+                parent
+                    .map(|p| p.get())
+                    .filter(|parent| *parent == this)
+                    .map(|_| entity)
+            })
+            .filter(|entity| filter(*entity))
             .collect()
     }
 
