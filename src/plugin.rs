@@ -7,6 +7,7 @@ use bevy_transform::{prelude::*, TransformSystem};
 use std::marker::PhantomData;
 
 use crate::{
+    grid_cell::GridCellAny,
     precision::GridPrecision,
     reference_frame::{local_origin::LocalFloatingOrigin, PropagationStats, ReferenceFrame},
     validation, BigSpace, FloatingOrigin, GridCell,
@@ -46,6 +47,7 @@ impl<P: GridPrecision> Default for BigSpacePlugin<P> {
 #[allow(missing_docs)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum FloatingOriginSet {
+    Init,
     RecenterLargeTransforms,
     LocalFloatingOrigins,
     PropagateHighPrecision,
@@ -61,6 +63,12 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> 
 
         let system_set_config = || {
             (
+                PropagationStats::reset
+                    .in_set(FloatingOriginSet::Init)
+                    .before(FloatingOriginSet::RecenterLargeTransforms),
+                ReferenceFrame::<P>::tag_low_precision_roots // loose ordering on this set
+                    .after(FloatingOriginSet::Init)
+                    .before(FloatingOriginSet::PropagateLowPrecision),
                 (
                     GridCell::<P>::recenter_large_transforms,
                     BigSpace::find_floating_origin,
@@ -79,16 +87,22 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> 
                 .in_set(TransformSystem::TransformPropagate)
         };
 
-        app.register_type::<Transform>()
+        app
+            // Reflect
+            .register_type::<Transform>()
             .register_type::<GlobalTransform>()
             .register_type::<GridCell<P>>()
+            .register_type::<GridCellAny>()
             .register_type::<ReferenceFrame<P>>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
+            // Propagation stats
             .register_type::<PropagationStats>()
             .init_resource::<PropagationStats>()
+            // Meat of the plugin, once on startup, as well as every update
             .add_systems(PostStartup, system_set_config())
             .add_systems(PostUpdate, system_set_config())
+            // Validation
             .add_systems(
                 PostUpdate,
                 validation::validate_hierarchy::<validation::SpatialHierarchyRoot<P>>

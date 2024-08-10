@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, iter::Sum, ops::Div};
 
 use bevy::prelude::*;
 use bevy_math::DVec3;
@@ -20,8 +20,10 @@ fn main() {
             CameraControllerPlugin::<i32>::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
-        .add_systems(Update, move_player)
+        .add_systems(Update, (avg_stats, move_player).chain())
         .init_resource::<MaterialPresets>()
+        .init_resource::<Avg<PropagationStats>>()
+        .init_resource::<Avg<SpatialHashStats>>()
         .insert_resource(ClearColor(Color::BLACK))
         .run();
 }
@@ -43,11 +45,11 @@ impl FromWorld for MaterialPresets {
     fn from_world(world: &mut World) -> Self {
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
 
-        let mut d: StandardMaterial = Color::from(Srgba::new(0.9, 0.9, 0.9, 0.05)).into();
+        let mut d: StandardMaterial = Color::from(Srgba::new(0.9, 0.9, 0.9, 1.0)).into();
         d.unlit = true;
-        let mut h: StandardMaterial = Color::from(Srgba::new(1.0, 0.0, 0.0, 0.5)).into();
+        let mut h: StandardMaterial = Color::from(Srgba::new(1.0, 0.0, 0.0, 1.0)).into();
         h.unlit = true;
-        let mut f: StandardMaterial = Color::from(Srgba::new(0.0, 1.0, 0.0, 0.1)).into();
+        let mut f: StandardMaterial = Color::from(Srgba::new(0.0, 1.0, 0.0, 1.0)).into();
         f.unlit = true;
 
         Self {
@@ -72,8 +74,8 @@ fn move_player(
     spatial_hash_map: Res<SpatialHashMap<i32>>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<(&mut Text, &mut StatsText)>,
-    hash_stats: Res<SpatialHashStats>,
-    prop_stats: Res<PropagationStats>,
+    hash_stats: Res<Avg<SpatialHashStats>>,
+    prop_stats: Res<Avg<PropagationStats>>,
 ) {
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
@@ -149,12 +151,59 @@ Low Precision Propagation: {: >9.2?}
 High Precision Propagation: {: >8.2?}",
         avg * 1e6,
         total,
-        hash_stats.hash_update_duration(),
-        hash_stats.map_update_duration(),
-        prop_stats.local_origin_propagation(),
-        prop_stats.low_precision_propagation(),
-        prop_stats.high_precision_propagation(),
+        hash_stats.avg.hash_update_duration(),
+        hash_stats.avg.map_update_duration(),
+        prop_stats.avg.local_origin_propagation(),
+        prop_stats.avg.low_precision_propagation(),
+        prop_stats.avg.high_precision_propagation(),
     );
+}
+
+#[derive(Resource)]
+struct Avg<T>
+where
+    for<'a> T: FromWorld + Sum<&'a T> + Div<u32, Output = T>,
+{
+    queue: VecDeque<T>,
+    avg: T,
+}
+
+impl<T> FromWorld for Avg<T>
+where
+    for<'a> T: FromWorld + Sum<&'a T> + Div<u32, Output = T>,
+{
+    fn from_world(world: &mut World) -> Self {
+        Avg {
+            queue: VecDeque::new(),
+            avg: T::from_world(world),
+        }
+    }
+}
+
+impl<T> Avg<T>
+where
+    for<'a> T: FromWorld + Sum<&'a T> + Div<u32, Output = T>,
+{
+    fn push(&mut self, value: T) -> &mut Self {
+        self.queue.truncate(63);
+        self.queue.push_front(value);
+        self
+    }
+
+    fn compute_avg(&mut self) -> &mut Self {
+        self.avg = self.queue.iter().sum::<T>() / self.queue.len() as u32;
+        self
+    }
+}
+
+fn avg_stats(
+    hash_stats: Res<SpatialHashStats>,
+    mut avg_hash_stats: ResMut<Avg<SpatialHashStats>>,
+    prop_stats: Res<PropagationStats>,
+    mut avg_prop_stats: ResMut<Avg<PropagationStats>>,
+) {
+    avg_hash_stats.push(hash_stats.clone()).compute_avg();
+    avg_prop_stats.push(prop_stats.clone()).compute_avg();
 }
 
 fn spawn(
@@ -179,7 +228,7 @@ fn spawn(
 
     let values: Vec<_> = std::iter::repeat_with(rng).take(N_ENTITIES).collect();
 
-    let sphere = meshes.add(Sphere::new(HALF_WIDTH / 200.0));
+    let sphere = meshes.add(Sphere::new(HALF_WIDTH / 600.0));
 
     commands.spawn_big_space(ReferenceFrame::<i32>::new(4.0, 0.0), |root| {
         root.spawn_spatial((

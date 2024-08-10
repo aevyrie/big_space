@@ -3,6 +3,7 @@
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
+    ops::Div,
 };
 
 use bevy_app::prelude::*;
@@ -114,6 +115,27 @@ impl SpatialHashStats {
     /// Time to update all spatial hash maps.
     pub fn map_update_duration(&self) -> Duration {
         self.map_update_duration
+    }
+}
+
+impl<'a> std::iter::Sum<&'a SpatialHashStats> for SpatialHashStats {
+    fn sum<I: Iterator<Item = &'a SpatialHashStats>>(iter: I) -> Self {
+        iter.fold(SpatialHashStats::default(), |mut acc, e| {
+            acc.hash_update_duration += e.hash_update_duration;
+            acc.map_update_duration += e.map_update_duration;
+            acc
+        })
+    }
+}
+
+impl Div<u32> for SpatialHashStats {
+    type Output = Self;
+
+    fn div(self, rhs: u32) -> Self::Output {
+        Self {
+            hash_update_duration: self.hash_update_duration.div(rhs),
+            map_update_duration: self.map_update_duration.div(rhs),
+        }
     }
 }
 

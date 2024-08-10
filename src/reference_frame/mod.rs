@@ -20,10 +20,15 @@ pub mod propagation;
 pub struct PropagationStats {
     local_origin_propagation: Duration,
     high_precision_propagation: Duration,
+    low_precision_root_tagging: Duration,
     low_precision_propagation: Duration,
 }
 
 impl PropagationStats {
+    pub(crate) fn reset(mut stats: ResMut<Self>) {
+        *stats = Self::default();
+    }
+
     /// How long it took to run [`LocalFloatingOrigin`] propagation this update.
     pub fn local_origin_propagation(&self) -> Duration {
         self.local_origin_propagation
@@ -37,6 +42,30 @@ impl PropagationStats {
     /// How long it took to run low precision [`Transform`] propagation this update.
     pub fn low_precision_propagation(&self) -> Duration {
         self.low_precision_propagation
+    }
+}
+
+impl<'a> std::iter::Sum<&'a PropagationStats> for PropagationStats {
+    fn sum<I: Iterator<Item = &'a PropagationStats>>(iter: I) -> Self {
+        iter.fold(PropagationStats::default(), |mut acc, e| {
+            acc.local_origin_propagation += e.local_origin_propagation;
+            acc.high_precision_propagation += e.high_precision_propagation;
+            acc.low_precision_propagation += e.low_precision_propagation;
+            acc
+        })
+    }
+}
+
+impl std::ops::Div<u32> for PropagationStats {
+    type Output = Self;
+
+    fn div(self, rhs: u32) -> Self::Output {
+        Self {
+            local_origin_propagation: self.local_origin_propagation.div(rhs),
+            high_precision_propagation: self.high_precision_propagation.div(rhs),
+            low_precision_root_tagging: self.low_precision_root_tagging.div(rhs),
+            low_precision_propagation: self.low_precision_propagation.div(rhs),
+        }
     }
 }
 

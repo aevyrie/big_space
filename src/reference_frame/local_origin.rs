@@ -45,7 +45,7 @@ mod inner {
     pub struct LocalFloatingOrigin<P: GridPrecision> {
         /// The local cell that the floating origin's grid cell origin falls into.
         cell: GridCell<P>,
-        /// The translation of floating origin's grid cell relative to the origin of
+        /// The translation of the floating origin's grid cell relative to the origin of
         /// [`LocalFloatingOrigin::cell`].
         translation: Vec3,
         /// The rotation of the floating origin's grid cell relative to the origin of
@@ -335,7 +335,7 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
         self.frame_query
             .get_mut(frame_entity)
             .map(|(_entity, mut frame, _parent)| func(frame.as_mut(), &cell, &transform))
-            .expect("The supplied reference frame handle to node is no longer valid.")
+            .expect("The supplied reference frame entity is no longer valid.")
     }
 
     /// Get the reference frame and the position of the reference frame from its `Entity`.
@@ -374,8 +374,8 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
         }
     }
 
-    /// Get handles to all reference frames that are children of this reference frame. Applies a
-    /// filter to the returned children.
+    /// Get all reference frame entities that are children of this reference frame. Applies a filter
+    /// to the returned children.
     fn child_frames_filtered(
         &mut self,
         this: Entity,
@@ -398,12 +398,12 @@ impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
             .collect()
     }
 
-    /// Get IDs to all reference frames that are children of this reference frame.
+    /// Get all reference frame entities that are children of this reference frame.
     pub fn child_frames(&mut self, this: Entity) -> Vec<Entity> {
         self.child_frames_filtered(this, |_| true)
     }
 
-    /// Get IDs to all reference frames that are siblings of this reference frame.
+    /// Get all reference frame entities  that are siblings of this reference frame.
     pub fn sibling_frames(&mut self, this_entity: Entity) -> Vec<Entity> {
         if let Some(parent) = self.parent_frame(this_entity) {
             self.child_frames_filtered(parent, |e| e != this_entity)
@@ -501,7 +501,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
             error!("Reached the maximum reference frame depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
         }
 
-        stats.local_origin_propagation = start.elapsed();
+        stats.local_origin_propagation += start.elapsed();
     }
 }
 

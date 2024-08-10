@@ -2,11 +2,25 @@
 
 use bevy_ecs::{batching::BatchingStrategy, prelude::*};
 use bevy_hierarchy::prelude::*;
+use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 
-use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, GridCell};
+use crate::{
+    grid_cell::GridCellAny, precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace,
+    GridCell,
+};
 
 use super::PropagationStats;
+
+/// Marks entities in the big space hierarchy that are themselves roots of a low-precision subtree.
+/// While finding these entities is slow, we only have to do it during hierarchy or archetype
+/// changes. Once the entity is marked (updating its archetype), querying it is now very fast.
+///
+/// - This entity's parent must be a high precision entity (with a [`GridCell`]).
+/// - This entity must not have a [`GridCell`].
+/// - This entity may or may not have children.
+#[derive(Component, Default, Reflect)]
+pub struct LowPrecisionRoot;
 
 impl<P: GridPrecision> ReferenceFrame<P> {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`]
@@ -67,7 +81,67 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                     frame.global_transform(&GridCell::default(), &Transform::IDENTITY);
             });
 
-        stats.high_precision_propagation = start.elapsed();
+        stats.high_precision_propagation += start.elapsed();
+    }
+
+    /// Marks entities with [`LowPrecisionRoot`]. Handles adding and removing the component.
+    pub fn tag_low_precision_roots(
+        mut stats: ResMut<PropagationStats>,
+        mut commands: Commands,
+        valid_parent: Query<(), (With<GridCell<P>>, With<GlobalTransform>, With<Children>)>,
+        unmarked: Query<
+            (Entity, &Parent),
+            (
+                With<Transform>,
+                With<GlobalTransform>,
+                Without<GridCellAny>,
+                Without<LowPrecisionRoot>,
+                Or<(Changed<Parent>, Added<Transform>)>,
+            ),
+        >,
+        invalidated: Query<
+            Entity,
+            (
+                With<LowPrecisionRoot>,
+                Or<(
+                    Without<Transform>,
+                    Without<GlobalTransform>,
+                    With<GridCell<P>>,
+                    Without<Parent>,
+                )>,
+            ),
+        >,
+
+        has_possibly_invalid_parent: Query<
+            (Entity, &Parent),
+            (
+                With<LowPrecisionRoot>,
+                Or<(
+                    Without<Transform>,
+                    Without<GlobalTransform>,
+                    With<GridCell<P>>,
+                    Without<Parent>,
+                )>,
+            ),
+        >,
+    ) {
+        let start = bevy_utils::Instant::now();
+        for (entity, parent) in unmarked.iter() {
+            if valid_parent.contains(parent.get()) {
+                commands.entity(entity).insert(LowPrecisionRoot);
+            }
+        }
+
+        for entity in invalidated.iter() {
+            commands.entity(entity).remove::<LowPrecisionRoot>();
+        }
+
+        for (entity, parent) in has_possibly_invalid_parent.iter() {
+            if !valid_parent.contains(parent.get()) {
+                commands.entity(entity).remove::<LowPrecisionRoot>();
+            }
+        }
+        stats.low_precision_root_tagging += start.elapsed();
     }
 
     /// Update the [`GlobalTransform`] of entities with a [`Transform`], without a [`GridCell`], and
@@ -75,19 +149,21 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     /// entities that only have low-precision [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
         mut stats: ResMut<PropagationStats>,
-        roots: Query<
-            (Entity, &Children, Ref<GlobalTransform>),
+        root_parents: Query<
+            Ref<GlobalTransform>,
             (
                 // A root big space does not have a grid cell, and not all high precision entities
                 // have a reference frame
                 Or<(With<ReferenceFrame<P>>, With<GridCell<P>>)>,
             ),
         >,
+        roots: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
         transform_query: Query<
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<Parent>,
-                Without<GridCell<P>>,
+                Without<GridCellAny>,
+                Without<GridCell<P>>, // Used to prove access to GlobalTransform is disjoint
                 Without<ReferenceFrame<P>>,
             ),
         >,
@@ -96,52 +172,46 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCell<P>>,
+                Without<GridCellAny>,
                 Without<ReferenceFrame<P>>,
             ),
         >,
     ) {
         let start = bevy_utils::Instant::now();
-        let update_transforms = |entity, children, global_transform: Ref<GlobalTransform>| {
-            for (child, actual_parent) in parent_query.iter_many(children) {
-                assert_eq!(
-                    actual_parent.get(), entity,
-                    "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
+        let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
+            // High precision global transforms are change-detected, and are only updated if
+            // that entity has moved relative to the floating origin's grid cell.
+            let changed = parent_transform.is_changed();
+
+            // SAFETY:
+            // - Unlike the bevy version of this, we do not iterate over all children of the root,
+            //   and manually verify each child has a parent component that points back to the same
+            //   entity. Instead, we query the roots directly, so we know they are unique.
+            // - We may operate as if all descendants are consistent, since `propagate_recursive`
+            //   will panic before continuing to propagate if it encounters an entity with
+            //   inconsistent parentage.
+            // - Since each root entity is unique and the hierarchy is consistent and forest-like,
+            //   other root entities' `propagate_recursive` calls will not conflict with this one.
+            // - Since this is the only place where `transform_query` gets used, there will be no
+            //   conflicting fetches elsewhere.
+            unsafe {
+                Self::propagate_recursive(
+                    &parent_transform,
+                    &transform_query,
+                    &parent_query,
+                    low_precision_root,
+                    changed,
                 );
-
-                // High precision global transforms are change-detected, and are only updated if
-                // that entity has moved relative to the floating origin's grid cell.
-                let changed = global_transform.is_changed();
-
-                // SAFETY:
-                // - `child` must have consistent parentage, or the above assertion would panic.
-                // Since `child` is parented to a root entity, the entire hierarchy leading to it is
-                // consistent.
-                // - We may operate as if all descendants are consistent, since
-                //   `propagate_recursive` will panic before continuing to propagate if it
-                //   encounters an entity with inconsistent parentage.
-                // - Since each root entity is unique and the hierarchy is consistent and
-                //   forest-like, other root entities' `propagate_recursive` calls will not conflict
-                //   with this one.
-                // - Since this is the only place where `transform_query` gets used, there will be
-                //   no conflicting fetches elsewhere.
-                unsafe {
-                    Self::propagate_recursive(
-                        &global_transform,
-                        &transform_query,
-                        &parent_query,
-                        child,
-                        changed,
-                    );
-                }
             }
         };
 
-        roots
-            .par_iter()
-            .for_each(|(e, c, g)| update_transforms(e, c, g));
+        roots.par_iter().for_each(|(low_precision_root, parent)| {
+            if let Ok(parent_transform) = root_parents.get(parent.get()) {
+                update_transforms(low_precision_root, parent_transform);
+            }
+        });
 
-        stats.low_precision_propagation = start.elapsed();
+        stats.low_precision_propagation += start.elapsed();
     }
 
     /// COPIED FROM BEVY
@@ -165,6 +235,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<Parent>,
+                Without<GridCellAny>, // ***ADDED*** Only recurse low-precision entities
                 Without<GridCell<P>>, // ***ADDED*** Only recurse low-precision entities
                 Without<ReferenceFrame<P>>, // ***ADDED*** Only recurse low-precision entities
             ),
@@ -174,7 +245,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCell<P>>,
+                Without<GridCellAny>,
                 Without<ReferenceFrame<P>>,
             ),
         >,
@@ -241,5 +312,50 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::prelude::*;
+
+    use crate::{BigSpaceCommands, BigSpacePlugin, FloatingOrigin, GridCell, ReferenceFrame};
+
+    #[test]
+    fn low_precision_in_big_space() {
+        #[derive(Component)]
+        struct Test;
+
+        let mut app = App::new();
+        app.add_plugins(BigSpacePlugin::<i32>::default())
+            .add_systems(Startup, |mut commands: Commands| {
+                commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+                    root.spawn_spatial(FloatingOrigin);
+                    root.spawn_spatial((
+                        Transform::from_xyz(3.0, 3.0, 3.0),
+                        GridCell::new(1, 1, 1), // Default cell size is 2000
+                    ))
+                    .with_children(|spatial| {
+                        spatial.spawn((
+                            SpatialBundle {
+                                transform: Transform::from_xyz(1.0, 2.0, 3.0),
+                                ..default()
+                            },
+                            Test,
+                        ));
+                    });
+                });
+            });
+
+        app.update();
+
+        let mut q = app
+            .world_mut()
+            .query_filtered::<&GlobalTransform, With<Test>>();
+        let actual_transform = *q.single(app.world());
+        assert_eq!(
+            actual_transform,
+            GlobalTransform::from_xyz(2004.0, 2005.0, 2006.0)
+        )
     }
 }

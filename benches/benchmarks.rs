@@ -106,11 +106,11 @@ fn spatial_hashing(c: &mut Criterion) {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
-                IVec3::new(
+                [
                     rng.i32(-HALF_WIDTH..=HALF_WIDTH),
                     rng.i32(-HALF_WIDTH..=HALF_WIDTH),
                     rng.i32(-HALF_WIDTH..=HALF_WIDTH),
-                )
+                ]
             })
             .take(N_SPAWN)
             .collect();
@@ -118,7 +118,7 @@ fn spatial_hashing(c: &mut Criterion) {
             root.with_children(|root| {
                 for pos in values {
                     root.spawn(BigSpatialBundle {
-                        cell: GridCell::new(pos.x, pos.y, pos.z),
+                        cell: GridCell::new(pos[0], pos[1], pos[2]),
                         ..Default::default()
                     });
                 }
@@ -128,7 +128,7 @@ fn spatial_hashing(c: &mut Criterion) {
 
     fn translate(mut cells: Query<&mut GridCell<i32>>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
-            *cell += IVec3::ONE;
+            *cell += GridCell::ONE;
         })
     }
 
@@ -217,11 +217,11 @@ fn hash_filtering(c: &mut Criterion) {
     fn setup(mut commands: Commands) {
         let rng = Rng::with_seed(342525);
         let values: Vec<_> = repeat_with(|| {
-            IVec3::new(
+            [
                 rng.i32(-HALF_WIDTH..=HALF_WIDTH),
                 rng.i32(-HALF_WIDTH..=HALF_WIDTH),
                 rng.i32(-HALF_WIDTH..=HALF_WIDTH),
-            )
+            ]
         })
         .take(N_ENTITIES)
         .collect();
@@ -230,7 +230,7 @@ fn hash_filtering(c: &mut Criterion) {
             root.with_children(|root| {
                 for (i, pos) in values.iter().enumerate() {
                     let mut cmd = root.spawn(BigSpatialBundle {
-                        cell: GridCell::new(pos.x, pos.y, pos.z),
+                        cell: GridCell::new(pos[0], pos[1], pos[2]),
                         ..Default::default()
                     });
                     if i < N_PLAYERS {

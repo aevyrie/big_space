@@ -86,7 +86,7 @@ impl BigSpace {
             .filter(|(_k, v)| **v == 0)
             .map(|(k, _v)| k)
         {
-            error!("BigSpace {space:#?} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",)
+            error!("BigSpace {space:#} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",)
         }
     }
 }
