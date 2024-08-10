@@ -11,12 +11,26 @@ use turborand::prelude::*;
 
 criterion_group!(
     benches,
+    global_transform,
     spatial_hashing,
     hash_filtering,
     deep_hierarchy,
     wide_hierarchy
 );
 criterion_main!(benches);
+
+#[allow(clippy::unit_arg)]
+fn global_transform(c: &mut Criterion) {
+    let mut group = c.benchmark_group("propagation");
+    group.bench_function("global_transform", |b| {
+        let frame = ReferenceFrame::default();
+        let local_cell = GridCell { x: 1, y: 1, z: 1 };
+        let local_transform = Transform::from_xyz(9.0, 200.0, 500.0);
+        b.iter(|| {
+            black_box(frame.global_transform(&local_cell, &local_transform));
+        });
+    });
+}
 
 #[allow(clippy::unit_arg)]
 fn deep_hierarchy(c: &mut Criterion) {
