@@ -49,6 +49,16 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
                     // moved and the floating origin's local origin in that reference frame hasn't
                     // changed.
+                    //
+                    // This also ensures we don't trigger change detection on GlobalTransforms when
+                    // they haven't changed.
+                    //
+                    // This check can have a big impact on reducing computations for entities in the
+                    // same reference frame as the floating origin, i.e. the main camera. It also
+                    // means that as the floating origin moves between cells, that could suddenly
+                    // cause a spike in the amount of computation needed that frame. In the future,
+                    // we might be able to spread that work across frames, entities far away can
+                    // maybe be delayed for a frame or two without being noticeable.
                     if frame.local_floating_origin().is_local_origin_unchanged()
                         && !transform.is_changed()
                         && !grid.is_changed()
