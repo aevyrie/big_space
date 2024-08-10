@@ -146,6 +146,7 @@ Spatial Hashing Update Cost:
 Update Hashes: {: >8.2?}
 Update Maps: {: >10.2?}
 
+Low Precision Root Tagging: {: >8.2?}
 Local Origin Propagation: {: >10.2?}
 Low Precision Propagation: {: >9.2?}
 High Precision Propagation: {: >8.2?}",
@@ -153,6 +154,7 @@ High Precision Propagation: {: >8.2?}",
         total,
         hash_stats.avg.hash_update_duration(),
         hash_stats.avg.map_update_duration(),
+        prop_stats.avg.low_precision_root_tagging(),
         prop_stats.avg.local_origin_propagation(),
         prop_stats.avg.low_precision_propagation(),
         prop_stats.avg.high_precision_propagation(),
@@ -235,7 +237,7 @@ fn spawn(
             Camera3dBundle::default(),
             CameraController::default(),
             FloatingOrigin,
-            GridCell::new(0, 0, HALF_WIDTH as i32 * 2),
+            GridCell::new(0, 0, HALF_WIDTH as i32),
         ));
         root.with_children(|root_builder| {
             for (i, value) in values.iter().enumerate() {

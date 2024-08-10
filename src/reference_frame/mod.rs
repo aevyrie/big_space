@@ -43,6 +43,11 @@ impl PropagationStats {
     pub fn low_precision_propagation(&self) -> Duration {
         self.low_precision_propagation
     }
+
+    /// How long it took to tag entities with [`LowPrecisionRoot`](propagation::LowPrecisionRoot).
+    pub fn low_precision_root_tagging(&self) -> Duration {
+        self.low_precision_root_tagging
+    }
 }
 
 impl<'a> std::iter::Sum<&'a PropagationStats> for PropagationStats {
@@ -51,6 +56,7 @@ impl<'a> std::iter::Sum<&'a PropagationStats> for PropagationStats {
             acc.local_origin_propagation += e.local_origin_propagation;
             acc.high_precision_propagation += e.high_precision_propagation;
             acc.low_precision_propagation += e.low_precision_propagation;
+            acc.low_precision_root_tagging += e.low_precision_root_tagging;
             acc
         })
     }
