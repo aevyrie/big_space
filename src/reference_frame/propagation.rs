@@ -121,19 +121,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 )>,
             ),
         >,
-
-        has_possibly_invalid_parent: Query<
-            (Entity, &Parent),
-            (
-                With<LowPrecisionRoot>,
-                Or<(
-                    Without<Transform>,
-                    Without<GlobalTransform>,
-                    With<GridCell<P>>,
-                    Without<Parent>,
-                )>,
-            ),
-        >,
+        has_possibly_invalid_parent: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
     ) {
         let start = bevy_utils::Instant::now();
         for (entity, parent) in unmarked.iter() {

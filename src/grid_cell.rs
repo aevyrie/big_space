@@ -1,7 +1,7 @@
 //! Contains the grid cell implementation
 
 use bevy_ecs::{component::StorageType, prelude::*};
-use bevy_math::IVec3;
+use bevy_math::{DVec3, IVec3};
 use bevy_reflect::prelude::*;
 
 use crate::*;
@@ -75,6 +75,15 @@ impl<P: GridPrecision> GridCell<P> {
         y: P::ONE,
         z: P::ONE,
     };
+
+    /// Convert this grid cell to a floating point translation within this `reference_frame`.
+    pub fn as_dvec3(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
+        DVec3 {
+            x: self.x.as_f64() * reference_frame.cell_edge_length() as f64,
+            y: self.y.as_f64() * reference_frame.cell_edge_length() as f64,
+            z: self.z.as_f64() * reference_frame.cell_edge_length() as f64,
+        }
+    }
 
     /// If an entity's transform translation becomes larger than the limit specified in its
     /// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the

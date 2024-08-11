@@ -123,22 +123,26 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Get the position of the floating origin relative to the current reference frame.
+    #[inline]
     pub fn local_floating_origin(&self) -> &LocalFloatingOrigin<P> {
         &self.local_floating_origin
     }
 
     /// Get the size of each cell this reference frame's grid.
+    #[inline]
     pub fn cell_edge_length(&self) -> f32 {
         self.cell_edge_length
     }
 
     /// Get the reference frame's [`Self::maximum_distance_from_origin`].
+    #[inline]
     pub fn maximum_distance_from_origin(&self) -> f32 {
         self.maximum_distance_from_origin
     }
 
     /// Compute the double precision position of an entity's [`Transform`] with respect to the given
     /// [`GridCell`] within this reference frame.
+    #[inline]
     pub fn grid_position_double(&self, pos: &GridCell<P>, transform: &Transform) -> DVec3 {
         DVec3 {
             x: pos.x.as_f64() * self.cell_edge_length as f64 + transform.translation.x as f64,
@@ -149,6 +153,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
     /// Compute the single precision position of an entity's [`Transform`] with respect to the given
     /// [`GridCell`].
+    #[inline]
     pub fn grid_position(&self, pos: &GridCell<P>, transform: &Transform) -> Vec3 {
         Vec3 {
             x: pos.x.as_f64() as f32 * self.cell_edge_length + transform.translation.x,
@@ -157,16 +162,8 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         }
     }
 
-    /// Returns the floating point position of a [`GridCell`].
-    pub fn grid_to_float(&self, pos: &GridCell<P>) -> DVec3 {
-        DVec3 {
-            x: pos.x.as_f64() * self.cell_edge_length as f64,
-            y: pos.y.as_f64() * self.cell_edge_length as f64,
-            z: pos.z.as_f64() * self.cell_edge_length as f64,
-        }
-    }
-
     /// Convert a large translation into a small translation relative to a grid cell.
+    #[inline]
     pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell<P>, Vec3) {
         let l = self.cell_edge_length as f64;
         let input = input.into();
@@ -194,6 +191,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Convert a large translation into a small translation relative to a grid cell.
+    #[inline]
     pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell<P>, Vec3) {
         self.translation_to_grid(input.as_dvec3())
     }
@@ -211,7 +209,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         // The grid cell offset of this entity relative to the floating origin's cell in this local
         // reference frame.
         let cell_origin_relative = *local_cell - self.local_floating_origin().cell();
-        let grid_offset = self.grid_to_float(&cell_origin_relative);
+        let grid_offset = cell_origin_relative.as_dvec3(self);
 
         let local_transform = DAffine3::from_scale_rotation_translation(
             local_transform.scale.as_dvec3(),
