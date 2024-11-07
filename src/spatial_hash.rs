@@ -3,7 +3,7 @@
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    ops::Div,
+    num::NonZeroU64,
 };
 
 use bevy_app::prelude::*;
@@ -13,10 +13,10 @@ use bevy_math::IVec3;
 use bevy_reflect::{Reflect, TypePath};
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},
-    AHasher, Duration, Instant, PassHash,
+    AHasher, Instant, Parallel, PassHash,
 };
 
-use crate::{precision::GridPrecision, GridCell};
+use crate::{precision::GridPrecision, timing::SpatialHashStats, GridCell};
 
 /// Add spatial hashing acceleration to `big_space`, accessible through the [`SpatialHashMap`]
 /// resource, and [`SpatialHash`] components.
@@ -42,15 +42,12 @@ impl<P: GridPrecision + TypePath, F: QueryFilter + Send + Sync + 'static> Plugin
     fn build(&self, app: &mut App) {
         app.init_resource::<SpatialHashMap<P, F>>()
             .register_type::<SpatialHash<P>>()
-            .init_resource::<SpatialHashStats>()
-            .register_type::<SpatialHashStats>()
+            .init_resource::<ChangedSpatialHashes<P, F>>()
             .add_systems(
                 PostUpdate,
                 (
-                    SpatialHashStats::reset.in_set(SpatialHashSet::Init),
                     Self::update_spatial_hashes
                         .in_set(SpatialHashSet::UpdateHash)
-                        .after(SpatialHashSet::Init)
                         .after(crate::FloatingOriginSet::RecenterLargeTransforms),
                     SpatialHashMap::<P, F>::update
                         .in_set(SpatialHashSet::UpdateMap)
@@ -61,19 +58,49 @@ impl<P: GridPrecision + TypePath, F: QueryFilter + Send + Sync + 'static> Plugin
     }
 }
 
+/// Used to manually track spatial hashes that have changed, for optimization purposes.
+///
+/// We use a manual collection instead of a `Changed` query because a query that uses `Changed`
+/// still has to iterate over every single entity. By making a shortlist of changed entities
+/// ourselves, we can make this 1000x faster.
+///
+/// Note that this is optimized for *sparse* updates, this may perform worse if you are updating
+/// every entity. The observation here is that usually entities are not moving between grid cells,
+/// and thus their spatial hash is not changing. On top of that, many entities are completely
+/// static.
+///
+/// It may be possible to remove this if bevy gets archetype change detection, or observers that can
+/// react to a component being mutated. For now, this performs well enough.
+#[derive(Resource)]
+struct ChangedSpatialHashes<P: GridPrecision, F: QueryFilter> {
+    list: Vec<Entity>,
+    spooky: PhantomData<(P, fn() -> F)>, // fn makes this send and sync
+}
+
+impl<P: GridPrecision, F: QueryFilter> Default for ChangedSpatialHashes<P, F> {
+    fn default() -> Self {
+        Self {
+            list: Vec::new(),
+            spooky: PhantomData,
+        }
+    }
+}
+
 impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
     /// Update or insert the [`SpatialHash`] of all changed entities that match the optional
     /// `QueryFilter`.
     fn update_spatial_hashes(
         mut commands: Commands,
+        mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
         mut spatial_entities: ParamSet<(
             Query<
-                (&Parent, &GridCell<P>, &mut SpatialHash<P>),
+                (Entity, &Parent, &GridCell<P>, &mut SpatialHash<P>),
                 (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
             >,
             Query<(Entity, &Parent, &GridCell<P>), (F, Without<SpatialHash<P>>)>,
         )>,
-        mut stats: ResMut<SpatialHashStats>,
+        mut stats: Option<ResMut<SpatialHashStats>>,
+        mut thread_local: Local<Parallel<Vec<Entity>>>,
     ) {
         let start = Instant::now();
 
@@ -81,60 +108,28 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
         for (entity, parent, cell) in spatial_entities.p1().iter() {
             let spatial_hash = SpatialHash::new(parent, cell);
             commands.entity(entity).insert(spatial_hash);
+            thread_local.scope(|tl| tl.push(entity));
         }
 
         // Update existing
         spatial_entities
             .p0()
             .par_iter_mut()
-            .for_each(|(parent, cell, mut old_hash)| {
-                let _ = old_hash.replace_if_neq(SpatialHash::new(parent, cell));
+            .for_each(|(entity, parent, cell, mut old_hash)| {
+                if old_hash
+                    .replace_if_neq(SpatialHash::new(parent, cell))
+                    .is_some()
+                {
+                    thread_local.scope(|tl| tl.push(entity));
+                }
             });
 
-        stats.hash_update_duration += start.elapsed();
-    }
-}
+        changed_hashes
+            .list
+            .extend(thread_local.drain::<Vec<Entity>>());
 
-/// Aggregate runtime statistics across all [`SpatialHashPlugin`]s.
-#[derive(Resource, Debug, Clone, Default, Reflect)]
-pub struct SpatialHashStats {
-    hash_update_duration: Duration,
-    map_update_duration: Duration,
-}
-
-impl SpatialHashStats {
-    fn reset(mut stats: ResMut<SpatialHashStats>) {
-        *stats = Self::default();
-    }
-
-    /// Time to update all entity hashes.
-    pub fn hash_update_duration(&self) -> Duration {
-        self.hash_update_duration
-    }
-
-    /// Time to update all spatial hash maps.
-    pub fn map_update_duration(&self) -> Duration {
-        self.map_update_duration
-    }
-}
-
-impl<'a> std::iter::Sum<&'a SpatialHashStats> for SpatialHashStats {
-    fn sum<I: Iterator<Item = &'a SpatialHashStats>>(iter: I) -> Self {
-        iter.fold(SpatialHashStats::default(), |mut acc, e| {
-            acc.hash_update_duration += e.hash_update_duration;
-            acc.map_update_duration += e.map_update_duration;
-            acc
-        })
-    }
-}
-
-impl Div<u32> for SpatialHashStats {
-    type Output = Self;
-
-    fn div(self, rhs: u32) -> Self::Output {
-        Self {
-            hash_update_duration: self.hash_update_duration.div(rhs),
-            map_update_duration: self.map_update_duration.div(rhs),
+        if let Some(ref mut stats) = stats {
+            stats.hash_update_duration += start.elapsed();
         }
     }
 }
@@ -142,8 +137,6 @@ impl Div<u32> for SpatialHashStats {
 /// System sets for [`SpatialHashPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
 pub enum SpatialHashSet {
-    /// Setup.
-    Init,
     /// [`SpatialHash`] updated.
     UpdateHash,
     /// [`SpatialHashMap`] updated.
@@ -161,6 +154,8 @@ pub enum SpatialHashSet {
 /// [`GridCell`] and the [`Parent`] of the entity to uniquely identify its position. These two
 /// values are then hashed and stored in this spatial hash component.
 ///
+/// For optimization reasons, this hash cannot be computed manually.
+///
 /// # WARNING
 ///
 /// Like all hashes, it is possible to encounter collisions. If two spatial hashes are identical,
@@ -172,7 +167,7 @@ pub enum SpatialHashSet {
 /// that could not possibly overlap: if the spatial hashes do not match, you can be certain they are
 /// not in the same cell.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
-pub struct SpatialHash<P: GridPrecision>(u64, #[reflect(ignore)] PhantomData<P>);
+pub struct SpatialHash<P: GridPrecision>(NonZeroU64, #[reflect(ignore)] PhantomData<P>);
 
 impl<P: GridPrecision> PartialEq for SpatialHash<P> {
     fn eq(&self, other: &Self) -> bool {
@@ -185,24 +180,23 @@ impl<P: GridPrecision> Eq for SpatialHash<P> {}
 impl<P: GridPrecision> Hash for SpatialHash<P> {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.0);
+        state.write_u64(self.0.into());
     }
 }
 
 impl<P: GridPrecision> SpatialHash<P> {
     /// Generate a new hash from parts.
+    ///
+    /// Intentionally left private, so we can ensure the only place these are constructed/mutated is
+    /// this module. This allows us to optimize change detection using [`ChangedSpatialHashes`].
     #[inline]
-    pub fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
+    fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
         PartialSpatialHash::new(parent).generate(cell)
     }
 
-    /// Effectively the same as [`Self::new`], but uses `Entity` instead of `Parent` as the input.
-    ///
-    /// We use `Parent` on the "happy path" to help prevent errors when passing in the wrong entity.
-    /// Using `Parent` also makes it obvious that when you are querying the `GridCell` of the
-    /// entity, you should add `Parent` to the query, *not* the `Entity`.
     #[inline]
-    pub fn from_parent(parent: Entity, cell: &GridCell<P>) -> Self {
+    #[cfg(test)]
+    pub(super) fn from_parent(parent: Entity, cell: &GridCell<P>) -> Self {
         PartialSpatialHash::from_parent(parent).generate(cell)
     }
 }
@@ -273,13 +267,10 @@ where
     /// the optional `QueryFilter`.
     fn update(
         mut spatial_map: ResMut<SpatialHashMap<P, F>>,
-        changed_entities: Query<
-            (Entity, &SpatialHash<P>, &Parent, &GridCell<P>),
-            (F, Changed<SpatialHash<P>>),
-        >,
+        mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
+        all_hashes: Query<(Entity, &SpatialHash<P>, &Parent, &GridCell<P>), F>,
         mut removed: RemovedComponents<SpatialHash<P>>,
-        mut stats: ResMut<SpatialHashStats>,
-        mut destroy_list: Local<Vec<SpatialHash<P>>>,
+        mut stats: Option<ResMut<SpatialHashStats>>,
     ) {
         let start = Instant::now();
 
@@ -287,13 +278,22 @@ where
             spatial_map.remove(entity)
         }
 
-        for (entity, spatial_hash, parent, cell) in &changed_entities {
+        if let Some(ref mut stats) = stats {
+            stats.moved_entities = changed_hashes.list.len();
+        }
+
+        // See the docs on ChangedSpatialHash understand why we don't use query change detection.
+        for (entity, spatial_hash, parent, cell) in changed_hashes
+            .list
+            .drain(..)
+            .filter_map(|entity| all_hashes.get(entity).ok())
+        {
             spatial_map.insert_or_update(entity, *spatial_hash, parent, cell);
         }
 
-        spatial_map.clean_up_empty_sets(&mut destroy_list);
-
-        stats.map_update_duration += start.elapsed();
+        if let Some(ref mut stats) = stats {
+            stats.map_update_duration += start.elapsed();
+        }
     }
 
     #[inline]
@@ -309,7 +309,7 @@ where
             if hash.eq(old_hash) {
                 return; // If the spatial hash is unchanged, early exit.
             }
-            Self::remove_from_map(entity, *old_hash, &mut self.map);
+            Self::remove_from_map(entity, *old_hash, &mut self.map, &mut self.hash_set_pool);
             *old_hash = hash;
         } else {
             self.reverse_map.insert(entity, hash);
@@ -335,7 +335,7 @@ where
     #[inline]
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
-            Self::remove_from_map(entity, old_hash, &mut self.map)
+            Self::remove_from_map(entity, old_hash, &mut self.map, &mut self.hash_set_pool)
         }
     }
 
@@ -344,25 +344,19 @@ where
         entity: Entity,
         old_hash: SpatialHash<P>,
         map: &mut HashMap<SpatialHash<P>, SpatialHashEntry<P>, PassHash>,
+        hash_set_pool: &mut Vec<HashSet<Entity, PassHash>>,
     ) {
-        if let Some(entry) = map.get_mut(&old_hash) {
+        let empty = if let Some(entry) = map.get_mut(&old_hash) {
             entry.entities.remove(&entity);
-        }
-    }
-
-    fn clean_up_empty_sets(&mut self, destroy_list: &mut Local<Vec<SpatialHash<P>>>) {
-        **destroy_list = self
-            .map
-            .iter()
-            .filter(|(_k, v)| v.entities.is_empty())
-            .map(|(k, _v)| *k)
-            .collect();
-        for empty_key in destroy_list.iter() {
-            if let Some(old_entry) = self.map.remove(empty_key) {
-                self.hash_set_pool.push(old_entry.entities);
+            entry.entities.is_empty()
+        } else {
+            false
+        };
+        if empty {
+            if let Some(empty) = map.remove(&old_hash) {
+                hash_set_pool.push(empty.entities);
             }
         }
-        destroy_list.clear();
     }
 
     /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].
@@ -413,12 +407,10 @@ where
         let search_width = 1 + 2 * radius;
         let search_volume = search_width.pow(3);
         let center = -radius;
+        let stride = IVec3::new(1, search_width, search_width.pow(2));
         let partial_hash = PartialSpatialHash::new(parent);
         (0..search_volume).map(move |i| {
-            let x = center + (i/* / search_width.pow(0) */) % search_width;
-            let y = center + (i / search_width/*.pow(1) */) % search_width;
-            let z = center + (i / search_width.pow(2)) % search_width;
-            let offset = IVec3::new(x, y, z);
+            let offset = center + i / stride % search_width;
             let neighbor_cell = cell + offset;
             (partial_hash.generate(&neighbor_cell), neighbor_cell)
         })
@@ -536,7 +528,10 @@ impl<P: GridPrecision> PartialSpatialHash<P> {
     pub fn generate(&self, cell: &GridCell<P>) -> SpatialHash<P> {
         let mut hasher_clone = self.hasher.clone();
         cell.hash(&mut hasher_clone);
-        SpatialHash(hasher_clone.finish(), PhantomData)
+        SpatialHash(
+            NonZeroU64::new(hasher_clone.finish()).unwrap_or(NonZeroU64::MIN),
+            PhantomData,
+        )
     }
 }
 

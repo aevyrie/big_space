@@ -1,16 +1,14 @@
 //! Logic for propagating transforms through the hierarchy of reference frames.
 
-use bevy_ecs::{batching::BatchingStrategy, prelude::*};
+use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 
 use crate::{
-    grid_cell::GridCellAny, precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace,
-    GridCell,
+    grid_cell::GridCellAny, precision::GridPrecision, reference_frame::ReferenceFrame,
+    timing::PropagationStats, BigSpace, GridCell,
 };
-
-use super::PropagationStats;
 
 /// Marks entities in the big space hierarchy that are themselves roots of a low-precision subtree.
 /// While finding these entities is slow, we only have to do it during hierarchy or archetype
@@ -40,10 +38,14 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     ) {
         let start = bevy_utils::Instant::now();
 
+        // Performance note: I've also tried to iterate over each reference frame's children at
+        // once, to avoid the reference frame and parent lookup, but that made things worse because
+        // it prevented dumb parallelism. The only think I can see to make this faster is archetype
+        // change detection. Change filters are not archetype filters, so they scale with the total
+        // number of entities that match the query, regardless of change.
         entities
             .p0()
             .par_iter_mut()
-            .batching_strategy(BatchingStrategy::fixed(10_000)) // Better scaling than default
             .for_each(|(grid, transform, parent, mut global_transform)| {
                 if let Ok(frame) = reference_frames.get(parent.get()) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
@@ -59,14 +61,13 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                     // cause a spike in the amount of computation needed that frame. In the future,
                     // we might be able to spread that work across frames, entities far away can
                     // maybe be delayed for a frame or two without being noticeable.
-                    if frame.local_floating_origin().is_local_origin_unchanged()
-                        && !transform.is_changed()
-                        && !grid.is_changed()
-                        && !parent.is_changed()
+                    if !frame.local_floating_origin().is_local_origin_unchanged()
+                        || transform.is_changed()
+                        || grid.is_changed()
+                        || parent.is_changed()
                     {
-                        return;
+                        *global_transform = frame.global_transform(&grid, &transform);
                     }
-                    *global_transform = frame.global_transform(&grid, &transform);
                 }
             });
 
@@ -223,10 +224,10 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     ///
     /// # Safety
     ///
-    /// - While this function is running, `transform_query` must not have any fetches for `entity`, nor
-    /// any of its descendants.
-    /// - The caller must ensure that the hierarchy leading to `entity` is well-formed and must remain
-    /// as a tree or a forest. Each entity must have at most one parent.
+    /// - While this function is running, `transform_query` must not have any fetches for `entity`,
+    ///   nor any of its descendants.
+    /// - The caller must ensure that the hierarchy leading to `entity` is well-formed and must
+    ///   remain as a tree or a forest. Each entity must have at most one parent.
     unsafe fn propagate_recursive(
         parent: &GlobalTransform,
         transform_query: &Query<

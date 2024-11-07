@@ -3,6 +3,7 @@
 use bevy_ecs::{component::StorageType, prelude::*};
 use bevy_math::{DVec3, IVec3};
 use bevy_reflect::prelude::*;
+use bevy_utils::Instant;
 
 use crate::*;
 
@@ -89,24 +90,33 @@ impl<P: GridPrecision> GridCell<P> {
     /// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
     /// transform.
     pub fn recenter_large_transforms(
+        mut stats: ResMut<PropagationStats>,
         reference_frames: Query<&ReferenceFrame<P>>,
         mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
     ) {
+        let start = Instant::now();
         changed_transform
             .par_iter_mut()
             .for_each(|(mut grid_pos, mut transform, parent)| {
                 let Ok(reference_frame) = reference_frames.get(parent.get()) else {
                     return;
                 };
-                if transform.as_ref().translation.abs().max_element()
+                if transform
+                    .bypass_change_detection()
+                    .translation
+                    .abs()
+                    .max_element()
                     > reference_frame.maximum_distance_from_origin()
                 {
                     let (grid_cell_delta, translation) = reference_frame
-                        .imprecise_translation_to_grid(transform.as_ref().translation);
+                        .imprecise_translation_to_grid(
+                            transform.bypass_change_detection().translation,
+                        );
                     *grid_pos += grid_cell_delta;
                     transform.translation = translation;
                 }
             });
+        stats.grid_recentering += start.elapsed();
     }
 }
 

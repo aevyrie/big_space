@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
-use bevy_log::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::{HashMap, HashSet};
 
@@ -103,7 +102,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         inspect.push('\n');
                     });
 
-                    error!("
+                    tracing::error!("
 -------------------------------------------
 big_space hierarchy validation error report
 -------------------------------------------
@@ -146,14 +145,14 @@ pub trait ValidHierarchyNode: sealed::CloneHierarchy + Send + Sync {
     }
 }
 
-pub(super) mod sealed {
+mod sealed {
     use super::ValidHierarchyNode;
 
     pub trait CloneHierarchy {
         fn clone_box(&self) -> Box<dyn ValidHierarchyNode>;
     }
 
-    impl<T: ?Sized> CloneHierarchy for T
+    impl<T> CloneHierarchy for T
     where
         T: 'static + ValidHierarchyNode + Clone,
     {

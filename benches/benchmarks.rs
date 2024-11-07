@@ -15,7 +15,8 @@ criterion_group!(
     spatial_hashing,
     hash_filtering,
     deep_hierarchy,
-    wide_hierarchy
+    wide_hierarchy,
+    vs_bevy,
 );
 criterion_main!(benches);
 
@@ -37,10 +38,10 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group("deep_hierarchy");
 
     /// Total number of entities to spawn
-    const N_SPAWN: usize = 10_000;
+    const N_SPAWN: usize = 100;
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+        commands.spawn_big_space(ReferenceFrame::<i32>::new(10000.0, 0.0), |root| {
             let mut parent = root.spawn_frame_default(()).id();
             for _ in 0..N_SPAWN {
                 let child = root
@@ -50,20 +51,24 @@ fn deep_hierarchy(c: &mut Criterion) {
                 root.commands().entity(parent).add_child(child);
                 parent = child;
             }
+            root.spawn_spatial(FloatingOrigin);
         });
     }
 
-    fn translate(mut cells: Query<&mut GridCell<i32>>) {
-        cells.iter_mut().for_each(|mut cell| {
-            *cell += IVec3::ONE;
+    fn translate(mut transforms: Query<&mut Transform>) {
+        transforms.iter_mut().for_each(|mut transform| {
+            transform.translation += Vec3::ONE;
         })
     }
 
     let mut app = App::new();
-    app.add_plugins(SpatialHashPlugin::<i32>::default())
-        .add_systems(Startup, setup)
-        .add_systems(Update, translate)
-        .update();
+    app.add_plugins((
+        SpatialHashPlugin::<i32>::default(),
+        BigSpacePlugin::<i32>::default(),
+    ))
+    .add_systems(Startup, setup)
+    .add_systems(Update, translate)
+    .update();
 
     group.bench_function("Baseline", |b| {
         b.iter(|| {
@@ -77,27 +82,31 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group("wide_hierarchy");
 
     /// Total number of entities to spawn
-    const N_SPAWN: usize = 10_000;
+    const N_SPAWN: usize = 100_000;
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+        commands.spawn_big_space(ReferenceFrame::<i32>::new(10000.0, 0.0), |root| {
             for _ in 0..N_SPAWN {
                 root.spawn_spatial(());
             }
+            root.spawn_spatial(FloatingOrigin);
         });
     }
 
-    fn translate(mut cells: Query<&mut GridCell<i32>>) {
-        cells.iter_mut().for_each(|mut cell| {
-            *cell += IVec3::ONE;
+    fn translate(mut transforms: Query<&mut Transform>) {
+        transforms.iter_mut().for_each(|mut transform| {
+            transform.translation += Vec3::ONE;
         })
     }
 
     let mut app = App::new();
-    app.add_plugins(SpatialHashPlugin::<i32>::default())
-        .add_systems(Startup, setup)
-        .add_systems(Update, translate)
-        .update();
+    app.add_plugins((
+        SpatialHashPlugin::<i32>::default(),
+        BigSpacePlugin::<i32>::default(),
+    ))
+    .add_systems(Startup, setup)
+    .add_systems(Update, translate)
+    .update();
 
     group.bench_function("Baseline", |b| {
         b.iter(|| {
@@ -306,6 +315,88 @@ fn hash_filtering(c: &mut Criterion) {
         .add_plugins((SpatialHashPlugin::<i32, With<Player>>::default(),))
         .add_plugins((SpatialHashPlugin::<i32, Without<Player>>::default(),));
     group.bench_function("All Plugins", |b| {
+        b.iter(|| {
+            black_box(app.update());
+        });
+    });
+}
+
+#[allow(clippy::unit_arg)]
+fn vs_bevy(c: &mut Criterion) {
+    let mut group = c.benchmark_group("transform_prop");
+
+    use bevy::prelude::*;
+    use big_space::BigSpacePlugin;
+
+    const N_ENTITIES: usize = 100_000;
+
+    fn setup_bevy(mut commands: Commands) {
+        commands
+            .spawn(SpatialBundle::default())
+            .with_children(|builder| {
+                for _ in 0..N_ENTITIES {
+                    builder.spawn(SpatialBundle::default());
+                }
+            });
+    }
+
+    fn setup_big(mut commands: Commands) {
+        commands
+            .spawn(BigSpaceRootBundle::<i32>::default())
+            .with_children(|builder| {
+                for _ in 0..N_ENTITIES {
+                    builder.spawn((SpatialBundle::default(), GridCell::<i32>::default()));
+                }
+            });
+    }
+
+    fn translate(mut transforms: Query<&mut Transform, With<Children>>) {
+        transforms.iter_mut().for_each(|mut transform| {
+            transform.translation += 1.0;
+        });
+    }
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, TransformPlugin))
+        .add_systems(Startup, setup_bevy)
+        .update();
+
+    group.bench_function("Bevy Propagation Static", |b| {
+        b.iter(|| {
+            black_box(app.update());
+        });
+    });
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, BigSpacePlugin::<i32>::default()))
+        .add_systems(Startup, setup_big)
+        .update();
+
+    group.bench_function("Big Space Propagation Static", |b| {
+        b.iter(|| {
+            black_box(app.update());
+        });
+    });
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, TransformPlugin))
+        .add_systems(Startup, setup_bevy)
+        .add_systems(Update, translate)
+        .update();
+
+    group.bench_function("Bevy Propagation", |b| {
+        b.iter(|| {
+            black_box(app.update());
+        });
+    });
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, BigSpacePlugin::<i32>::default()))
+        .add_systems(Startup, setup_big)
+        .add_systems(Update, translate)
+        .update();
+
+    group.bench_function("Big Space Propagation", |b| {
         b.iter(|| {
             black_box(app.update());
         });

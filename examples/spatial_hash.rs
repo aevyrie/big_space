@@ -1,15 +1,16 @@
-use std::{collections::VecDeque, iter::Sum, ops::Div};
+use std::{collections::VecDeque, time::Duration};
 
 use bevy::prelude::*;
 use bevy_math::DVec3;
 use bevy_utils::Instant;
 use big_space::{
     camera::{CameraController, CameraControllerPlugin},
-    spatial_hash::{SpatialHashMap, SpatialHashPlugin, SpatialHashStats},
-    *,
+    spatial_hash::{SpatialHashMap, SpatialHashPlugin},
+    timing::PropagationStats,
+    BigSpaceCommands, BigSpacePlugin, BigSpatialBundle, FloatingOrigin, GridCell, ReferenceFrame,
+    SmoothedStat, SpatialHashStats,
 };
 use noise::{NoiseFn, Perlin};
-use reference_frame::PropagationStats;
 
 fn main() {
     App::new()
@@ -20,16 +21,17 @@ fn main() {
             CameraControllerPlugin::<i32>::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
-        .add_systems(Update, (avg_stats, move_player).chain())
-        .init_resource::<MaterialPresets>()
-        .init_resource::<Avg<PropagationStats>>()
-        .init_resource::<Avg<SpatialHashStats>>()
+        .add_systems(Update, move_player)
         .insert_resource(ClearColor(Color::BLACK))
+        .init_resource::<MaterialPresets>()
         .run();
 }
 
 const HALF_WIDTH: f32 = 100.0;
-const N_ENTITIES: usize = 100_000;
+const N_ENTITIES: usize = 50_000;
+// How fast the entities should move, causing them to move into neighboring cells.
+const MOVEMENT_SPEED: f32 = 4e5;
+const PERCENT_STATIC: f32 = 0.9;
 
 #[derive(Component)]
 struct Player;
@@ -59,6 +61,7 @@ impl FromWorld for MaterialPresets {
         }
     }
 }
+
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 fn move_player(
@@ -74,8 +77,8 @@ fn move_player(
     spatial_hash_map: Res<SpatialHashMap<i32>>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<(&mut Text, &mut StatsText)>,
-    hash_stats: Res<Avg<SpatialHashStats>>,
-    prop_stats: Res<Avg<PropagationStats>>,
+    hash_stats: Res<SmoothedStat<SpatialHashStats>>,
+    prop_stats: Res<SmoothedStat<PropagationStats>>,
 ) {
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
@@ -84,14 +87,19 @@ fn move_player(
     }
 
     let t = time.elapsed_seconds() * 3.0;
-    let scale = 1e5 / (N_ENTITIES as f32 * HALF_WIDTH);
-    for (mut transform, _, _) in non_player.iter_mut() {
-        transform.translation.x += t.sin() * scale;
-        transform.translation.y += t.cos() * scale;
-        transform.translation.z += (t * 2.3).sin() * scale;
+    let scale = MOVEMENT_SPEED / (N_ENTITIES as f32 * HALF_WIDTH);
+    if scale.abs() > 0.0 {
+        // Avoid change detection
+        for (i, (mut transform, _, _)) in non_player.iter_mut().enumerate() {
+            if i > (PERCENT_STATIC * N_ENTITIES as f32) as usize {
+                transform.translation.x += t.sin() * scale;
+                transform.translation.y += t.cos() * scale;
+                transform.translation.z += (t * 2.3).sin() * scale;
+            }
+        }
     }
 
-    let t = time.elapsed_seconds() * 0.1;
+    let t = time.elapsed_seconds() * 0.01;
     let (mut transform, mut cell, parent) = player.single_mut();
     let absolute_pos = HALF_WIDTH * Vec3::new((5.0 * t).sin(), (7.0 * t).cos(), (20.0 * t).sin());
     (*cell, transform.translation) = reference_frame
@@ -131,81 +139,47 @@ fn move_player(
         .neighbors_contiguous(1, parent, *cell)
         .map(|(.., entry)| entry.entities.len())
         .sum::<usize>();
-    let elapsed = lookup_start.elapsed().as_secs_f32();
+    let elapsed = lookup_start.elapsed();
 
     let (mut text, mut stats) = text.single_mut();
     stats.0.truncate(0);
     stats.0.push_front(elapsed);
-    let avg = stats.0.iter().sum::<f32>() / stats.0.len() as f32;
+    let avg = stats
+        .0
+        .iter()
+        .sum::<Duration>()
+        .div_f32(stats.0.len() as f32);
     text.sections[0].value = format!(
         "\
-Neighbor Lookup: {: >5.2}us
-Neighboring Entities: {}
+Neighbor Flood Fill: {: >8.1?}
+Neighbors: {: >9} Entities
 
-Spatial Hashing Update Cost:
-Update Hashes: {: >8.2?}
-Update Maps: {: >10.2?}
+Spatial Hashing
+Moved Cells: {: >7?} Entities
+Compute Hashes: {: >13.1?}
+Update Maps: {: >16.1?}
 
-Low Precision Root Tagging: {: >8.2?}
-Local Origin Propagation: {: >10.2?}
-Low Precision Propagation: {: >9.2?}
-High Precision Propagation: {: >8.2?}",
-        avg * 1e6,
+Transform Propagation
+Cell Recentering: {: >11.1?}
+LP Root: {: >20.1?}
+Frame Origin: {: >15.1?}
+LP Propagation: {: >13.1?}
+HP Propagation: {: >13.1?}
+Total: {: >22.1?}",
+        avg,
         total,
-        hash_stats.avg.hash_update_duration(),
-        hash_stats.avg.map_update_duration(),
-        prop_stats.avg.low_precision_root_tagging(),
-        prop_stats.avg.local_origin_propagation(),
-        prop_stats.avg.low_precision_propagation(),
-        prop_stats.avg.high_precision_propagation(),
+        //
+        hash_stats.avg().moved_cell_entities(),
+        hash_stats.avg().hash_update_duration(),
+        hash_stats.avg().map_update_duration(),
+        //
+        prop_stats.avg().grid_recentering(),
+        prop_stats.avg().low_precision_root_tagging(),
+        prop_stats.avg().local_origin_propagation(),
+        prop_stats.avg().low_precision_propagation(),
+        prop_stats.avg().high_precision_propagation(),
+        prop_stats.avg().total(),
     );
-}
-
-#[derive(Resource)]
-struct Avg<T>
-where
-    for<'a> T: FromWorld + Sum<&'a T> + Div<u32, Output = T>,
-{
-    queue: VecDeque<T>,
-    avg: T,
-}
-
-impl<T> FromWorld for Avg<T>
-where
-    for<'a> T: FromWorld + Sum<&'a T> + Div<u32, Output = T>,
-{
-    fn from_world(world: &mut World) -> Self {
-        Avg {
-            queue: VecDeque::new(),
-            avg: T::from_world(world),
-        }
-    }
-}
-
-impl<T> Avg<T>
-where
-    for<'a> T: FromWorld + Sum<&'a T> + Div<u32, Output = T>,
-{
-    fn push(&mut self, value: T) -> &mut Self {
-        self.queue.truncate(63);
-        self.queue.push_front(value);
-        self
-    }
-
-    fn compute_avg(&mut self) -> &mut Self {
-        self.avg = self.queue.iter().sum::<T>() / self.queue.len() as u32;
-        self
-    }
-}
-
-fn avg_stats(
-    hash_stats: Res<SpatialHashStats>,
-    mut avg_hash_stats: ResMut<Avg<SpatialHashStats>>,
-    prop_stats: Res<PropagationStats>,
-    mut avg_prop_stats: ResMut<Avg<PropagationStats>>,
-) {
-    avg_hash_stats.push(hash_stats.clone()).compute_avg();
-    avg_prop_stats.push(prop_stats.clone()).compute_avg();
 }
 
 fn spawn(
@@ -230,7 +204,12 @@ fn spawn(
 
     let values: Vec<_> = std::iter::repeat_with(rng).take(N_ENTITIES).collect();
 
-    let sphere = meshes.add(Sphere::new(HALF_WIDTH / 600.0));
+    let sphere = meshes.add(
+        Sphere::new(HALF_WIDTH / (N_ENTITIES as f32).powf(0.33) * 0.1)
+            .mesh()
+            .ico(1)
+            .unwrap(),
+    );
 
     commands.spawn_big_space(ReferenceFrame::<i32>::new(4.0, 0.0), |root| {
         root.spawn_spatial((
@@ -239,6 +218,7 @@ fn spawn(
             FloatingOrigin,
             GridCell::new(0, 0, HALF_WIDTH as i32),
         ));
+
         root.with_children(|root_builder| {
             for (i, value) in values.iter().enumerate() {
                 let mut child_commands = root_builder.spawn((
@@ -256,10 +236,12 @@ fn spawn(
                     let mut matl: StandardMaterial =
                         Color::from(Srgba::new(1.0, 1.0, 0.0, 1.0)).into();
                     matl.unlit = true;
-                    child_commands
-                        .insert(meshes.add(Sphere::new(1.0)))
-                        .insert(Player)
-                        .insert(materials.add(matl));
+                    child_commands.insert((
+                        meshes.add(Sphere::new(1.0)),
+                        Player,
+                        materials.add(matl),
+                        Transform::from_scale(Vec3::splat(1.0)),
+                    ));
                 }
             }
         });
@@ -267,17 +249,22 @@ fn spawn(
 }
 
 #[derive(Component)]
-struct StatsText(VecDeque<f32>);
+struct StatsText(VecDeque<Duration>);
 
 fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn((NodeBundle {
             style: Style {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                padding: UiRect::all(Val::Px(24.)),
+                width: Val::Auto,
+                height: Val::Auto,
+                padding: UiRect::all(Val::Px(16.)),
+                margin: UiRect::all(Val::Px(12.)),
+                border: UiRect::all(Val::Px(1.)),
                 ..default()
             },
+            border_radius: BorderRadius::all(Val::Px(8.0)),
+            border_color: Color::linear_rgba(0.03, 0.03, 0.03, 0.95).into(),
+            background_color: Color::linear_rgba(0.012, 0.012, 0.012, 0.95).into(),
             ..default()
         },))
         .with_children(|parent| {

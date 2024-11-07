@@ -6,7 +6,6 @@ use bevy_ecs::prelude::*;
 use bevy_math::{prelude::*, Affine3A, DAffine3, DVec3};
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
-use bevy_utils::Duration;
 
 use crate::{precision::GridPrecision, GridCell};
 
@@ -14,66 +13,6 @@ use self::local_origin::LocalFloatingOrigin;
 
 pub mod local_origin;
 pub mod propagation;
-
-/// Aggregate runtime statistics for transform propagation.
-#[derive(Resource, Debug, Clone, Default, Reflect)]
-pub struct PropagationStats {
-    local_origin_propagation: Duration,
-    high_precision_propagation: Duration,
-    low_precision_root_tagging: Duration,
-    low_precision_propagation: Duration,
-}
-
-impl PropagationStats {
-    pub(crate) fn reset(mut stats: ResMut<Self>) {
-        *stats = Self::default();
-    }
-
-    /// How long it took to run [`LocalFloatingOrigin`] propagation this update.
-    pub fn local_origin_propagation(&self) -> Duration {
-        self.local_origin_propagation
-    }
-
-    /// How long it took to run high precision [`Transform`]+[`GridCell`] propagation this update.
-    pub fn high_precision_propagation(&self) -> Duration {
-        self.high_precision_propagation
-    }
-
-    /// How long it took to run low precision [`Transform`] propagation this update.
-    pub fn low_precision_propagation(&self) -> Duration {
-        self.low_precision_propagation
-    }
-
-    /// How long it took to tag entities with [`LowPrecisionRoot`](propagation::LowPrecisionRoot).
-    pub fn low_precision_root_tagging(&self) -> Duration {
-        self.low_precision_root_tagging
-    }
-}
-
-impl<'a> std::iter::Sum<&'a PropagationStats> for PropagationStats {
-    fn sum<I: Iterator<Item = &'a PropagationStats>>(iter: I) -> Self {
-        iter.fold(PropagationStats::default(), |mut acc, e| {
-            acc.local_origin_propagation += e.local_origin_propagation;
-            acc.high_precision_propagation += e.high_precision_propagation;
-            acc.low_precision_propagation += e.low_precision_propagation;
-            acc.low_precision_root_tagging += e.low_precision_root_tagging;
-            acc
-        })
-    }
-}
-
-impl std::ops::Div<u32> for PropagationStats {
-    type Output = Self;
-
-    fn div(self, rhs: u32) -> Self::Output {
-        Self {
-            local_origin_propagation: self.local_origin_propagation.div(rhs),
-            high_precision_propagation: self.high_precision_propagation.div(rhs),
-            low_precision_root_tagging: self.low_precision_root_tagging.div(rhs),
-            low_precision_propagation: self.low_precision_propagation.div(rhs),
-        }
-    }
-}
 
 /// A component that defines a reference frame for children of this entity with [`GridCell`]s. All
 /// entities with a [`GridCell`] must be children of an entity with a [`ReferenceFrame`]. The
@@ -162,6 +101,15 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         }
     }
 
+    /// Returns the floating point position of a [`GridCell`].
+    pub fn grid_to_float(&self, pos: &GridCell<P>) -> DVec3 {
+        DVec3 {
+            x: pos.x.as_f64(),
+            y: pos.y.as_f64(),
+            z: pos.z.as_f64(),
+        } * self.cell_edge_length as f64
+    }
+
     /// Convert a large translation into a small translation relative to a grid cell.
     #[inline]
     pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell<P>, Vec3) {
@@ -182,9 +130,9 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
         (
             GridCell {
-                x: P::from_f32(x_r as f32),
-                y: P::from_f32(y_r as f32),
-                z: P::from_f32(z_r as f32),
+                x: P::from_f64(x_r),
+                y: P::from_f64(y_r),
+                z: P::from_f64(z_r),
             },
             Vec3::new(t_x as f32, t_y as f32, t_z as f32),
         )
@@ -209,8 +157,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         // The grid cell offset of this entity relative to the floating origin's cell in this local
         // reference frame.
         let cell_origin_relative = *local_cell - self.local_floating_origin().cell();
-        let grid_offset = cell_origin_relative.as_dvec3(self);
-
+        let grid_offset = self.grid_to_float(&cell_origin_relative);
         let local_transform = DAffine3::from_scale_rotation_translation(
             local_transform.scale.as_dvec3(),
             local_transform.rotation.as_dquat(),

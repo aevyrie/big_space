@@ -118,11 +118,11 @@ impl CameraController {
 impl Default for CameraController {
     fn default() -> Self {
         Self {
-            smoothness: 0.8,
-            rotational_smoothness: 0.5,
+            smoothness: 0.85,
+            rotational_smoothness: 0.8,
             speed: 1.0,
-            speed_pitch: 1.0,
-            speed_yaw: 1.0,
+            speed_pitch: 2.0,
+            speed_yaw: 2.0,
             speed_roll: 1.0,
             speed_bounds: [1e-17, 1e30],
             slow_near_objects: true,
@@ -217,7 +217,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
         &GlobalTransform,
         &Aabb,
         Option<&RenderLayers>,
-        Option<&InheritedVisibility>,
+        &InheritedVisibility,
     )>,
     mut camera: Query<(
         Entity,
@@ -240,10 +240,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
             let obj_layer = obj_layer.unwrap_or_default();
             cam_layer.intersects(obj_layer)
         })
-        .filter(|(.., visibility)| {
-            let visibility = visibility.copied().unwrap_or(InheritedVisibility::VISIBLE);
-            visibility.get()
-        })
+        .filter(|(.., visibility)| visibility.get())
         .map(|(entity, object_local, obj_pos, aabb, ..)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();

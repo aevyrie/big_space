@@ -2,14 +2,15 @@
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_reflect::{prelude::*, GetTypeRegistration};
-use bevy_transform::{prelude::*, TransformSystem};
+use bevy_reflect::prelude::*;
+use bevy_transform::prelude::*;
 use std::marker::PhantomData;
 
 use crate::{
     grid_cell::GridCellAny,
     precision::GridPrecision,
-    reference_frame::{local_origin::LocalFloatingOrigin, PropagationStats, ReferenceFrame},
+    reference_frame::{local_origin::LocalFloatingOrigin, ReferenceFrame},
+    timing::TimingStatsPlugin,
     validation, BigSpace, FloatingOrigin, GridCell,
 };
 
@@ -54,18 +55,18 @@ pub enum FloatingOriginSet {
     PropagateLowPrecision,
 }
 
-impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> Plugin
+impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetTypeRegistration> Plugin
     for BigSpacePlugin<P>
 {
     fn build(&self, app: &mut App) {
-        // Silence bevy's built-in error spam about GLobalTransforms in the hierarchy
+        // Silence bevy's built-in error spam about GlobalTransforms in the hierarchy
         app.insert_resource(bevy_hierarchy::ReportHierarchyIssue::<GlobalTransform>::new(false));
+
+        // Performance timings
+        app.add_plugins(TimingStatsPlugin);
 
         let system_set_config = || {
             (
-                PropagationStats::reset
-                    .in_set(FloatingOriginSet::Init)
-                    .before(FloatingOriginSet::RecenterLargeTransforms),
                 ReferenceFrame::<P>::tag_low_precision_roots // loose ordering on this set
                     .after(FloatingOriginSet::Init)
                     .before(FloatingOriginSet::PropagateLowPrecision),
@@ -96,9 +97,6 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + GetTypeRegistration> 
             .register_type::<ReferenceFrame<P>>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
-            // Propagation stats
-            .register_type::<PropagationStats>()
-            .init_resource::<PropagationStats>()
             // Meat of the plugin, once on startup, as well as every update
             .add_systems(PostStartup, system_set_config())
             .add_systems(PostUpdate, system_set_config())

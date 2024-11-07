@@ -191,6 +191,7 @@ pub mod plugin;
 pub mod precision;
 pub mod reference_frame;
 pub mod spatial_hash;
+pub mod timing;
 pub mod validation;
 pub mod world_query;
 
@@ -207,3 +208,4 @@ pub use floating_origins::{BigSpace, FloatingOrigin};
 pub use grid_cell::GridCell;
 pub use plugin::{BigSpacePlugin, FloatingOriginSet};
 pub use reference_frame::ReferenceFrame;
+pub use timing::{PropagationStats, SmoothedStat, SpatialHashStats};

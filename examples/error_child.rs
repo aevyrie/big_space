@@ -7,7 +7,6 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
             big_space::BigSpacePlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
@@ -18,8 +17,13 @@ fn main() {
 
 // The nearby object is NEARBY meters away from us. The distance object is DISTANT meters away from
 // us, and has a child that is DISTANT meters toward us (relative its parent) minus NEARBY meters.
-const DISTANT: DVec3 = DVec3::new(1e10, 1e10, 1e10);
-const SPHERE_RADIUS: f32 = 10.0;
+//
+// The result is two spheres that should perfectly overlap, even though one of those spheres is a
+// child of an object more than one quadrillion meters away. This example intentionally results in a
+// small amount of error, to demonstrate the scales and precision available even between different
+// reference frames.
+const DISTANT: DVec3 = DVec3::new(1e17, 1e17, 1e17);
+const SPHERE_RADIUS: f32 = 1.0;
 const NEARBY: Vec3 = Vec3::new(SPHERE_RADIUS * 20.0, SPHERE_RADIUS * 20.0, 0.0);
 
 fn setup_scene(
@@ -28,10 +32,6 @@ fn setup_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mesh_handle = meshes.add(Sphere::new(SPHERE_RADIUS).mesh());
-    let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.8, 0.7, 0.6),
-        ..default()
-    });
 
     commands.spawn_big_space(
         ReferenceFrame::<i64>::new(SPHERE_RADIUS * 100.0, 0.0),
@@ -54,7 +54,7 @@ fn setup_scene(
                         .translation_to_grid(-DISTANT + NEARBY.as_dvec3());
                     parent_frame.insert(PbrBundle {
                         mesh: mesh_handle.clone(),
-                        material: matl_handle.clone(),
+                        material: materials.add(Color::from(palettes::css::RED)),
                         transform: Transform::from_translation(parent.1),
                         ..default()
                     });
