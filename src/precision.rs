@@ -5,7 +5,7 @@ use std::{
     ops::{Add, Mul},
 };
 
-use bevy_reflect::Reflect;
+use bevy_reflect::{FromReflect, GetTypeRegistration, Reflect, TypePath};
 
 /// Used to make the floating origin plugin generic over many grid sizes.
 ///
@@ -53,6 +53,9 @@ pub trait GridPrecision:
     + Send
     + Sync
     + Reflect
+    + FromReflect
+    + GetTypeRegistration
+    + TypePath
     + Add
     + Add<Self, Output = Self>
     + Mul<Self, Output = Self>

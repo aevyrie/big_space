@@ -60,23 +60,21 @@ fn setup_scene(
                     });
                     parent_frame.insert(parent.0);
 
-                    parent_frame.with_children(|child_builder| {
-                        // A green sphere that is a child of the sphere very far from the origin.
-                        // This child is very far from its parent, and should be located exactly at
-                        // the origin (if there was no floating point error). The distance from the
-                        // green sphere to the red sphere is the error caused by float imprecision.
-                        // Note that the sphere does not have any rendering artifacts, its position
-                        // just has a fixed error.
-                        child_builder.spawn((
-                            PbrBundle {
-                                mesh: mesh_handle,
-                                material: materials.add(Color::from(palettes::css::GREEN)),
-                                transform: Transform::from_translation(child.1),
-                                ..default()
-                            },
-                            child.0,
-                        ));
-                    });
+                    // A green sphere that is a child of the sphere very far from the origin.
+                    // This child is very far from its parent, and should be located exactly at
+                    // the origin (if there was no floating point error). The distance from the
+                    // green sphere to the red sphere is the error caused by float imprecision.
+                    // Note that the sphere does not have any rendering artifacts, its position
+                    // just has a fixed error.
+                    parent_frame.spawn((
+                        PbrBundle {
+                            mesh: mesh_handle,
+                            material: materials.add(Color::from(palettes::css::GREEN)),
+                            transform: Transform::from_translation(child.1),
+                            ..default()
+                        },
+                        child.0,
+                    ));
                 },
             );
 

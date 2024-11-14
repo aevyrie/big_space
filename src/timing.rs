@@ -35,12 +35,17 @@ impl Plugin for TimingStatsPlugin {
     }
 }
 
-fn update_totals(mut prop_stats: ResMut<PropagationStats>) {
+fn update_totals(
+    mut prop_stats: ResMut<PropagationStats>,
+    mut hash_stats: ResMut<SpatialHashStats>,
+) {
     prop_stats.total = prop_stats.grid_recentering
         + prop_stats.high_precision_propagation
         + prop_stats.local_origin_propagation
         + prop_stats.low_precision_propagation
-        + prop_stats.low_precision_root_tagging
+        + prop_stats.low_precision_root_tagging;
+
+    hash_stats.total = hash_stats.hash_update_duration + hash_stats.map_update_duration;
 }
 
 fn update_averages(
@@ -143,6 +148,7 @@ pub struct SpatialHashStats {
     pub(crate) hash_update_duration: Duration,
     pub(crate) map_update_duration: Duration,
     pub(crate) moved_entities: usize,
+    pub(crate) total: Duration,
 }
 
 impl SpatialHashStats {
@@ -164,6 +170,11 @@ impl SpatialHashStats {
     pub fn moved_cell_entities(&self) -> usize {
         self.moved_entities
     }
+
+    /// Total runtime cost of spatial hashing.
+    pub fn total(&self) -> Duration {
+        self.total
+    }
 }
 
 impl<'a> std::iter::Sum<&'a SpatialHashStats> for SpatialHashStats {
@@ -172,6 +183,7 @@ impl<'a> std::iter::Sum<&'a SpatialHashStats> for SpatialHashStats {
             acc.hash_update_duration += e.hash_update_duration;
             acc.map_update_duration += e.map_update_duration;
             acc.moved_entities += e.moved_entities;
+            acc.total += e.total;
             acc
         })
     }
@@ -185,6 +197,7 @@ impl Div<u32> for SpatialHashStats {
             hash_update_duration: self.hash_update_duration.div(rhs),
             map_update_duration: self.map_update_duration.div(rhs),
             moved_entities: self.moved_entities.div(rhs as usize),
+            total: self.total.div(rhs),
         }
     }
 }

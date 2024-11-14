@@ -6,7 +6,8 @@ use big_space::{
     *,
 };
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use std::iter::repeat_with;
+use spatial_hash::SpatialHash;
+use std::{iter::repeat_with, ops::Neg};
 use turborand::prelude::*;
 
 criterion_group!(
@@ -35,10 +36,10 @@ fn global_transform(c: &mut Criterion) {
 
 #[allow(clippy::unit_arg)]
 fn deep_hierarchy(c: &mut Criterion) {
-    let mut group = c.benchmark_group("deep_hierarchy");
-
     /// Total number of entities to spawn
     const N_SPAWN: usize = 100;
+
+    let mut group = c.benchmark_group(format!("deep_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(10000.0, 0.0), |root| {
@@ -63,6 +64,7 @@ fn deep_hierarchy(c: &mut Criterion) {
 
     let mut app = App::new();
     app.add_plugins((
+        MinimalPlugins,
         SpatialHashPlugin::<i32>::default(),
         BigSpacePlugin::<i32>::default(),
     ))
@@ -79,10 +81,10 @@ fn deep_hierarchy(c: &mut Criterion) {
 
 #[allow(clippy::unit_arg)]
 fn wide_hierarchy(c: &mut Criterion) {
-    let mut group = c.benchmark_group("wide_hierarchy");
-
     /// Total number of entities to spawn
     const N_SPAWN: usize = 100_000;
+
+    let mut group = c.benchmark_group(format!("wide_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
         commands.spawn_big_space(ReferenceFrame::<i32>::new(10000.0, 0.0), |root| {
@@ -101,6 +103,7 @@ fn wide_hierarchy(c: &mut Criterion) {
 
     let mut app = App::new();
     app.add_plugins((
+        MinimalPlugins,
         SpatialHashPlugin::<i32>::default(),
         BigSpacePlugin::<i32>::default(),
     ))
@@ -138,14 +141,9 @@ fn spatial_hashing(c: &mut Criterion) {
             .take(N_SPAWN)
             .collect();
 
-            root.with_children(|root| {
-                for pos in values {
-                    root.spawn(BigSpatialBundle {
-                        cell: GridCell::new(pos[0], pos[1], pos[2]),
-                        ..Default::default()
-                    });
-                }
-            });
+            for pos in values {
+                root.spawn_spatial(GridCell::new(pos[0], pos[1], pos[2]));
+            }
         });
     }
 
@@ -187,41 +185,101 @@ fn spatial_hashing(c: &mut Criterion) {
     let ent = *first.1.entities.iter().next().unwrap();
     group.bench_function("Find entity", |b| {
         b.iter(|| {
-            black_box(map.get(first.0).map(|entry| entry.entities.get(&ent)));
-        });
-    });
-
-    let parent = app
-        .world_mut()
-        .query::<&Parent>()
-        .get(app.world(), ent)
-        .unwrap();
-    let map = app.world().resource::<SpatialHashMap<i32>>();
-
-    group.bench_function("Neighbors radius: 1", |b| {
-        b.iter(|| {
-            black_box(map.neighbors(1, parent, GridCell::new(0, 0, 0)).count());
-        });
-    });
-
-    group.bench_function("Neighbors radius: 4", |b| {
-        b.iter(|| {
-            black_box(map.neighbors(4, parent, GridCell::new(0, 0, 0)).count());
-        });
-    });
-
-    group.bench_function(format!("Neighbors radius: {}", HALF_WIDTH), |b| {
-        b.iter(|| {
             black_box(
-                map.neighbors(HALF_WIDTH as u8, parent, GridCell::new(0, 0, 0))
-                    .count(),
+                map.get(first.0)
+                    .map(|entry| entry.entities.iter().find(|e| *e == &ent)),
             );
         });
     });
 
-    let flood = || map.neighbors_contiguous(1, parent, GridCell::ZERO).count();
-    group.bench_function("Neighbors flood 1", |b| {
+    // let parent = app
+    //     .world_mut()
+    //     .query::<&SpatialHash<i32>>()
+    //     .get(app.world(), ent)
+    //     .unwrap();
+    // let map = app.world().resource::<SpatialHashMap<i32>>();
+    // let entry = map.get(parent).unwrap();
+
+    // group.bench_function("Neighbors radius: 4", |b| {
+    //     b.iter(|| {
+    //         black_box(map.neighbors(entry).count());
+    //     });
+    // });
+
+    // group.bench_function(format!("Neighbors radius: {}", HALF_WIDTH), |b| {
+    //     b.iter(|| {
+    //         black_box(
+    //             map.neighbors(entry)x
+    //                 .count(),
+    //         );
+    //     });
+    // });
+
+    fn setup_uniform<const HALF_EXTENT: i32>(mut commands: Commands) {
+        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+            for x in HALF_EXTENT.neg()..HALF_EXTENT {
+                for y in HALF_EXTENT.neg()..HALF_EXTENT {
+                    for z in HALF_EXTENT.neg()..HALF_EXTENT {
+                        root.spawn_spatial(GridCell::new(x, y, z));
+                    }
+                }
+            }
+        });
+    }
+
+    // Uniform Grid Population 1_000
+
+    let mut app = App::new();
+    app.add_plugins(SpatialHashPlugin::<i32>::default())
+        .add_systems(Startup, setup_uniform::<5>)
+        .update();
+
+    let parent = app
+        .world_mut()
+        .query_filtered::<Entity, With<BigSpace>>()
+        .single(app.world());
+    let spatial_map = app.world().resource::<SpatialHashMap<i32>>();
+    let hash = SpatialHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let entry = spatial_map.get(&hash).unwrap();
+
+    assert_eq!(spatial_map.nearby(entry).count(), 26);
+    group.bench_function("nearby 1 population 1_000", |b| {
+        b.iter(|| {
+            black_box(spatial_map.nearby(entry).count());
+        });
+    });
+
+    assert_eq!(spatial_map.nearby_flood(&hash).count(), 1_000);
+    let flood = || spatial_map.nearby_flood(&hash).count();
+    group.bench_function("nearby flood population 1_000", |b| {
         b.iter(|| black_box(flood()));
+    });
+
+    // Uniform Grid Population 1_000_000
+
+    let mut app = App::new();
+    app.add_plugins(SpatialHashPlugin::<i32>::default())
+        .add_systems(Startup, setup_uniform::<50>)
+        .update();
+
+    let parent = app
+        .world_mut()
+        .query_filtered::<Entity, With<BigSpace>>()
+        .single(app.world());
+    let spatial_map = app.world().resource::<SpatialHashMap<i32>>();
+    let hash = SpatialHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let entry = spatial_map.get(&hash).unwrap();
+
+    assert_eq!(spatial_map.nearby(entry).count(), 26);
+    group.bench_function("nearby 1 population 1_000_000", |b| {
+        b.iter(|| {
+            black_box(spatial_map.nearby(entry).count());
+        });
+    });
+
+    assert_eq!(spatial_map.nearby_flood(&hash).count(), 1_000_000);
+    group.bench_function("nearby flood population 1_000_000", |b| {
+        b.iter(|| black_box(spatial_map.nearby_flood(&hash).count()));
     });
 }
 
@@ -250,17 +308,12 @@ fn hash_filtering(c: &mut Criterion) {
         .collect();
 
         commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
-            root.with_children(|root| {
-                for (i, pos) in values.iter().enumerate() {
-                    let mut cmd = root.spawn(BigSpatialBundle {
-                        cell: GridCell::new(pos[0], pos[1], pos[2]),
-                        ..Default::default()
-                    });
-                    if i < N_PLAYERS {
-                        cmd.insert(Player);
-                    }
+            for (i, pos) in values.iter().enumerate() {
+                let mut cmd = root.spawn_spatial(GridCell::new(pos[0], pos[1], pos[2]));
+                if i < N_PLAYERS {
+                    cmd.insert(Player);
                 }
-            });
+            }
         });
     }
 
@@ -328,7 +381,7 @@ fn vs_bevy(c: &mut Criterion) {
     use bevy::prelude::*;
     use big_space::BigSpacePlugin;
 
-    const N_ENTITIES: usize = 100_000;
+    const N_ENTITIES: usize = 1_000_000;
 
     fn setup_bevy(mut commands: Commands) {
         commands
@@ -341,16 +394,15 @@ fn vs_bevy(c: &mut Criterion) {
     }
 
     fn setup_big(mut commands: Commands) {
-        commands
-            .spawn(BigSpaceRootBundle::<i32>::default())
-            .with_children(|builder| {
-                for _ in 0..N_ENTITIES {
-                    builder.spawn((SpatialBundle::default(), GridCell::<i32>::default()));
-                }
-            });
+        commands.spawn_big_space(ReferenceFrame::<i32>::default(), |builder| {
+            for _ in 0..N_ENTITIES {
+                builder.spawn_spatial(());
+            }
+            builder.spawn_spatial(FloatingOrigin);
+        });
     }
 
-    fn translate(mut transforms: Query<&mut Transform, With<Children>>) {
+    fn translate(mut transforms: Query<&mut Transform>) {
         transforms.iter_mut().for_each(|mut transform| {
             transform.translation += 1.0;
         });

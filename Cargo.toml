@@ -15,6 +15,7 @@ camera = ["bevy_render", "bevy_time", "bevy_input"]
 
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
+smallvec = "1.13.2" # Already used by bevy in commands
 bevy_app = { version = "0.14.0", default-features = false }
 bevy_ecs = { version = "0.14.0", default-features = false }
 bevy_hierarchy = { version = "0.14.0", default-features = false }
@@ -30,6 +31,7 @@ bevy_gizmos = { version = "0.14.0", default-features = false, optional = true }
 bevy_render = { version = "0.14.0", default-features = false, optional = true }
 bevy_input = { version = "0.14.0", default-features = false, optional = true }
 bevy_time = { version = "0.14.0", default-features = false, optional = true }
+
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
@@ -48,6 +50,7 @@ bevy = { version = "0.14.0", default-features = false, features = [
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
+bytemuck = "1.19.0"
 
 [[bench]]
 name = "benchmarks"

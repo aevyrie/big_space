@@ -1,16 +1,16 @@
 //! Spatial hashing acceleration structure. See [`SpatialHashPlugin`].
 
 use std::{
+    collections::VecDeque,
     hash::{Hash, Hasher},
     marker::PhantomData,
-    num::NonZeroU64,
 };
 
 use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
 use bevy_hierarchy::Parent;
 use bevy_math::IVec3;
-use bevy_reflect::{Reflect, TypePath};
+use bevy_reflect::Reflect;
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},
     AHasher, Instant, Parallel, PassHash,
@@ -36,9 +36,7 @@ impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashPlugin<P, F> {
     }
 }
 
-impl<P: GridPrecision + TypePath, F: QueryFilter + Send + Sync + 'static> Plugin
-    for SpatialHashPlugin<P, F>
-{
+impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> Plugin for SpatialHashPlugin<P, F> {
     fn build(&self, app: &mut App) {
         app.init_resource::<SpatialHashMap<P, F>>()
             .register_type::<SpatialHash<P>>()
@@ -94,39 +92,52 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
         mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
         mut spatial_entities: ParamSet<(
             Query<
-                (Entity, &Parent, &GridCell<P>, &mut SpatialHash<P>),
+                (
+                    Entity,
+                    &Parent,
+                    &GridCell<P>,
+                    &mut SpatialHash<P>,
+                    &mut FastSpatialHash,
+                ),
                 (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
             >,
             Query<(Entity, &Parent, &GridCell<P>), (F, Without<SpatialHash<P>>)>,
         )>,
         mut stats: Option<ResMut<SpatialHashStats>>,
-        mut thread_local: Local<Parallel<Vec<Entity>>>,
+        mut thread_changed_hashes: Local<Parallel<Vec<Entity>>>,
+        mut thread_commands: Local<Parallel<Vec<(Entity, SpatialHash<P>, FastSpatialHash)>>>,
     ) {
         let start = Instant::now();
 
         // Create new
-        for (entity, parent, cell) in spatial_entities.p1().iter() {
-            let spatial_hash = SpatialHash::new(parent, cell);
-            commands.entity(entity).insert(spatial_hash);
-            thread_local.scope(|tl| tl.push(entity));
+        spatial_entities
+            .p1()
+            .par_iter()
+            .for_each(|(entity, parent, cell)| {
+                let spatial_hash = SpatialHash::new(parent, cell);
+                let fast_hash = FastSpatialHash(spatial_hash.pre_hash);
+                thread_commands.scope(|tl| tl.push((entity, spatial_hash, fast_hash)));
+                thread_changed_hashes.scope(|tl| tl.push(entity));
+            });
+        for (entity, spatial_hash, fast_hash) in thread_commands.drain::<Vec<_>>() {
+            commands.entity(entity).insert((spatial_hash, fast_hash));
         }
 
         // Update existing
-        spatial_entities
-            .p0()
-            .par_iter_mut()
-            .for_each(|(entity, parent, cell, mut old_hash)| {
-                if old_hash
-                    .replace_if_neq(SpatialHash::new(parent, cell))
-                    .is_some()
-                {
-                    thread_local.scope(|tl| tl.push(entity));
+        spatial_entities.p0().par_iter_mut().for_each(
+            |(entity, parent, cell, mut hash, mut fast_hash)| {
+                let new_hash = SpatialHash::new(parent, cell);
+                let new_fast_hash = new_hash.pre_hash;
+                if hash.replace_if_neq(new_hash).is_some() {
+                    thread_changed_hashes.scope(|tl| tl.push(entity));
                 }
-            });
+                fast_hash.0 = new_fast_hash;
+            },
+        );
 
         changed_hashes
             .list
-            .extend(thread_local.drain::<Vec<Entity>>());
+            .extend(thread_changed_hashes.drain::<Vec<Entity>>());
 
         if let Some(ref mut stats) = stats {
             stats.hash_update_duration += start.elapsed();
@@ -143,35 +154,42 @@ pub enum SpatialHashSet {
     UpdateMap,
 }
 
-/// A`Component` storing an automatically-updated hash of this entity's high-precision position,
-/// derived from its [`GridCell`] and [`Parent`].
+/// A fast but lossy version of [`SpatialHash`]. Use this component when you don't care about
+/// testing for false positives (hash collisions). See the docs on [`SpatialHash::fast_eq`] for more
+/// details on fast but lossy equality checks.
+#[derive(Component, Clone, Copy, Debug, Reflect, PartialEq, Eq)]
+pub struct FastSpatialHash(u64);
+
+impl Hash for FastSpatialHash {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.0);
+    }
+}
+
+/// A`Component` used to create a unique spatial hash of any entity within this [`GridCell`].
 ///
 /// Once computed, a spatial hash can be used to rapidly check if any two entities are in the same
-/// cell, by comparing their spatial hashes. You can also get a list of all entities within a cell
+/// cell, by comparing the hashes. You can also get a list of all entities within a cell
 /// using the [`SpatialHashMap`] resource.
 ///
 /// Due to reference frames and multiple big spaces in a single world, this must use both the
 /// [`GridCell`] and the [`Parent`] of the entity to uniquely identify its position. These two
 /// values are then hashed and stored in this spatial hash component.
-///
-/// For optimization reasons, this hash cannot be computed manually.
-///
-/// # WARNING
-///
-/// Like all hashes, it is possible to encounter collisions. If two spatial hashes are identical,
-/// this does ***not*** guarantee that these two entities are located in the same cell. If the
-/// hashes are *not* equal, however, this ***does*** guarantee that the entities are in different
-/// cells.
-///
-/// This means you should only use spatial hashes to accelerate checks by filtering out entities
-/// that could not possibly overlap: if the spatial hashes do not match, you can be certain they are
-/// not in the same cell.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
-pub struct SpatialHash<P: GridPrecision>(NonZeroU64, #[reflect(ignore)] PhantomData<P>);
+pub struct SpatialHash<P: GridPrecision> {
+    cell: GridCell<P>,
+    parent: Entity,
+    pre_hash: u64,
+}
 
 impl<P: GridPrecision> PartialEq for SpatialHash<P> {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        // Comparing the hash is redundant.
+        //
+        // TODO benchmark adding a hash comparison at the front, may help early out for most
+        // comparisons? It might not be a win, because many of the comparisons could be coming from
+        // hashmaps, in which case we already know the hashes are the same.
+        self.cell == other.cell && self.parent == other.parent
     }
 }
 
@@ -180,7 +198,7 @@ impl<P: GridPrecision> Eq for SpatialHash<P> {}
 impl<P: GridPrecision> Hash for SpatialHash<P> {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.0.into());
+        state.write_u64(self.pre_hash);
     }
 }
 
@@ -190,26 +208,95 @@ impl<P: GridPrecision> SpatialHash<P> {
     /// Intentionally left private, so we can ensure the only place these are constructed/mutated is
     /// this module. This allows us to optimize change detection using [`ChangedSpatialHashes`].
     #[inline]
-    fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
-        PartialSpatialHash::new(parent).generate(cell)
+    pub fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
+        Self::from_parent(parent.get(), cell)
     }
 
     #[inline]
-    #[cfg(test)]
     pub(super) fn from_parent(parent: Entity, cell: &GridCell<P>) -> Self {
-        PartialSpatialHash::from_parent(parent).generate(cell)
+        let hasher = &mut AHasher::default();
+        hasher.write_u64(parent.to_bits());
+        cell.hash(hasher);
+
+        SpatialHash {
+            cell: *cell,
+            parent,
+            pre_hash: hasher.finish(),
+        }
+    }
+
+    /// Do not use this as a component. You've been warned.
+    #[doc(hidden)]
+    pub fn __new_manual(parent: Entity, cell: &GridCell<P>) -> Self {
+        Self::from_parent(parent, cell)
+    }
+
+    /// Fast comparison that can return false positives, but never false negatives.
+    ///
+    /// Consider using [`FastSpatialHash`] if you only need fast equality comparisons, as it is much
+    /// more cache friendly than this [`SpatialHash`] component.
+    ///
+    /// Unlike the [`PartialEq`] implementation, this equality check will only compare the hash
+    /// value instead of the cell and parent. This can result in collisions. You should only use
+    /// this when you want to prove that two cells do not overlap.
+    ///
+    /// - If this returns `false`, it is guaranteed that the two cells are in different positions
+    /// - if this returns `true`, it is probable (but not guaranteed) that the two cells are in the
+    ///   same position.
+    ///
+    /// If this returns true, you may either want to try the slightly slower `eq` method, or, ignore
+    /// the chance of a false positive. This is common in collision detection - a false positive is
+    /// rare, and only results in doing some extra narrow-phase collision tests, but no logic
+    /// errors.
+    ///
+    /// In other words, this should only be used for acceleration, when you want to quickly cull
+    /// non-overlapping cells, and you will be double checking for false positives later.
+    pub fn fast_eq(&self, other: &Self) -> bool {
+        self.pre_hash == other.pre_hash
+    }
+
+    /// Returns an iterator over all neighboring grid cells and their hashes, within the
+    /// `cell_radius`. This iterator will not visit `cell`.
+    pub fn neighbors(
+        &self,
+        cell_radius: u8,
+    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> + use<'_, P> {
+        let radius = cell_radius as i32;
+        let search_width = 1 + 2 * radius;
+        let search_volume = search_width.pow(3);
+        let center = -radius;
+        let stride = IVec3::new(1, search_width, search_width.pow(2));
+        (0..search_volume)
+            .map(move |i| center + i / stride % search_width)
+            .filter(|offset| *offset != IVec3::ZERO) // Skip center cell
+            .map(move |offset| {
+                let neighbor_cell = self.cell + offset;
+                (
+                    SpatialHash::from_parent(self.parent, &neighbor_cell),
+                    neighbor_cell,
+                )
+            })
     }
 }
 
 /// An entry in a [`SpatialHashMap`].
 #[derive(Clone, Debug)]
 pub struct SpatialHashEntry<P: GridPrecision> {
-    /// The reference frame entity that this grid cell and entities are a child of.
-    pub reference_frame: Entity,
-    /// The grid cell coordinate of this spatial hash.
-    pub cell: GridCell<P>,
     /// All the entities located in this grid cell.
     pub entities: HashSet<Entity, PassHash>,
+    /// Precomputed hashes to direct neighbors.
+    pub occupied_neighbors: Vec<SpatialHash<P>>,
+}
+
+impl<P: GridPrecision> SpatialHashEntry<P> {
+    /// Find an occupied neighbor's index in the list.
+    fn neighbor_index(&self, hash: &SpatialHash<P>) -> Option<usize> {
+        self.occupied_neighbors
+            .iter()
+            .enumerate()
+            .rev() // recently added cells are more likely to be removed
+            .find_map(|(i, h)| (h == hash).then_some(i))
+    }
 }
 
 /// A global spatial hash map for quickly finding entities in a grid cell.
@@ -219,14 +306,12 @@ where
     P: GridPrecision,
     F: QueryFilter + Send + Sync + 'static,
 {
-    map: HashMap<SpatialHash<P>, SpatialHashEntry<P>, PassHash>,
+    /// The primary hash map for looking up entities by their [`SpatialHash`].
+    map: InnerSpatialHashMap<P>,
+    /// A reverse lookup to find the latest spatial hash associated with an entity that this map is
+    /// aware of. This is needed to remove or move an entity when its cell changes, because once it
+    /// changes in the ECS, we need to know its *previous* value when it was inserted in this map.
     reverse_map: HashMap<Entity, SpatialHash<P>, PassHash>,
-    /// Creating and freeing hash sets is expensive. To reduce time spent allocating and running
-    /// destructors, we save any hash sets that would otherwise be thrown away. The next time we
-    /// need to construct a new hash set of entities, we can grab one here.
-    ///
-    /// <https://en.wikipedia.org/wiki/Object_pool_pattern>.
-    hash_set_pool: Vec<HashSet<Entity, PassHash>>,
     spooky: PhantomData<F>,
 }
 
@@ -252,7 +337,6 @@ where
         Self {
             map: Default::default(),
             reverse_map: Default::default(),
-            hash_set_pool: Default::default(),
             spooky: PhantomData,
         }
     }
@@ -268,7 +352,7 @@ where
     fn update(
         mut spatial_map: ResMut<SpatialHashMap<P, F>>,
         mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
-        all_hashes: Query<(Entity, &SpatialHash<P>, &Parent, &GridCell<P>), F>,
+        all_hashes: Query<(Entity, &SpatialHash<P>), F>,
         mut removed: RemovedComponents<SpatialHash<P>>,
         mut stats: Option<ResMut<SpatialHashStats>>,
     ) {
@@ -283,12 +367,12 @@ where
         }
 
         // See the docs on ChangedSpatialHash understand why we don't use query change detection.
-        for (entity, spatial_hash, parent, cell) in changed_hashes
+        for (entity, spatial_hash) in changed_hashes
             .list
             .drain(..)
             .filter_map(|entity| all_hashes.get(entity).ok())
         {
-            spatial_map.insert_or_update(entity, *spatial_hash, parent, cell);
+            spatial_map.insert(entity, *spatial_hash);
         }
 
         if let Some(ref mut stats) = stats {
@@ -297,78 +381,39 @@ where
     }
 
     #[inline]
-    fn insert_or_update(
-        &mut self,
-        entity: Entity,
-        hash: SpatialHash<P>,
-        parent: &Parent,
-        cell: &GridCell<P>,
-    ) {
+    fn insert(&mut self, entity: Entity, hash: SpatialHash<P>) {
         // If this entity is already in the maps, we need to remove and update it.
         if let Some(old_hash) = self.reverse_map.get_mut(&entity) {
             if hash.eq(old_hash) {
                 return; // If the spatial hash is unchanged, early exit.
             }
-            Self::remove_from_map(entity, *old_hash, &mut self.map, &mut self.hash_set_pool);
+            self.map.remove(entity, *old_hash);
             *old_hash = hash;
         } else {
             self.reverse_map.insert(entity, hash);
         }
 
-        self.map
-            .entry(hash)
-            .and_modify(|entry| {
-                entry.entities.insert(entity);
-            })
-            .or_insert_with(|| {
-                let mut entities = self.hash_set_pool.pop().unwrap_or_default();
-                entities.insert(entity);
-                SpatialHashEntry {
-                    reference_frame: parent.get(),
-                    cell: *cell,
-                    entities,
-                }
-            });
+        self.map.insert(entity, hash);
     }
 
     /// Remove an entity from the [`SpatialHashMap`].
     #[inline]
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
-            Self::remove_from_map(entity, old_hash, &mut self.map, &mut self.hash_set_pool)
-        }
-    }
-
-    #[inline]
-    fn remove_from_map(
-        entity: Entity,
-        old_hash: SpatialHash<P>,
-        map: &mut HashMap<SpatialHash<P>, SpatialHashEntry<P>, PassHash>,
-        hash_set_pool: &mut Vec<HashSet<Entity, PassHash>>,
-    ) {
-        let empty = if let Some(entry) = map.get_mut(&old_hash) {
-            entry.entities.remove(&entity);
-            entry.entities.is_empty()
-        } else {
-            false
-        };
-        if empty {
-            if let Some(empty) = map.remove(&old_hash) {
-                hash_set_pool.push(empty.entities);
-            }
+            self.map.remove(entity, old_hash)
         }
     }
 
     /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].
     #[inline]
     pub fn get(&self, hash: &SpatialHash<P>) -> Option<&SpatialHashEntry<P>> {
-        self.map.get(hash)
+        self.map.inner.get(hash)
     }
 
     /// An iterator visiting all spatial hash cells and their contents in arbitrary order.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&SpatialHash<P>, &SpatialHashEntry<P>)> {
-        self.map.iter()
+        self.map.inner.iter()
     }
 
     /// Find entities in this and neighboring cells, within `cell_radius`.
@@ -377,78 +422,118 @@ where
     /// cells. You can also think of this as a cube centered on the specified cell, expanded in each
     /// direction by `radius`.
     ///
-    /// Returns an iterator over all non-empty neighboring cells, including the cell, and the set of
-    /// entities in that cell.
+    /// Returns an iterator over all non-empty neighboring cells and the set of entities in those
+    /// cells.
     ///
     /// This is a lazy query, if you don't consume the iterator, it won't do any work!
-    pub fn neighbors(
-        &self,
-        cell_radius: u8,
-        parent: &Parent,
-        cell: GridCell<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, &SpatialHashEntry<P>)> + '_ {
-        self.neighbor_hashes(cell_radius, parent, cell).filter_map(
-            |(neighbor_hash, _neighbor_cell)| {
-                self.get(&neighbor_hash)
-                    .map(|neighbor_entry| (neighbor_hash, neighbor_entry))
-            },
-        )
-    }
-
-    /// Returns an iterator over all neighboring grid cells and their hashes, within the
-    /// `cell_radius`. This iterator will also visit `cell`.
-    pub fn neighbor_hashes<'a>(
+    pub fn nearby<'a>(
         &'a self,
-        cell_radius: u8,
-        parent: &'a Parent,
-        cell: GridCell<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> {
-        let radius = cell_radius as i32;
-        let search_width = 1 + 2 * radius;
-        let search_volume = search_width.pow(3);
-        let center = -radius;
-        let stride = IVec3::new(1, search_width, search_width.pow(2));
-        let partial_hash = PartialSpatialHash::new(parent);
-        (0..search_volume).map(move |i| {
-            let offset = center + i / stride % search_width;
-            let neighbor_cell = cell + offset;
-            (partial_hash.generate(&neighbor_cell), neighbor_cell)
+        entry: &'a SpatialHashEntry<P>,
+    ) -> impl Iterator<Item = (SpatialHash<P>, &SpatialHashEntry<P>)> + '_ {
+        entry.occupied_neighbors.iter().map(|neighbor_hash| {
+            // We can unwrap here because occupied_neighbors are guaranteed to be occupied
+            let neighbor_entry = self.get(neighbor_hash).unwrap();
+            (*neighbor_hash, neighbor_entry)
         })
     }
 
-    /// Like [`Self::neighbors`], but flattens the included set of entities into a flat list.
-    pub fn neighbors_flat(
-        &self,
-        cell_radius: u8,
-        parent: &Parent,
-        cell: GridCell<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>, Entity)> + '_ {
-        self.neighbors(cell_radius, parent, cell)
-            .flat_map(|(hash, entry)| {
-                entry
-                    .entities
-                    .iter()
-                    .map(move |entity| (hash, entry.cell, *entity))
-            })
+    /// Like [`Self::nearby`], but flattens the included set of entities into a flat list.
+    pub fn nearby_flat<'a>(
+        &'a self,
+        entry: &'a SpatialHashEntry<P>,
+    ) -> impl Iterator<Item = (SpatialHash<P>, Entity)> + '_ {
+        self.nearby(entry)
+            .flat_map(|(hash, entry)| entry.entities.iter().map(move |entity| (hash, *entity)))
     }
 
-    /// Recursively searches for all connected neighboring cells within the given `cell_radius` at
-    /// every point. The result is a set of all grid cells connected by a cell distance of
-    /// `max_distance` or less.
-    pub fn neighbors_contiguous<'a>(
+    /// Iterates over all contiguous neighboring cells. Worst case, this could iterate over every
+    /// cell in the map once.
+    pub fn nearby_flood<'a>(
         &'a self,
-        max_distance: u8,
-        parent: &'a Parent,
-        cell: GridCell<P>,
+        starting_cell: &SpatialHash<P>,
     ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> {
-        let mut pushed_cells = HashSet::with_capacity_and_hasher(self.map.len() / 2, PassHash);
-        pushed_cells.insert(SpatialHash::new(parent, &cell));
         ContiguousNeighborsIter {
+            initial_hash: Some(*starting_cell),
             spatial_map: self,
-            max_distance,
-            parent,
-            stack: vec![cell],
-            pushed_cells,
+            stack: Default::default(),
+            visited_cells: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct InnerSpatialHashMap<P: GridPrecision> {
+    inner: HashMap<SpatialHash<P>, SpatialHashEntry<P>, PassHash>,
+    /// Creating and freeing hash sets is expensive. To reduce time spent allocating and running
+    /// destructors, we save any hash sets that would otherwise be thrown away. The next time we
+    /// need to construct a new hash set of entities, we can grab one here.
+    ///
+    /// <https://en.wikipedia.org/wiki/Object_pool_pattern>.
+    hash_set_pool: Vec<HashSet<Entity, PassHash>>,
+    neighbor_pool: Vec<Vec<SpatialHash<P>>>,
+}
+
+impl<P: GridPrecision> InnerSpatialHashMap<P> {
+    #[inline]
+    fn insert(&mut self, entity: Entity, hash: SpatialHash<P>) {
+        if let Some(entry) = self.inner.get_mut(&hash) {
+            entry.entities.insert(entity);
+        } else {
+            let mut entities = self.hash_set_pool.pop().unwrap_or_default();
+            entities.insert(entity);
+
+            let mut occupied_neighbors = self.neighbor_pool.pop().unwrap_or_default();
+            occupied_neighbors.extend(
+                hash.neighbors(1)
+                    .filter(|(neighbor, _)| {
+                        self.inner
+                            .get_mut(neighbor)
+                            .map(|entry| {
+                                entry.occupied_neighbors.push(hash);
+                                true
+                            })
+                            .unwrap_or_default()
+                    })
+                    .map(|(neighbor, _)| neighbor),
+            );
+
+            self.inner.insert(
+                hash,
+                SpatialHashEntry {
+                    entities,
+                    occupied_neighbors,
+                },
+            );
+        }
+    }
+
+    #[inline]
+    fn remove(&mut self, entity: Entity, old_hash: SpatialHash<P>) {
+        if let Some(entry) = self.inner.get_mut(&old_hash) {
+            entry.entities.remove(&entity);
+            if !entry.entities.is_empty() {
+                return; // Early exit if the cell still has other entities in it
+            }
+        }
+
+        // The entry is empty, so we need to do some cleanup
+        if let Some(mut removed_entry) = self.inner.remove(&old_hash) {
+            // Remove this entry from its neighbors' occupied neighbor list
+            removed_entry
+                .occupied_neighbors
+                .drain(..)
+                .for_each(|neighbor_hash| {
+                    let neighbor = self
+                        .inner
+                        .get_mut(&neighbor_hash)
+                        .expect("occupied neighbors is guaranteed to be up to date");
+                    let index = neighbor.neighbor_index(&old_hash).unwrap();
+                    neighbor.occupied_neighbors.remove(index);
+                });
+
+            // Add the allocated structs to their object pools, to reuse the allocations.
+            self.hash_set_pool.push(removed_entry.entities);
+            self.neighbor_pool.push(removed_entry.occupied_neighbors)
         }
     }
 }
@@ -459,11 +544,10 @@ where
     P: GridPrecision,
     F: QueryFilter + Send + Sync + 'static,
 {
+    initial_hash: Option<SpatialHash<P>>,
     spatial_map: &'a SpatialHashMap<P, F>,
-    max_distance: u8,
-    parent: &'a Parent,
-    stack: Vec<GridCell<P>>,
-    pushed_cells: HashSet<SpatialHash<P>, PassHash>,
+    stack: VecDeque<(SpatialHash<P>, &'a SpatialHashEntry<P>)>,
+    visited_cells: HashSet<SpatialHash<P>>,
 }
 
 impl<'a, P, F> Iterator for ContiguousNeighborsIter<'a, P, F>
@@ -474,64 +558,28 @@ where
     type Item = (SpatialHash<P>, &'a SpatialHashEntry<P>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let cell = self.stack.pop()?;
-
-            // We know the current cell contains some entities, so we should push all neighbors with
-            // entities onto the stack.
-            self.spatial_map
-                .neighbor_hashes(self.max_distance, self.parent, cell)
-                .for_each(|(neighbor_hash, neighbor_cell)| {
-                    if self.pushed_cells.insert(neighbor_hash)
-                        && self.spatial_map.map.contains_key(&neighbor_hash)
-                    {
-                        self.stack.push(neighbor_cell);
-                    }
-                });
-
-            let hash = SpatialHash::new(self.parent, &cell);
-            if let Some(neighbor) = self.spatial_map.get(&hash).map(|entry| (hash, entry)) {
-                return Some(neighbor);
+        if let Some(hash) = self.initial_hash.take() {
+            self.stack.push_front((hash, self.spatial_map.get(&hash)?));
+            self.visited_cells.insert(hash);
+        }
+        while let Some((hash, entry)) = self.stack.pop_back() {
+            for (neighbor_hash, neighbor_entry) in entry
+                .occupied_neighbors
+                .iter()
+                .filter(|neighbor_hash| self.visited_cells.insert(**neighbor_hash))
+                .map(|neighbor_hash| {
+                    let entry = self
+                        .spatial_map
+                        .get(&neighbor_hash)
+                        .expect("Neighbor hashes in SpatialHashEntry are guaranteed to exist.");
+                    (neighbor_hash, entry)
+                })
+            {
+                self.stack.push_front((*neighbor_hash, neighbor_entry));
             }
+            return Some((hash, entry));
         }
-    }
-}
-
-/// A halfway-hashed [`SpatialHash`], only taking into account the parent, and not the cell. This
-/// allows for reusing the first half of the hash when computing spatial hashes of many cells in the
-/// same reference frame. Reducing the amount of hashing can help performance in those cases.
-pub struct PartialSpatialHash<P: GridPrecision> {
-    hasher: AHasher,
-    spooky: PhantomData<P>,
-}
-
-impl<P: GridPrecision> PartialSpatialHash<P> {
-    /// Create a partial spatial hash from the parent of the hashed entity.
-    pub fn new(parent: &Parent) -> Self {
-        Self::from_parent(**parent)
-    }
-
-    /// When you don't have access to the `Parent`, but you do have the `Entity`. Careful not to use
-    /// the wrong `Entity`!
-    pub fn from_parent(parent: Entity) -> Self {
-        let mut hasher = AHasher::default();
-        hasher.write_u64(parent.to_bits());
-        PartialSpatialHash {
-            hasher,
-            spooky: PhantomData,
-        }
-    }
-
-    /// Generate a new, fully complete [`SpatialHash`] by providing the other required half of the
-    /// hash - the grid cell. This function can be called many times.
-    #[inline]
-    pub fn generate(&self, cell: &GridCell<P>) -> SpatialHash<P> {
-        let mut hasher_clone = self.hasher.clone();
-        cell.hash(&mut hasher_clone);
-        SpatialHash(
-            NonZeroU64::new(hasher_clone.finish()).unwrap_or(NonZeroU64::MIN),
-            PhantomData,
-        )
+        None
     }
 }
 
@@ -713,17 +761,16 @@ mod tests {
             .unwrap();
 
         let map = app.world().resource::<SpatialHashMap<i32>>();
-        let neighbors: HashSet<Entity> = map
-            .neighbors_flat(1, parent, GridCell::ZERO)
-            .map(|(.., entity)| entity)
-            .collect();
+        let entry = map.get(&SpatialHash::new(parent, &GridCell::ZERO)).unwrap();
+        let neighbors: HashSet<Entity> =
+            map.nearby_flat(entry).map(|(.., entity)| entity).collect();
 
-        assert!(neighbors.contains(&entities.a));
+        assert!(!neighbors.contains(&entities.a));
         assert!(neighbors.contains(&entities.b));
         assert!(!neighbors.contains(&entities.c));
 
         let flooded: HashSet<Entity> = map
-            .neighbors_contiguous(1, parent, GridCell::ZERO)
+            .nearby_flood(&SpatialHash::new(parent, &GridCell::ZERO))
             .flat_map(|(_hash, entry)| entry.entities.iter().copied())
             .collect();
 
