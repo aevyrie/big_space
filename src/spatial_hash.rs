@@ -27,15 +27,15 @@ use bevy_utils::{
 /// If you are adding multiple copies of this plugin with different filters, there are optimizations
 /// in place to avoid duplicating work. However, you should still take care to avoid excessively
 /// overlapping filters.
-pub struct SpatialHashPlugin<P: GridPrecision, F: QueryFilter = ()>(PhantomData<(P, F)>);
+pub struct SpatialHashPlugin<P: GridPrecision, F: SpatialHashFilter = ()>(PhantomData<(P, F)>);
 
-impl<P: GridPrecision, F: QueryFilter> Default for SpatialHashPlugin<P, F> {
+impl<P: GridPrecision, F: SpatialHashFilter> Default for SpatialHashPlugin<P, F> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> Plugin for SpatialHashPlugin<P, F> {
+impl<P: GridPrecision, F: SpatialHashFilter> Plugin for SpatialHashPlugin<P, F> {
     fn build(&self, app: &mut App) {
         app.init_resource::<SpatialHashMap<P, F>>()
             .register_type::<SpatialHash<P>>()
@@ -55,6 +55,16 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> Plugin for Spatia
     }
 }
 
+/// Used as a [`QueryFilter`] to include or exclude certain types of entities from spatial
+/// hashing.The trait is automatically implemented for all compatible types, like [`With`] or
+/// [`Without`].
+///
+/// By default, this is `()`, but it can be overidden when adding the [`SpatialHashPlugin`] and
+/// [`SpatialHashMap`]. For example, if you use `With<Players>` as your filter, only `Player`s would
+/// be considered when building spatial hash maps.
+pub trait SpatialHashFilter: QueryFilter + Send + Sync + 'static {}
+impl<T: QueryFilter + Send + Sync + 'static> SpatialHashFilter for T {}
+
 /// Used to manually track spatial hashes that have changed, for optimization purposes.
 ///
 /// We use a manual collection instead of a `Changed` query because a query that uses `Changed`
@@ -69,12 +79,12 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> Plugin for Spatia
 /// It may be possible to remove this if bevy gets archetype change detection, or observers that can
 /// react to a component being mutated. For now, this performs well enough.
 #[derive(Resource)]
-struct ChangedSpatialHashes<P: GridPrecision, F: QueryFilter> {
+struct ChangedSpatialHashes<P: GridPrecision, F: SpatialHashFilter> {
     list: Vec<Entity>,
-    spooky: PhantomData<(P, fn() -> F)>, // fn makes this send and sync
+    spooky: PhantomData<(P, F)>,
 }
 
-impl<P: GridPrecision, F: QueryFilter> Default for ChangedSpatialHashes<P, F> {
+impl<P: GridPrecision, F: SpatialHashFilter> Default for ChangedSpatialHashes<P, F> {
     fn default() -> Self {
         Self {
             list: Vec::new(),
@@ -83,9 +93,9 @@ impl<P: GridPrecision, F: QueryFilter> Default for ChangedSpatialHashes<P, F> {
     }
 }
 
-impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
+impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashPlugin<P, F> {
     /// Update or insert the [`SpatialHash`] of all changed entities that match the optional
-    /// `QueryFilter`.
+    /// [`SpatialHashFilter`].
     fn update_spatial_hashes(
         mut commands: Commands,
         mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
@@ -303,7 +313,7 @@ impl<P: GridPrecision> SpatialHashEntry<P> {
 pub struct SpatialHashMap<P, F = ()>
 where
     P: GridPrecision,
-    F: QueryFilter + Send + Sync + 'static,
+    F: SpatialHashFilter,
 {
     /// The primary hash map for looking up entities by their [`SpatialHash`].
     map: InnerSpatialHashMap<P>,
@@ -317,7 +327,7 @@ where
 impl<P, F> std::fmt::Debug for SpatialHashMap<P, F>
 where
     P: GridPrecision,
-    F: QueryFilter + Send + Sync + 'static,
+    F: SpatialHashFilter,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SpatialHashMap")
@@ -330,7 +340,7 @@ where
 impl<P, F> Default for SpatialHashMap<P, F>
 where
     P: GridPrecision,
-    F: QueryFilter + Send + Sync + 'static,
+    F: SpatialHashFilter,
 {
     fn default() -> Self {
         Self {
@@ -344,10 +354,10 @@ where
 impl<P, F> SpatialHashMap<P, F>
 where
     P: GridPrecision,
-    F: QueryFilter + Send + Sync + 'static,
+    F: SpatialHashFilter,
 {
     /// Update the [`SpatialHashMap`] with entities that have changed [`SpatialHash`]es, and meet
-    /// the optional `QueryFilter`.
+    /// the optional [`SpatialHashFilter`].
     fn update(
         mut spatial_map: ResMut<SpatialHashMap<P, F>>,
         mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
@@ -541,7 +551,7 @@ impl<P: GridPrecision> InnerSpatialHashMap<P> {
 pub struct ContiguousNeighborsIter<'a, P, F>
 where
     P: GridPrecision,
-    F: QueryFilter + Send + Sync + 'static,
+    F: SpatialHashFilter,
 {
     initial_hash: Option<SpatialHash<P>>,
     spatial_map: &'a SpatialHashMap<P, F>,
@@ -552,7 +562,7 @@ where
 impl<'a, P, F> Iterator for ContiguousNeighborsIter<'a, P, F>
 where
     P: GridPrecision,
-    F: QueryFilter + Send + Sync + 'static,
+    F: SpatialHashFilter,
 {
     type Item = (SpatialHash<P>, &'a SpatialHashEntry<P>);
 
