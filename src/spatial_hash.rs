@@ -83,47 +83,28 @@ impl<P: GridPrecision, F: QueryFilter> Default for ChangedSpatialHashes<P, F> {
     }
 }
 
-impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
+impl<P: GridPrecision, F: QueryFilter + 'static> SpatialHashPlugin<P, F> {
     /// Update or insert the [`SpatialHash`] of all changed entities that match the optional
     /// `QueryFilter`.
     fn update_spatial_hashes(
-        mut commands: Commands,
         mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
-        mut spatial_entities: ParamSet<(
-            Query<
-                (
-                    Entity,
-                    &Parent,
-                    &GridCell<P>,
-                    &mut SpatialHash<P>,
-                    &mut FastSpatialHash,
-                ),
-                (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
-            >,
-            Query<(Entity, &Parent, &GridCell<P>), (F, Without<SpatialHash<P>>)>,
-        )>,
+        mut spatial_entities: Query<
+            (
+                Entity,
+                &Parent,
+                &GridCell<P>,
+                &mut SpatialHash<P>,
+                &mut FastSpatialHash,
+            ),
+            (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
+        >,
         mut stats: Option<ResMut<crate::timing::SpatialHashStats>>,
         mut thread_changed_hashes: Local<Parallel<Vec<Entity>>>,
-        mut thread_commands: Local<Parallel<Vec<(Entity, SpatialHash<P>, FastSpatialHash)>>>,
     ) {
         let start = Instant::now();
 
-        // Create new
-        spatial_entities
-            .p1()
-            .par_iter()
-            .for_each(|(entity, parent, cell)| {
-                let spatial_hash = SpatialHash::new(parent, cell);
-                let fast_hash = FastSpatialHash(spatial_hash.pre_hash);
-                thread_commands.scope(|tl| tl.push((entity, spatial_hash, fast_hash)));
-                thread_changed_hashes.scope(|tl| tl.push(entity));
-            });
-        for (entity, spatial_hash, fast_hash) in thread_commands.drain::<Vec<_>>() {
-            commands.entity(entity).insert((spatial_hash, fast_hash));
-        }
-
-        // Update existing
-        spatial_entities.p0().par_iter_mut().for_each(
+        // Update fast hashes
+        spatial_entities.par_iter_mut().for_each(
             |(entity, parent, cell, mut hash, mut fast_hash)| {
                 let new_hash = SpatialHash::new(parent, cell);
                 let new_fast_hash = new_hash.pre_hash;
@@ -174,11 +155,25 @@ impl Hash for FastSpatialHash {
 /// Due to reference frames and multiple big spaces in a single world, this must use both the
 /// [`GridCell`] and the [`Parent`] of the entity to uniquely identify its position. These two
 /// values are then hashed and stored in this spatial hash component.
-#[derive(Component, Clone, Copy, Debug, Reflect)]
+#[derive(Clone, Copy, Debug, Reflect)]
 pub struct SpatialHash<P: GridPrecision> {
     cell: GridCell<P>,
     parent: Entity,
     pre_hash: u64,
+}
+
+impl<P: GridPrecision> Component for SpatialHash<P> {
+    const STORAGE_TYPE: bevy_ecs::component::StorageType = bevy_ecs::component::StorageType::Table;
+
+    // Automatically add and remove FastSpatialHash for this entity.
+    fn register_component_hooks(hooks: &mut bevy_ecs::component::ComponentHooks) {
+        hooks.on_add(|mut world, entity, _| {
+            world.commands().entity(entity).insert(FastSpatialHash(0));
+        });
+        hooks.on_remove(|mut world, entity, _| {
+            world.commands().entity(entity).remove::<FastSpatialHash>();
+        });
+    }
 }
 
 impl<P: GridPrecision> PartialEq for SpatialHash<P> {
