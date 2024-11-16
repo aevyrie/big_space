@@ -1,7 +1,6 @@
 //! Component bundles for big_space.
 
-use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, GridCell};
-
+use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_transform::prelude::*;
 

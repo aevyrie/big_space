@@ -2,17 +2,11 @@
 
 use std::marker::PhantomData;
 
+use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::{HashMap, HashSet};
-
-use crate::{
-    grid_cell::GridCellAny,
-    precision::GridPrecision,
-    reference_frame::{propagation::LowPrecisionRoot, ReferenceFrame},
-    BigSpace, FloatingOrigin, GridCell,
-};
 
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
@@ -29,7 +23,7 @@ struct ValidatorCaches {
     error_entities: HashSet<Entity>,
 }
 
-/// Validate the entity hierarchy and report errors.
+/// An exclusive system that validate the entity hierarchy and report errors.
 pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut World) {
     world.init_resource::<ValidatorCaches>();
     let mut caches = world.remove_resource::<ValidatorCaches>().unwrap();
@@ -308,7 +302,7 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildRootSpatialLowPrecision<P> {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
-            .with::<LowPrecisionRoot>()
+            .with::<crate::reference_frame::propagation::LowPrecisionRoot>()
             .without::<GridCellAny>()
             .without::<BigSpace>()
             .without::<ReferenceFrame<P>>()
@@ -328,7 +322,7 @@ struct ChildSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
     fn name(&self) -> &'static str {
-        "Non-root entity in a low-precision Transform hierarchy"
+        "Non-root low-precision spatial entity"
     }
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
@@ -355,7 +349,7 @@ struct ChildSpatialHighPrecision<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialHighPrecision<P> {
     fn name(&self) -> &'static str {
-        "Non-root entity in a high-precision BigSpace hierarchy"
+        "Non-root high precision spatial entity"
     }
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {

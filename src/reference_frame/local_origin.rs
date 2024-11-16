@@ -2,6 +2,7 @@
 //! frames, and used to compute the floating origin's position relative to each reference frame. See
 //! [`LocalFloatingOrigin`].
 
+use crate::prelude::*;
 use bevy_ecs::{
     prelude::*,
     system::{
@@ -15,16 +16,13 @@ use bevy_transform::prelude::*;
 
 pub use inner::LocalFloatingOrigin;
 
-use crate::{precision::GridPrecision, timing::PropagationStats, BigSpace, GridCell};
-
 use super::ReferenceFrame;
 
 /// A module kept private to enforce use of setters and getters within the parent module.
 mod inner {
+    use crate::prelude::*;
     use bevy_math::{prelude::*, DAffine3, DMat3, DQuat};
     use bevy_reflect::prelude::*;
-
-    use crate::{precision::GridPrecision, GridCell};
 
     /// An isometry that describes the location of the floating origin's grid cell's origin, in the
     /// local reference frame.
@@ -432,7 +430,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// only affect the rendering precision. The high precision coordinates ([`GridCell`] and
     /// [`Transform`]) are the source of truth and never mutated.
     pub fn compute_all(
-        mut stats: ResMut<PropagationStats>,
+        mut stats: ResMut<crate::timing::PropagationStats>,
         mut reference_frames: ReferenceFramesMut<P>,
         mut frame_stack: Local<Vec<Entity>>,
         mut scratch_buffer: Local<Vec<Entity>>,
@@ -528,7 +526,6 @@ mod tests {
     use bevy::{ecs::system::SystemState, math::DVec3, prelude::*};
 
     use super::*;
-    use crate::*;
 
     /// Test that the reference frame getters do what they say they do.
     #[test]

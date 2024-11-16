@@ -1,14 +1,13 @@
 #![allow(clippy::type_complexity)]
 
-use bevy::prelude::*;
-use bevy_color::palettes;
-use big_space::{commands::BigSpaceCommands, reference_frame::ReferenceFrame, FloatingOrigin};
+use bevy::{color::palettes, prelude::*};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i64>::default(),
+            BigSpacePlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))

@@ -1,18 +1,11 @@
 //! The bevy plugin for big_space.
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 use std::marker::PhantomData;
-
-use crate::{
-    grid_cell::GridCellAny,
-    precision::GridPrecision,
-    reference_frame::{local_origin::LocalFloatingOrigin, ReferenceFrame},
-    timing::TimingStatsPlugin,
-    validation, BigSpace, FloatingOrigin, GridCell,
-};
 
 /// Add this plugin to your [`App`] for floating origin functionality.
 pub struct BigSpacePlugin<P: GridPrecision> {
@@ -47,7 +40,7 @@ impl<P: GridPrecision> Default for BigSpacePlugin<P> {
 
 #[allow(missing_docs)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-pub enum FloatingOriginSet {
+pub enum FloatingOriginSystem {
     Init,
     RecenterLargeTransforms,
     LocalFloatingOrigins,
@@ -63,27 +56,27 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
         app.insert_resource(bevy_hierarchy::ReportHierarchyIssue::<GlobalTransform>::new(false));
 
         // Performance timings
-        app.add_plugins(TimingStatsPlugin);
+        app.add_plugins(crate::timing::TimingStatsPlugin);
 
         let system_set_config = || {
             (
                 ReferenceFrame::<P>::tag_low_precision_roots // loose ordering on this set
-                    .after(FloatingOriginSet::Init)
-                    .before(FloatingOriginSet::PropagateLowPrecision),
+                    .after(FloatingOriginSystem::Init)
+                    .before(FloatingOriginSystem::PropagateLowPrecision),
                 (
                     GridCell::<P>::recenter_large_transforms,
                     BigSpace::find_floating_origin,
                 )
-                    .in_set(FloatingOriginSet::RecenterLargeTransforms),
+                    .in_set(FloatingOriginSystem::RecenterLargeTransforms),
                 LocalFloatingOrigin::<P>::compute_all
-                    .in_set(FloatingOriginSet::LocalFloatingOrigins)
-                    .after(FloatingOriginSet::RecenterLargeTransforms),
+                    .in_set(FloatingOriginSystem::LocalFloatingOrigins)
+                    .after(FloatingOriginSystem::RecenterLargeTransforms),
                 ReferenceFrame::<P>::propagate_high_precision
-                    .in_set(FloatingOriginSet::PropagateHighPrecision)
-                    .after(FloatingOriginSet::LocalFloatingOrigins),
+                    .in_set(FloatingOriginSystem::PropagateHighPrecision)
+                    .after(FloatingOriginSystem::LocalFloatingOrigins),
                 ReferenceFrame::<P>::propagate_low_precision
-                    .in_set(FloatingOriginSet::PropagateLowPrecision)
-                    .after(FloatingOriginSet::PropagateHighPrecision),
+                    .in_set(FloatingOriginSystem::PropagateLowPrecision)
+                    .after(FloatingOriginSystem::PropagateHighPrecision),
             )
                 .in_set(TransformSystem::TransformPropagate)
         };
@@ -103,8 +96,8 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
             // Validation
             .add_systems(
                 PostUpdate,
-                validation::validate_hierarchy::<validation::SpatialHierarchyRoot<P>>
-                    .before(TransformSystem::TransformPropagate)
+                crate::validation::validate_hierarchy::<crate::validation::SpatialHierarchyRoot<P>>
+                    .after(TransformSystem::TransformPropagate)
                     .run_if({
                         let run = self.validate_hierarchies;
                         move || run

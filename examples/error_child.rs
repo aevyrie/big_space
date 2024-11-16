@@ -1,13 +1,13 @@
 //! This example demonstrates error accumulating from parent to children in nested reference frames.
 use bevy::{math::DVec3, prelude::*};
 use bevy_color::palettes;
-use big_space::{commands::BigSpaceCommands, reference_frame::ReferenceFrame, FloatingOrigin};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i64>::default(),
+            BigSpacePlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))

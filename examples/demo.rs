@@ -1,23 +1,21 @@
 use bevy::{
+    color::palettes,
     prelude::*,
     transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow},
 };
-use bevy_color::palettes;
 use big_space::{
     camera::{CameraController, CameraInput},
-    commands::BigSpaceCommands,
-    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
+    prelude::*,
     world_query::GridTransformReadOnly,
-    FloatingOrigin,
 };
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i128>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i128>::default(),
+            BigSpacePlugin::<i128>::default(),
+            FloatingOriginDebugPlugin::<i128>::default(),
             big_space::camera::CameraControllerPlugin::<i128>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))

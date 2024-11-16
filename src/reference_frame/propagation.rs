@@ -1,14 +1,10 @@
 //! Logic for propagating transforms through the hierarchy of reference frames.
 
+use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
-
-use crate::{
-    grid_cell::GridCellAny, precision::GridPrecision, reference_frame::ReferenceFrame,
-    timing::PropagationStats, BigSpace, GridCell,
-};
 
 /// Marks entities in the big space hierarchy that are themselves roots of a low-precision subtree.
 /// While finding these entities is slow, we only have to do it during hierarchy or archetype
@@ -24,7 +20,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`]
     /// the entity belongs to.
     pub fn propagate_high_precision(
-        mut stats: ResMut<PropagationStats>,
+        mut stats: ResMut<crate::timing::PropagationStats>,
         reference_frames: Query<&ReferenceFrame<P>>,
         mut entities: ParamSet<(
             Query<(
@@ -97,7 +93,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
     /// Marks entities with [`LowPrecisionRoot`]. Handles adding and removing the component.
     pub fn tag_low_precision_roots(
-        mut stats: ResMut<PropagationStats>,
+        mut stats: ResMut<crate::timing::PropagationStats>,
         mut commands: Commands,
         valid_parent: Query<(), (With<GridCell<P>>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
@@ -147,7 +143,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     /// that are children of an entity with a [`GlobalTransform`]. This will recursively propagate
     /// entities that only have low-precision [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
-        mut stats: ResMut<PropagationStats>,
+        mut stats: ResMut<crate::timing::PropagationStats>,
         root_parents: Query<
             Ref<GlobalTransform>,
             (
@@ -316,9 +312,8 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::*;
     use bevy::prelude::*;
-
-    use crate::{BigSpaceCommands, BigSpacePlugin, FloatingOrigin, GridCell, ReferenceFrame};
 
     #[test]
     fn low_precision_in_big_space() {

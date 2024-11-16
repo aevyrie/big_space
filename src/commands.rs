@@ -1,7 +1,9 @@
 //! Adds `big_space`-specific commands to bevy's `Commands`.
 
-use self::precision::GridPrecision;
-use crate::{reference_frame::ReferenceFrame, *};
+use crate::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_hierarchy::prelude::*;
+use bevy_transform::prelude::*;
 use smallvec::SmallVec;
 use std::marker::PhantomData;
 

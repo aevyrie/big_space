@@ -6,6 +6,7 @@ use std::{
     marker::PhantomData,
 };
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
 use bevy_hierarchy::Parent;
@@ -15,8 +16,6 @@ use bevy_utils::{
     hashbrown::{HashMap, HashSet},
     AHasher, Instant, Parallel, PassHash,
 };
-
-use crate::{precision::GridPrecision, timing::SpatialHashStats, GridCell};
 
 /// Add spatial hashing acceleration to `big_space`, accessible through the [`SpatialHashMap`]
 /// resource, and [`SpatialHash`] components.
@@ -45,11 +44,11 @@ impl<P: GridPrecision, F: QueryFilter + Send + Sync + 'static> Plugin for Spatia
                 PostUpdate,
                 (
                     Self::update_spatial_hashes
-                        .in_set(SpatialHashSet::UpdateHash)
-                        .after(crate::FloatingOriginSet::RecenterLargeTransforms),
+                        .in_set(SpatialHashSystem::UpdateHash)
+                        .after(FloatingOriginSystem::RecenterLargeTransforms),
                     SpatialHashMap::<P, F>::update
-                        .in_set(SpatialHashSet::UpdateMap)
-                        .after(SpatialHashSet::UpdateHash),
+                        .in_set(SpatialHashSystem::UpdateMap)
+                        .after(SpatialHashSystem::UpdateHash),
                 )
                     .in_set(bevy_transform::TransformSystem::TransformPropagate),
             );
@@ -103,7 +102,7 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
             >,
             Query<(Entity, &Parent, &GridCell<P>), (F, Without<SpatialHash<P>>)>,
         )>,
-        mut stats: Option<ResMut<SpatialHashStats>>,
+        mut stats: Option<ResMut<crate::timing::SpatialHashStats>>,
         mut thread_changed_hashes: Local<Parallel<Vec<Entity>>>,
         mut thread_commands: Local<Parallel<Vec<(Entity, SpatialHash<P>, FastSpatialHash)>>>,
     ) {
@@ -147,7 +146,7 @@ impl<P: GridPrecision, F: QueryFilter> SpatialHashPlugin<P, F> {
 
 /// System sets for [`SpatialHashPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
-pub enum SpatialHashSet {
+pub enum SpatialHashSystem {
     /// [`SpatialHash`] updated.
     UpdateHash,
     /// [`SpatialHashMap`] updated.
@@ -354,7 +353,7 @@ where
         mut changed_hashes: ResMut<ChangedSpatialHashes<P, F>>,
         all_hashes: Query<(Entity, &SpatialHash<P>), F>,
         mut removed: RemovedComponents<SpatialHash<P>>,
-        mut stats: Option<ResMut<SpatialHashStats>>,
+        mut stats: Option<ResMut<crate::timing::SpatialHashStats>>,
     ) {
         let start = Instant::now();
 
@@ -587,12 +586,8 @@ where
 mod tests {
     use std::sync::OnceLock;
 
+    use crate::prelude::*;
     use bevy_utils::hashbrown::HashSet;
-
-    use crate::{
-        spatial_hash::{SpatialHash, SpatialHashMap, SpatialHashPlugin},
-        BigSpaceCommands, GridCell, ReferenceFrame,
-    };
 
     #[test]
     fn entity_despawn() {

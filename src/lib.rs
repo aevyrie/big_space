@@ -179,10 +179,6 @@
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
 
-use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
-use bevy_transform::prelude::*;
-
 pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
@@ -202,10 +198,22 @@ pub mod debug;
 #[cfg(test)]
 mod tests;
 
-pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
-pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};
-pub use floating_origins::{BigSpace, FloatingOrigin};
-pub use grid_cell::GridCell;
-pub use plugin::{BigSpacePlugin, FloatingOriginSet};
-pub use reference_frame::ReferenceFrame;
-pub use timing::{PropagationStats, SmoothedStat, SpatialHashStats};
+/// Common big_space imports.
+pub mod prelude {
+    use crate::*;
+    pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
+    pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};
+    pub use debug::FloatingOriginDebugPlugin;
+    pub use floating_origins::{BigSpace, FloatingOrigin};
+    pub use grid_cell::{GridCell, GridCellAny};
+    pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
+    pub use precision::GridPrecision;
+    pub use reference_frame::{
+        local_origin::{LocalFloatingOrigin, ReferenceFrames, ReferenceFramesMut},
+        ReferenceFrame,
+    };
+    pub use spatial_hash::{
+        FastSpatialHash, SpatialHash, SpatialHashMap, SpatialHashPlugin, SpatialHashSystem,
+    };
+    pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
+}

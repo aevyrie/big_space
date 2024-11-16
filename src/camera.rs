@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
@@ -15,8 +16,6 @@ use bevy_render::{
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
 use bevy_utils::HashSet;
-
-use crate::{precision::GridPrecision, reference_frame::local_origin::ReferenceFrames, GridCell};
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
@@ -258,7 +257,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
-    frames: ReferenceFrames<P>,
+    frames: crate::reference_frame::local_origin::ReferenceFrames<P>,
     mut input: ResMut<CameraInput>,
     mut camera: Query<(
         Entity,

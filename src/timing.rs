@@ -2,12 +2,11 @@
 
 use std::{collections::VecDeque, iter::Sum, ops::Div, time::Duration};
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_transform::TransformSystem;
-
-use crate::FloatingOriginSet;
 
 /// Summarizes plugin performance timings
 pub struct TimingStatsPlugin;
@@ -24,7 +23,8 @@ impl Plugin for TimingStatsPlugin {
             .register_type::<SmoothedStat<SpatialHashStats>>()
             .add_systems(
                 PostUpdate,
-                (SpatialHashStats::reset, PropagationStats::reset).in_set(FloatingOriginSet::Init),
+                (SpatialHashStats::reset, PropagationStats::reset)
+                    .in_set(FloatingOriginSystem::Init),
             )
             .add_systems(
                 PostUpdate,

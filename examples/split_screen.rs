@@ -10,21 +10,15 @@ use bevy::{
     transform::TransformSystem,
 };
 use bevy_color::palettes;
-use big_space::{
-    camera::{CameraController, CameraControllerPlugin},
-    commands::BigSpaceCommands,
-    reference_frame::ReferenceFrame,
-    world_query::{GridTransform, GridTransformReadOnly},
-    BigSpacePlugin, FloatingOrigin,
-};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::<i32>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i32>::default(),
-            CameraControllerPlugin::<i32>::default(),
+            FloatingOriginDebugPlugin::<i32>::default(),
+            big_space::camera::CameraControllerPlugin::<i32>::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, set_camera_viewports)
@@ -71,7 +65,7 @@ fn setup(
                         .looking_to(Vec3::NEG_X, Vec3::Y),
                     ..default()
                 },
-                CameraController::default().with_smoothness(0.8, 0.8),
+                big_space::camera::CameraController::default().with_smoothness(0.8, 0.8),
                 RenderLayers::layer(2),
                 LeftCamera,
                 FloatingOrigin,

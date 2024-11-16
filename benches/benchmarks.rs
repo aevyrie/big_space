@@ -1,12 +1,8 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::prelude::*;
-use big_space::{
-    spatial_hash::{SpatialHashMap, SpatialHashPlugin},
-    *,
-};
+use big_space::prelude::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use spatial_hash::SpatialHash;
 use std::{iter::repeat_with, ops::Neg};
 use turborand::prelude::*;
 
@@ -379,7 +375,7 @@ fn vs_bevy(c: &mut Criterion) {
     let mut group = c.benchmark_group("transform_prop");
 
     use bevy::prelude::*;
-    use big_space::BigSpacePlugin;
+    use BigSpacePlugin;
 
     const N_ENTITIES: usize = 1_000_000;
 

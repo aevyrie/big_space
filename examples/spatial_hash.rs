@@ -7,13 +7,7 @@ use bevy::{
 use bevy_math::DVec3;
 use bevy_render::view::VisibilityRange;
 use bevy_utils::Instant;
-use big_space::{
-    camera::{CameraController, CameraControllerPlugin},
-    spatial_hash::{SpatialHash, SpatialHashMap, SpatialHashPlugin},
-    timing::PropagationStats,
-    BigSpaceCommands, BigSpacePlugin, BigSpatialBundle, FloatingOrigin, GridCell, ReferenceFrame,
-    SmoothedStat, SpatialHashStats,
-};
+use big_space::prelude::*;
 use noise::{NoiseFn, Perlin};
 
 fn main() {
@@ -22,7 +16,7 @@ fn main() {
             DefaultPlugins,
             BigSpacePlugin::<i32>::default(),
             SpatialHashPlugin::<i32>::default(),
-            CameraControllerPlugin::<i32>::default(),
+            big_space::camera::CameraControllerPlugin::<i32>::default(),
         ))
         .insert_resource(Msaa::Off)
         .add_systems(Startup, (spawn, setup_ui))
@@ -35,9 +29,9 @@ fn main() {
         .run();
 }
 
+const N_ENTITIES: usize = 100_000;
 const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
-const N_ENTITIES: usize = 1_000_000;
 // How fast the entities should move, causing them to move into neighboring cells.
 const MOVEMENT_SPEED: f32 = 8e4;
 const PERCENT_STATIC: f32 = 0.9;
@@ -91,14 +85,14 @@ fn move_player(
         (&mut Transform, &mut GridCell<i32>, &Parent),
         (Without<Player>, With<Handle<Mesh>>),
     >,
-    mut materials: Query<&mut Handle<StandardMaterial>>,
+    mut materials: Query<&mut Handle<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
     reference_frame: Query<&ReferenceFrame<i32>>,
     spatial_hash_map: Res<SpatialHashMap<i32>>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<(&mut Text, &mut StatsText)>,
-    hash_stats: Res<SmoothedStat<SpatialHashStats>>,
-    prop_stats: Res<SmoothedStat<PropagationStats>>,
+    hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::SpatialHashStats>>,
+    prop_stats: Res<big_space::timing::SmoothedStat<big_space::timing::PropagationStats>>,
 ) {
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
@@ -255,9 +249,10 @@ fn spawn(
                     ..Default::default()
                 },
                 tonemapping: Tonemapping::AcesFitted,
+                transform: Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
                 ..Default::default()
             },
-            CameraController::default()
+            big_space::camera::CameraController::default()
                 .with_smoothness(0.98, 0.93)
                 .with_slowing(false)
                 .with_speed(15.0),
@@ -275,19 +270,18 @@ fn spawn(
                 ..default()
             },));
             if i == 0 {
-                let matl: StandardMaterial = Color::from(Srgba::new(1.0, 1.0, 0.0, 1.0)).into();
                 sphere_builder.insert((
                     meshes.add(Sphere::new(1.0)),
                     Player,
-                    materials.add(matl),
-                    Transform::from_scale(Vec3::splat(1.0)),
+                    materials.add(Color::from(Srgba::new(20.0, 20.0, 0.0, 1.0))),
+                    Transform::from_scale(Vec3::splat(2.0)),
                 ));
             } else {
                 sphere_builder.insert((
                     material_presets.default.clone_weak(),
                     VisibilityRange {
                         start_margin: 1.0..5.0,
-                        end_margin: HALF_WIDTH * CELL_WIDTH * 2.0..HALF_WIDTH * CELL_WIDTH * 2.5,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 2.0..HALF_WIDTH * CELL_WIDTH * 3.0,
                     },
                     sphere_mesh_lq.clone(),
                 ));

@@ -1,9 +1,7 @@
 use std::collections::VecDeque;
 
-/// Example with spheres at the scale and distance of the earth and moon around the sun, at 1:1
-/// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
-/// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{
+    color::palettes,
     core_pipeline::bloom::BloomSettings,
     math::DVec3,
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
@@ -11,13 +9,7 @@ use bevy::{
     render::camera::Exposure,
     transform::TransformSystem,
 };
-use bevy_color::palettes;
-use big_space::{
-    camera::{CameraController, CameraInput},
-    commands::BigSpaceCommands,
-    reference_frame::ReferenceFrame,
-    FloatingOrigin,
-};
+use big_space::prelude::*;
 use turborand::{rng::Rng, TurboRand};
 
 fn main() {
@@ -25,7 +17,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            big_space::BigSpacePlugin::<i64>::new(true),
+            BigSpacePlugin::<i64>::new(true),
             // big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
         ))
@@ -43,7 +35,7 @@ fn main() {
                     .in_set(TransformSystem::TransformPropagate)
                     .after(bevy::transform::systems::sync_simple_transforms)
                     .after(bevy::transform::systems::propagate_transforms)
-                    .after(big_space::FloatingOriginSet::PropagateLowPrecision),
+                    .after(FloatingOriginSystem::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
                     .after(big_space::camera::default_camera_inputs)
@@ -89,7 +81,7 @@ fn lighting(
 }
 
 fn springy_ship(
-    cam_input: Res<CameraInput>,
+    cam_input: Res<big_space::camera::CameraInput>,
     mut ship: Query<&mut Transform, With<Spaceship>>,
     mut desired_dir: Local<(Vec3, Quat)>,
     mut smoothed_rot: Local<VecDeque<Vec3>>,
@@ -243,7 +235,7 @@ fn spawn_solar_system(
                 earth.with_frame_default(|camera| {
                     camera.insert((
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
-                        CameraController::default() // Built-in camera controller
+                        big_space::camera::CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
                             .with_smoothness(0.98, 0.98)
                             .with_speed(1.0),

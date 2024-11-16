@@ -1,8 +1,10 @@
 //! Contains the grid cell implementation
 
 use bevy_ecs::{component::StorageType, prelude::*};
+use bevy_hierarchy::prelude::*;
 use bevy_math::{DVec3, IVec3};
 use bevy_reflect::prelude::*;
+use bevy_transform::prelude::*;
 use bevy_utils::Instant;
 
 use crate::*;
@@ -90,7 +92,7 @@ impl<P: GridPrecision> GridCell<P> {
     /// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
     /// transform.
     pub fn recenter_large_transforms(
-        mut stats: ResMut<PropagationStats>,
+        mut stats: ResMut<timing::PropagationStats>,
         reference_frames: Query<&ReferenceFrame<P>>,
         mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
     ) {

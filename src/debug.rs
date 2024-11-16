@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_color::prelude::*;
 use bevy_ecs::prelude::*;
@@ -9,12 +10,6 @@ use bevy_gizmos::prelude::*;
 use bevy_math::prelude::*;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
-
-use crate::{
-    precision::GridPrecision,
-    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
-    FloatingOrigin, GridCell,
-};
 
 /// This plugin will render the bounds of occupied grid cells.
 #[derive(Default)]

@@ -6,17 +6,13 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::{
-    commands::BigSpaceCommands,
-    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
-    FloatingOrigin, GridCell,
-};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i128>::default(),
+            BigSpacePlugin::<i128>::default(),
         ))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))

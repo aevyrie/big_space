@@ -37,6 +37,7 @@ bevy_time = { version = "0.14.0", default-features = false, optional = true }
 big_space = { path = "", features = ["debug", "camera"] }
 bevy = { version = "0.14.0", default-features = false, features = [
     "bevy_scene",
+    "bevy_asset",
     "bevy_gltf",
     "bevy_winit",
     "default_font",
@@ -51,6 +52,7 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.19.0"
+bevy_hanabi = "0.13"
 
 [[bench]]
 name = "benchmarks"
