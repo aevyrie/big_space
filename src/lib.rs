@@ -213,7 +213,9 @@ pub mod prelude {
         ReferenceFrame,
     };
     pub use spatial_hash::{
-        FastSpatialHash, SpatialHash, SpatialHashMap, SpatialHashPlugin, SpatialHashSystem,
+        component::{FastSpatialHash, SpatialHash},
+        map::SpatialHashMap,
+        SpatialHashPlugin, SpatialHashSystem,
     };
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
 }
