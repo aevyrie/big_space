@@ -65,7 +65,7 @@ impl<P: GridPrecision> SpatialHash<P> {
     /// Intentionally left private, so we can ensure the only place these are constructed/mutated is
     /// this module. This allows us to optimize change detection using [`ChangedSpatialHashes`].
     #[inline]
-    pub fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
+    pub(super) fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
         Self::from_parent(parent.get(), cell)
     }
 

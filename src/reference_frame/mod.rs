@@ -22,10 +22,10 @@ pub mod propagation;
 /// Reference frames are hierarchical, allowing more precision for objects with similar relative
 /// velocities. All entities in the same reference frame will move together, like standard transform
 /// propagation, but with much more precision. Entities in the same reference frame as the
-/// [`crate::FloatingOrigin`] will be rendered with the most precision. Transforms are propagated
-/// starting from the floating origin, ensuring that references frames in a similar point in the
-/// hierarchy have accumulated the least error. Reference frames are transformed relative to each
-/// other using 64 bit float transforms.
+/// [`FloatingOrigin`] will be rendered with the most precision. Transforms are propagated starting
+/// from the floating origin, ensuring that references frames in a similar point in the hierarchy
+/// have accumulated the least error. Reference frames are transformed relative to each other using
+/// 64 bit float transforms.
 ///
 /// ## Example
 ///

@@ -1,15 +1,12 @@
 //! Contains the grid cell implementation
 
+use crate::prelude::*;
 use bevy_ecs::{component::StorageType, prelude::*};
 use bevy_hierarchy::prelude::*;
 use bevy_math::{DVec3, IVec3};
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::Instant;
-
-use crate::*;
-
-use self::{precision::GridPrecision, reference_frame::ReferenceFrame};
 
 /// Marks entities with any generic [`GridCell`] component. Allows you to query for high precision
 /// spatial entities of any [`GridPrecision`].
@@ -92,7 +89,7 @@ impl<P: GridPrecision> GridCell<P> {
     /// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
     /// transform.
     pub fn recenter_large_transforms(
-        mut stats: ResMut<timing::PropagationStats>,
+        mut stats: ResMut<crate::timing::PropagationStats>,
         reference_frames: Query<&ReferenceFrame<P>>,
         mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
     ) {

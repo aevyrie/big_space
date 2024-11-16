@@ -115,8 +115,7 @@
 //! # Usage
 //!
 //! To start using this plugin, you will first need to choose how big your world should be! Do you
-//! need an i8, or an i128? See [`GridPrecision`](crate::precision::GridPrecision) for more details
-//! and documentation.
+//! need an i8, or an i128? See [`GridPrecision`] for more details and documentation.
 //!
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
 //! 2. Add the [`BigSpacePlugin`] to your `App`
@@ -178,6 +177,11 @@
 
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
+
+#[allow(unused_imports)] // For docs
+use bevy_transform::prelude::*;
+#[allow(unused_imports)] // For docs
+use prelude::*;
 
 pub mod bundles;
 pub mod commands;

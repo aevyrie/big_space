@@ -81,16 +81,13 @@ impl PropagationStats {
         self.grid_recentering
     }
 
-    /// How long it took to run
-    /// [`LocalFloatingOrigin`](crate::reference_frame::local_origin::LocalFloatingOrigin)
-    /// propagation this update.
+    /// How long it took to run [`LocalFloatingOrigin`] propagation this update.
     pub fn local_origin_propagation(&self) -> Duration {
         self.local_origin_propagation
     }
 
     /// How long it took to run high precision
-    /// [`Transform`](bevy_transform::prelude::Transform)+[`GridCell`](crate::grid_cell::GridCell)
-    /// propagation this update.
+    /// [`Transform`](bevy_transform::prelude::Transform)+[`GridCell`] propagation this update.
     pub fn high_precision_propagation(&self) -> Duration {
         self.high_precision_propagation
     }
