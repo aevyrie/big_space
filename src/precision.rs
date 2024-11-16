@@ -35,7 +35,7 @@ use bevy_reflect::{FromReflect, GetTypeRegistration, Reflect, TypePath};
 /// define a type alias!
 ///
 /// ```
-/// # use big_space::GridCell;
+/// # use big_space::prelude::*;
 /// type GalacticGrid = GridCell<i64>;
 /// ```
 ///
