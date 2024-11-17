@@ -1,9 +1,11 @@
-//! A bare minimum example of spawning big_spaces.
+//! A minimal example of spawning meshes and floating origin cameras in big_spaces.
 
 use bevy::prelude::*;
+use bevy_math::DVec3;
 use big_space::prelude::*;
 
-const BIG_DIST: f32 = 100_000_000.0; // Spawn stuff really far from the origin to show it works.
+// Spawn the camera and mesh really far from the origin to show it works.
+const BIG_DISTANCE: f64 = 100_000_000_000_000.0;
 
 fn main() {
     App::new()
@@ -19,27 +21,54 @@ fn main() {
 
 fn setup_scene(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Using `spawn_big_space()` helps you avoid mistakes when building a hierarchy.
-    // You can have multiple independent BigSpaces in your world, with their own floating origins.
+    // Using `spawn_big_space()` helps you avoid mistakes when building hierarchies. A world can
+    // have multiple independent BigSpaces, with their own floating origins. This can come in handy
+    // if you want to have two cameras very far from each other, like split screen, or portals.
     commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
-        // spawn_spatial will spawn a high-precision spatial entity with floating origin support
+        // Because BIG_DISTANCE is so large, we want to avoid using bevy's f32 transforms alone.
+        // Instead, we use this helper to convert an f64 position into a grid cell and offset.
+        let (grid_cell, cell_offset) = root_frame
+            .frame()
+            .translation_to_grid(DVec3::splat(BIG_DISTANCE));
+
+        // `spawn_spatial` will spawn a high-precision spatial entity with floating origin support
         root_frame.spawn_spatial(DirectionalLightBundle::default());
-        root_frame.spawn_spatial(PbrBundle {
-            mesh: meshes.add(Sphere::default()),
-            material: materials.add(Color::WHITE),
-            transform: Transform::from_translation(Vec3::splat(BIG_DIST)),
-            ..default()
-        });
+
+        // Spawn a sphere mesh with high precision
         root_frame.spawn_spatial((
-            // Any spatial entity can be the floating origin. Attaching it to the camera ensures the
-            // camera will never see floating point precision rendering artifacts.
+            PbrBundle {
+                mesh: meshes.add(Sphere::default()),
+                material: materials.add(Color::WHITE),
+                transform: Transform::from_translation(cell_offset),
+                ..default()
+            },
+            grid_cell,
+        ));
+
+        // Spawning low-precision entities (without a GridCell) as children of high-precision
+        // entities (with a GridCell), is also supported. We demonstrate this here by loading in a
+        // GLTF scene, which will be added a child of this entity using only Transforms.
+        root_frame.spawn_spatial((
+            SceneBundle {
+                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                transform: Transform::from_translation(cell_offset - 10.0),
+                ..default()
+            },
+            grid_cell,
+        ));
+
+        // Any spatial entity can be the floating origin. Attaching it to the camera ensures the
+        // camera will never see floating point precision rendering artifacts.
+        root_frame.spawn_spatial((
             Camera3dBundle {
-                transform: Transform::from_translation(BIG_DIST + Vec3::new(0.0, 0.0, 10.0)),
+                transform: Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
                 ..Default::default()
             },
+            grid_cell,
             FloatingOrigin,
             big_space::camera::CameraController::default(),
         ));
