@@ -115,10 +115,10 @@ impl<P: GridPrecision> SpatialHash<P> {
 
     /// Returns an iterator over all neighboring grid cells and their hashes, within the
     /// `cell_radius`. This iterator will not visit `cell`.
-    pub fn neighbors(
-        &self,
+    pub fn neighbors<'a>(
+        &'a self,
         cell_radius: u8,
-    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> + use<'_, P> {
+    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> + 'a {
         let radius = cell_radius as i32;
         let search_width = 1 + 2 * radius;
         let search_volume = search_width.pow(3);
