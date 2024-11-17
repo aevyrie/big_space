@@ -4,8 +4,8 @@ use bevy::prelude::*;
 use bevy_math::DVec3;
 use big_space::prelude::*;
 
-// Spawn the camera and mesh really far from the origin to show it works.
-const BIG_DISTANCE: f64 = 100_000_000_000_000.0;
+// Spawn the camera and mesh really, stupidly, far from the origin .
+const BIG_DISTANCE: f64 = 1_000_000_000_000_000_000.0;
 
 fn main() {
     App::new()
