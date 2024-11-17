@@ -36,66 +36,68 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_big_space(
-        ReferenceFrame::<i128>::new(SMALL_SCALE * 1_000.0, 0.0),
-        |root_frame| {
-            root_frame.spawn_spatial(DirectionalLightBundle::default());
+    // Because we are working on such small scales, we need to make the reference frame's grid very
+    // small. This ensures that the maximum floating point error is also very small, because no
+    // entities can ever get farther than `SMALL_SCALE * 500` units from the origin.
+    let small_reference_frame_grid = ReferenceFrame::<i128>::new(SMALL_SCALE * 1_000.0, 0.0);
 
-            // A carbon atom at the origin
-            root_frame.spawn_spatial((
-                Atom,
-                PbrBundle {
-                    mesh: meshes.add(Sphere::default()),
-                    material: materials.add(Color::WHITE),
-                    transform: Transform::from_scale(Vec3::splat(SMALL_SCALE)),
-                    ..default()
-                },
-            ));
+    commands.spawn_big_space(small_reference_frame_grid, |root_frame| {
+        root_frame.spawn_spatial(DirectionalLightBundle::default());
 
-            // Compute the grid cell for the far away objects
-            let (grid_cell, cell_offset) = root_frame
-                .frame()
-                .translation_to_grid(DVec3::X * BIG_DISTANCE);
+        // A carbon atom at the origin
+        root_frame.spawn_spatial((
+            Atom,
+            PbrBundle {
+                mesh: meshes.add(Sphere::default()),
+                material: materials.add(Color::WHITE),
+                transform: Transform::from_scale(Vec3::splat(SMALL_SCALE)),
+                ..default()
+            },
+        ));
 
-            // A carbon atom at the other side of the milky way
-            root_frame.spawn_spatial((
-                Atom,
-                PbrBundle {
-                    mesh: meshes.add(Sphere::default()),
-                    material: materials.add(Color::WHITE),
-                    transform: Transform::from_translation(cell_offset)
-                        .with_scale(Vec3::splat(SMALL_SCALE)),
-                    ..default()
-                },
-                grid_cell,
-            ));
+        // Compute the grid cell for the far away objects
+        let (grid_cell, cell_offset) = root_frame
+            .frame()
+            .translation_to_grid(DVec3::X * BIG_DISTANCE);
 
-            root_frame.spawn_spatial((
-                Camera3dBundle {
-                    projection: Projection::Perspective(PerspectiveProjection {
-                        near: SMALL_SCALE * 0.01, // Without this, the atom would be clipped
-                        ..Default::default()
-                    }),
-                    transform: Transform::from_xyz(0.0, 0.0, SMALL_SCALE * 2.0),
+        // A carbon atom at the other side of the milky way
+        root_frame.spawn_spatial((
+            Atom,
+            PbrBundle {
+                mesh: meshes.add(Sphere::default()),
+                material: materials.add(Color::WHITE),
+                transform: Transform::from_translation(cell_offset)
+                    .with_scale(Vec3::splat(SMALL_SCALE)),
+                ..default()
+            },
+            grid_cell,
+        ));
+
+        root_frame.spawn_spatial((
+            Camera3dBundle {
+                projection: Projection::Perspective(PerspectiveProjection {
+                    near: SMALL_SCALE * 0.01, // Without this, the atom would be clipped
                     ..Default::default()
-                },
-                grid_cell,
-                FloatingOrigin,
-                big_space::camera::CameraController::default(),
-            ));
+                }),
+                transform: Transform::from_xyz(0.0, 0.0, SMALL_SCALE * 2.0),
+                ..Default::default()
+            },
+            grid_cell,
+            FloatingOrigin,
+            big_space::camera::CameraController::default(),
+        ));
 
-            // A space ship
-            root_frame.spawn_spatial((
-                SceneBundle {
-                    scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                    transform: Transform::from_xyz(0.0, 0.0, 2.5)
-                        .with_rotation(Quat::from_rotation_y(3.14)),
-                    ..default()
-                },
-                grid_cell,
-            ));
-        },
-    );
+        // A space ship
+        root_frame.spawn_spatial((
+            SceneBundle {
+                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                transform: Transform::from_xyz(0.0, 0.0, 2.5)
+                    .with_rotation(Quat::from_rotation_y(3.14)),
+                ..default()
+            },
+            grid_cell,
+        ));
+    });
 
     commands.spawn(TextBundle {
         text: Text::from_section(
