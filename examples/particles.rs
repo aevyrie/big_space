@@ -1,8 +1,7 @@
-//! This example demonstrates error accumulating from parent to children in nested reference frames.
+//! Demonstration of using `bevy_hanabi` gpu particles with `big_space` to render a particle trail
+//! that follows the camera even when it moves between cells.
+
 use bevy::prelude::*;
-use bevy_color::palettes::css::BLACK;
-use bevy_hanabi::EffectAsset;
-use bevy_render::primitives::Aabb;
 use big_space::prelude::*;
 
 fn main() {
@@ -15,6 +14,10 @@ fn main() {
             bevy_hanabi::HanabiPlugin,
         ))
         .add_systems(Startup, setup_scene)
+        .add_systems(
+            PostUpdate,
+            update_trail.after(TransformSystem::TransformPropagate),
+        )
         .run();
 }
 
@@ -24,13 +27,15 @@ fn setup_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut effects: ResMut<Assets<bevy_hanabi::EffectAsset>>,
 ) {
+    let effect = effects.add(particle_effect());
     commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
         root_frame.spawn_spatial(DirectionalLightBundle::default());
         root_frame.spawn_spatial(PbrBundle {
             mesh: meshes.add(Sphere::default()),
-            material: materials.add(Color::from(BLACK)),
+            material: materials.add(Color::from(Color::BLACK)),
             ..default()
         });
+
         root_frame.spawn_spatial((
             Camera3dBundle {
                 transform: Transform::from_xyz(0.0, 0.0, 50.0),
@@ -46,121 +51,117 @@ fn setup_scene(
                 ..default()
             },
             FloatingOrigin,
-            big_space::camera::CameraController::default(),
+            big_space::camera::CameraController::default().with_smoothness(0.98, 0.9),
         ));
 
-        let firework = effects.add(firework_effect());
-        for i in 0..10 {
-            let i = i as f32 * 100_000.0;
-            root_frame.spawn_spatial((
-                Name::new("firework"),
-                bevy_hanabi::ParticleEffectBundle {
-                    effect: bevy_hanabi::ParticleEffect::new(firework.clone()),
-                    transform: Transform::from_xyz(i, 0.0, 0.0),
-                    ..Default::default()
-                },
-                Aabb::default(),
-            ));
-        }
+        // Because we want the trail to be fixed in the root reference frame, we spawn it here,
+        // instead of on the camera itself.
+        root_frame.spawn_spatial((
+            Name::new("effect"),
+            bevy_hanabi::ParticleEffectBundle {
+                effect: bevy_hanabi::ParticleEffect::new(effect.clone()),
+                ..Default::default()
+            },
+        ));
     });
 }
 
-fn firework_effect() -> EffectAsset {
-    use bevy_hanabi::prelude::*;
-    let mut color_gradient1 = Gradient::new();
-    color_gradient1.add_key(0.0, Vec4::new(4.0, 4.0, 4.0, 1.0));
-    color_gradient1.add_key(0.1, Vec4::new(4.0, 4.0, 0.0, 1.0));
-    color_gradient1.add_key(0.6, Vec4::new(4.0, 0.0, 0.0, 1.0));
-    color_gradient1.add_key(1.0, Vec4::new(4.0, 0.0, 0.0, 0.0));
+/// Update the trail with the latest camera position.
+///
+/// Working with `GlobalTransform` is preferred when working on a rendering feature like this with
+/// big_space. This is because you will be working with the same coordinates that are being sent to
+/// the GPU, allowing you to ignore GridCells and other implementation details of big_space.
+///
+/// To update our trail, all we need to do is update the latest position of the camera, from the
+/// perspective of the emitter, which is simply `cam_translation - emitter_translation`.
+///
+/// IMPORTANT: The only thing this example is missing is handling when the object with a trail moves
+/// far from the emitter. If you move too far away, you will need to spawn a new emitter at the
+/// current location of the moving object, and keep the old emitter around until the trail fades
+/// away. In other words, the object with a trail should leave behind a series of emitters behind
+/// it, like breadcrumbs, as it moves across large distances.
+fn update_trail(
+    cam: Query<&GlobalTransform, With<Camera>>,
+    query: Query<&GlobalTransform, With<bevy_hanabi::ParticleEffect>>,
+    mut effect: Query<&mut bevy_hanabi::EffectProperties>,
+) {
+    let cam = cam.single();
+    let Ok(mut properties) = effect.get_single_mut() else {
+        return;
+    };
+    for emitter in query.iter() {
+        let pos = cam.translation() - emitter.translation();
+        properties.set("latest_pos", (pos).into());
+    }
+}
 
-    let mut size_gradient1 = Gradient::new();
-    size_gradient1.add_key(0.0, Vec3::splat(0.05));
-    size_gradient1.add_key(0.3, Vec3::splat(0.05));
-    size_gradient1.add_key(1.0, Vec3::splat(0.0));
+// Below is copied from bevy_hanabi's example. The one modification is that you always want to be
+// using `SimulationSpace::Local`. Using the global space will not work with `big_space` when
+// entities move between cells.
+
+const LIFETIME: f32 = 10.0;
+const TRAIL_SPAWN_RATE: f32 = 256.0;
+
+fn particle_effect() -> bevy_hanabi::EffectAsset {
+    use bevy_hanabi::prelude::*;
+    use bevy_math::vec4;
 
     let writer = ExprWriter::new();
 
-    // Give a bit of variation by randomizing the age per particle. This will
-    // control the starting color and starting size of particles.
-    let age = writer.lit(0.).uniform(writer.lit(0.2)).expr();
-    let init_age = SetAttributeModifier::new(Attribute::AGE, age);
-
-    // Give a bit of variation by randomizing the lifetime per particle
-    let lifetime = writer.lit(0.8).normal(writer.lit(1.2)).expr();
-    let init_lifetime = SetAttributeModifier::new(Attribute::LIFETIME, lifetime);
-
-    // Add constant downward acceleration to simulate gravity
-    let accel = writer.lit(Vec3::Y * -16.).expr();
-    let update_accel = AccelModifier::new(accel);
-
-    // Add drag to make particles slow down a bit after the initial explosion
-    let drag = writer.lit(4.).expr();
-    let update_drag = LinearDragModifier::new(drag);
-
-    let init_pos = SetPositionSphereModifier {
-        center: writer.lit(Vec3::ZERO).expr(),
-        radius: writer.lit(0.1).expr(),
-        dimension: ShapeDimension::Volume,
+    let init_position_attr = SetAttributeModifier {
+        attribute: Attribute::POSITION,
+        value: writer.lit(Vec3::ZERO).expr(),
     };
 
-    // Give a bit of variation by randomizing the initial speed
-    let init_vel = SetVelocitySphereModifier {
-        center: writer.lit(Vec3::ZERO).expr(),
-        speed: (writer.rand(ScalarType::Float) * writer.lit(20.) + writer.lit(60.)).expr(),
+    let init_velocity_attr = SetAttributeModifier {
+        attribute: Attribute::VELOCITY,
+        value: writer.lit(Vec3::ZERO).expr(),
     };
 
-    // Clear the trail velocity so trail particles just stay in place as they fade
-    // away
-    let init_vel_trail =
-        SetAttributeModifier::new(Attribute::VELOCITY, writer.lit(Vec3::ZERO).expr());
+    let init_age_attr = SetAttributeModifier {
+        attribute: Attribute::AGE,
+        value: writer.lit(0.0).expr(),
+    };
 
-    let lead = ParticleGroupSet::single(0);
-    let trail = ParticleGroupSet::single(1);
+    let init_lifetime_attr = SetAttributeModifier {
+        attribute: Attribute::LIFETIME,
+        value: writer.lit(999999.0).expr(),
+    };
 
-    let effect = EffectAsset::new(
-        // 2k lead particles, with 32 trail particles each
-        2048,
-        Spawner::burst(2048.0.into(), 2.0.into()),
-        writer.finish(),
-    )
-    .with_simulation_space(SimulationSpace::Local)
-    // Tie together trail particles to make arcs. This way we don't need a lot of them, yet there's
-    // a continuity between them.
-    .with_ribbons(2048 * 32, 1.0 / 64.0, 0.2, 0)
-    .with_name("firework")
-    .init_groups(init_pos, lead)
-    .init_groups(init_vel, lead)
-    .init_groups(init_age, lead)
-    .init_groups(init_lifetime, lead)
-    .init_groups(init_vel_trail, trail)
-    .update_groups(update_drag, lead)
-    .update_groups(update_accel, lead)
-    .render_groups(
-        ColorOverLifetimeModifier {
-            gradient: color_gradient1.clone(),
-        },
-        lead,
-    )
-    .render_groups(
-        SizeOverLifetimeModifier {
-            gradient: size_gradient1.clone(),
-            screen_space_size: false,
-        },
-        lead,
-    )
-    .render_groups(
-        ColorOverLifetimeModifier {
-            gradient: color_gradient1,
-        },
-        trail,
-    )
-    .render_groups(
-        SizeOverLifetimeModifier {
-            gradient: size_gradient1,
-            screen_space_size: false,
-        },
-        trail,
-    );
+    let init_size_attr = SetAttributeModifier {
+        attribute: Attribute::SIZE,
+        value: writer.lit(20.5).expr(),
+    };
 
-    effect
+    let pos = writer.add_property("latest_pos", Vec3::ZERO.into());
+    let pos = writer.prop(pos);
+
+    let move_modifier = SetAttributeModifier {
+        attribute: Attribute::POSITION,
+        value: pos.expr(),
+    };
+
+    let render_color = ColorOverLifetimeModifier {
+        gradient: Gradient::linear(vec4(3.0, 0.0, 0.0, 1.0), vec4(3.0, 0.0, 0.0, 0.0)),
+    };
+
+    EffectAsset::new(256, Spawner::once(1.0.into(), true), writer.finish())
+        .with_ribbons(32768, 1.0 / TRAIL_SPAWN_RATE, LIFETIME, 0)
+        .with_simulation_space(SimulationSpace::Local)
+        .init_groups(init_position_attr, ParticleGroupSet::single(0))
+        .init_groups(init_velocity_attr, ParticleGroupSet::single(0))
+        .init_groups(init_age_attr, ParticleGroupSet::single(0))
+        .init_groups(init_lifetime_attr, ParticleGroupSet::single(0))
+        .init_groups(init_size_attr, ParticleGroupSet::single(0))
+        .update_groups(move_modifier, ParticleGroupSet::single(0))
+        .render(SizeOverLifetimeModifier {
+            gradient: Gradient::from_keys([
+                (0., Vec3::splat(0.0)),
+                (0.1, Vec3::splat(0.0)),
+                (0.2, Vec3::splat(200.0)),
+                (1.0, Vec3::splat(0.0)),
+            ]),
+            ..default()
+        })
+        .render_groups(render_color, ParticleGroupSet::single(1))
 }
