@@ -23,25 +23,24 @@ fn setup_scene(
     let sphere = meshes.add(Sphere::default());
     let matl = materials.add(Color::WHITE);
 
-    commands.spawn_big_space(ReferenceFrame::<i8>::default(), |root_frame| {
-        let range = || -8..8;
-        for x in range() {
-            for y in range() {
-                for z in range() {
-                    root_frame.spawn_spatial((
-                        PbrBundle {
-                            mesh: sphere.clone(),
-                            material: matl.clone(),
-                            ..default()
-                        },
-                        GridCell::<i8> {
-                            x: x * 16,
-                            y: y * 16,
-                            z: z * 16,
-                        },
-                    ));
-                }
-            }
+    commands.spawn_big_space::<i8>(ReferenceFrame::default(), |root_frame| {
+        let width = || -8..8;
+        for (x, y, z) in width()
+            .flat_map(|x| width().map(move |y| (x, y)))
+            .flat_map(|(x, y)| width().map(move |z| (x, y, z)))
+        {
+            root_frame.spawn_spatial((
+                PbrBundle {
+                    mesh: sphere.clone(),
+                    material: matl.clone(),
+                    ..default()
+                },
+                GridCell::<i8> {
+                    x: x * 16,
+                    y: y * 16,
+                    z: z * 16,
+                },
+            ));
         }
         root_frame.spawn_spatial(DirectionalLightBundle::default());
         root_frame.spawn_spatial((
@@ -51,8 +50,7 @@ fn setup_scene(
             },
             FloatingOrigin,
             big_space::camera::CameraController::default()
-                .with_slowing(false)
-                .with_speed(1000.)
+                .with_speed(10.)
                 .with_smoothness(0.99, 0.95),
         ));
     });

@@ -10,7 +10,6 @@ fn main() {
             BigSpacePlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
-        .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement, rotation))
         .run();
@@ -65,7 +64,7 @@ fn setup(
         ..default()
     });
 
-    commands.spawn_big_space(ReferenceFrame::<i64>::new(1.0, 0.01), |root| {
+    commands.spawn_big_space::<i64>(ReferenceFrame::new(1.0, 0.01), |root| {
         root.spawn_spatial((
             PbrBundle {
                 mesh: mesh_handle.clone(),

@@ -67,7 +67,8 @@ fn setup_scene(
                 mesh: meshes.add(Sphere::default()),
                 material: materials.add(Color::WHITE),
                 transform: Transform::from_translation(cell_offset)
-                    .with_scale(Vec3::splat(SMALL_SCALE)),
+                    .with_scale(Vec3::splat(SMALL_SCALE))
+                    .with_translation(SMALL_SCALE * 499.0 * Vec3::ONE),
                 ..default()
             },
             grid_cell,
@@ -92,7 +93,7 @@ fn setup_scene(
             SceneBundle {
                 scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
                 transform: Transform::from_xyz(0.0, 0.0, 2.5)
-                    .with_rotation(Quat::from_rotation_y(3.14)),
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
                 ..default()
             },
             grid_cell,

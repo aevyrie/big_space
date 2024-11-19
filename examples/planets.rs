@@ -145,7 +145,7 @@ fn spawn_solar_system(
         },
     ));
 
-    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
+    commands.spawn_big_space_default::<i64>(|root_frame| {
         root_frame.with_frame_default(|sun| {
             sun.insert((Sun, Name::new("Sun")));
             sun.spawn_spatial((

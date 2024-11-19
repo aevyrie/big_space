@@ -8,17 +8,23 @@ use smallvec::SmallVec;
 use std::marker::PhantomData;
 
 /// Adds `big_space` commands to bevy's `Commands`.
-pub trait BigSpaceCommands<P: GridPrecision> {
+pub trait BigSpaceCommands {
     /// Spawn a root [`BigSpace`] [`ReferenceFrame`].
-    fn spawn_big_space(
+    fn spawn_big_space<P: GridPrecision>(
         &mut self,
         root_frame: ReferenceFrame<P>,
         child_builder: impl FnOnce(&mut ReferenceFrameCommands<P>),
     );
+
+    /// Spawn a root [`BigSpace`] with default [`ReferenceFrame`] settings.
+    fn spawn_big_space_default<P: GridPrecision>(
+        &mut self,
+        child_builder: impl FnOnce(&mut ReferenceFrameCommands<P>),
+    );
 }
 
-impl<P: GridPrecision> BigSpaceCommands<P> for Commands<'_, '_> {
-    fn spawn_big_space(
+impl BigSpaceCommands for Commands<'_, '_> {
+    fn spawn_big_space<P: GridPrecision>(
         &mut self,
         reference_frame: ReferenceFrame<P>,
         root_frame: impl FnOnce(&mut ReferenceFrameCommands<P>),
@@ -31,6 +37,13 @@ impl<P: GridPrecision> BigSpaceCommands<P> for Commands<'_, '_> {
             children: Default::default(),
         };
         root_frame(&mut cmd);
+    }
+
+    fn spawn_big_space_default<P: GridPrecision>(
+        &mut self,
+        child_builder: impl FnOnce(&mut ReferenceFrameCommands<P>),
+    ) {
+        self.spawn_big_space(ReferenceFrame::default(), child_builder);
     }
 }
 

@@ -112,7 +112,7 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
+    commands.spawn_big_space_default::<i128>(|root| {
         let d = DISTANCE / root.frame().cell_edge_length() as i128;
         let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 

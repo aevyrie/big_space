@@ -36,7 +36,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
 
         // Performance note: I've also tried to iterate over each reference frame's children at
         // once, to avoid the reference frame and parent lookup, but that made things worse because
-        // it prevented dumb parallelism. The only think I can see to make this faster is archetype
+        // it prevented dumb parallelism. The only thing I can see to make this faster is archetype
         // change detection. Change filters are not archetype filters, so they scale with the total
         // number of entities that match the query, regardless of change.
         entities
@@ -323,7 +323,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(BigSpacePlugin::<i32>::default())
             .add_systems(Startup, |mut commands: Commands| {
-                commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+                commands.spawn_big_space_default::<i32>(|root| {
                     root.spawn_spatial(FloatingOrigin);
                     root.spawn_spatial((
                         Transform::from_xyz(3.0, 3.0, 3.0),

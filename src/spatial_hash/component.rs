@@ -82,7 +82,7 @@ impl<P: GridPrecision> SpatialHash<P> {
         }
     }
 
-    /// Do not use this as a component. You've been warned.
+    /// Do not use this to manually construct this component. You've been warned.
     #[doc(hidden)]
     pub fn __new_manual(parent: Entity, cell: &GridCell<P>) -> Self {
         Self::from_parent(parent, cell)
@@ -115,10 +115,10 @@ impl<P: GridPrecision> SpatialHash<P> {
 
     /// Returns an iterator over all neighboring grid cells and their hashes, within the
     /// `cell_radius`. This iterator will not visit `cell`.
-    pub fn neighbors<'a>(
-        &'a self,
+    pub fn neighbors(
+        &self,
         cell_radius: u8,
-    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> + 'a {
+    ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> + '_ {
         let radius = cell_radius as i32;
         let search_width = 1 + 2 * radius;
         let search_volume = search_width.pow(3);

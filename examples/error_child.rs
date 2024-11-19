@@ -22,6 +22,10 @@ fn main() {
 // child of an object more than one quadrillion meters away. This example intentionally results in a
 // small amount of error, to demonstrate the scales and precision available even between different
 // reference frames.
+//
+// Note that as you increase the distance further, there are still no rendering errors, and the
+// green sphere does not vanish, however, as you move farther away, you will see that the green
+// sphere will pop into neighboring cells due to rounding error.
 const DISTANT: DVec3 = DVec3::new(1e17, 1e17, 1e17);
 const SPHERE_RADIUS: f32 = 1.0;
 const NEARBY: Vec3 = Vec3::new(SPHERE_RADIUS * 20.0, SPHERE_RADIUS * 20.0, 0.0);
@@ -33,8 +37,8 @@ fn setup_scene(
 ) {
     let mesh_handle = meshes.add(Sphere::new(SPHERE_RADIUS).mesh());
 
-    commands.spawn_big_space(
-        ReferenceFrame::<i64>::new(SPHERE_RADIUS * 100.0, 0.0),
+    commands.spawn_big_space::<i64>(
+        ReferenceFrame::new(SPHERE_RADIUS * 100.0, 0.0),
         |root_frame| {
             root_frame.spawn_spatial(PbrBundle {
                 mesh: mesh_handle.clone(),
@@ -60,12 +64,12 @@ fn setup_scene(
                     });
                     parent_frame.insert(parent.0);
 
-                    // A green sphere that is a child of the sphere very far from the origin.
-                    // This child is very far from its parent, and should be located exactly at
-                    // the origin (if there was no floating point error). The distance from the
-                    // green sphere to the red sphere is the error caused by float imprecision.
-                    // Note that the sphere does not have any rendering artifacts, its position
-                    // just has a fixed error.
+                    // A green sphere that is a child of the sphere very far from the origin. This
+                    // child is very far from its parent, and should be located exactly at the
+                    // NEARBY position (if there was no floating point error). The distance from the
+                    // green sphere to the blue sphere is the error caused by float imprecision.
+                    // Note that the sphere does not have any rendering artifacts, its position just
+                    // has a fixed error.
                     parent_frame.spawn((
                         PbrBundle {
                             mesh: mesh_handle,

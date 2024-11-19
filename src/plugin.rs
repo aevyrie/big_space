@@ -25,15 +25,9 @@ impl<P: GridPrecision> BigSpacePlugin<P> {
 
 impl<P: GridPrecision> Default for BigSpacePlugin<P> {
     fn default() -> Self {
-        #[cfg(debug_assertions)]
-        let validate_hierarchies = true;
-
-        #[cfg(not(debug_assertions))]
-        let validate_hierarchies = false;
-
         Self {
-            phantom: Default::default(),
-            validate_hierarchies,
+            phantom: PhantomData,
+            validate_hierarchies: cfg!(debug_assertions),
         }
     }
 }

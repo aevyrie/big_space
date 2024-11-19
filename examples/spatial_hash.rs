@@ -240,7 +240,7 @@ fn spawn(
             .unwrap(),
     );
 
-    commands.spawn_big_space(ReferenceFrame::<i32>::new(CELL_WIDTH, 0.0), |root| {
+    commands.spawn_big_space::<i32>(ReferenceFrame::new(CELL_WIDTH, 0.0), |root| {
         root.spawn_spatial((
             FloatingOrigin,
             Camera3dBundle {

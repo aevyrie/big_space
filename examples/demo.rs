@@ -33,7 +33,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
+    commands.spawn_big_space_default::<i128>(|root| {
         root.spawn_spatial((
             Camera3dBundle {
                 transform: Transform::from_xyz(0.0, 0.0, 8.0)

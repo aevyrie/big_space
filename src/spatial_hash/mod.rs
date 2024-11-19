@@ -110,7 +110,7 @@ mod tests {
         static ENTITY: OnceLock<Entity> = OnceLock::new();
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+            commands.spawn_big_space_default::<i32>(|root| {
                 let entity = root.spawn_spatial(GridCell::<i32>::ZERO).id();
                 ENTITY.set(entity).ok();
             });
@@ -163,7 +163,7 @@ mod tests {
         }
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+            commands.spawn_big_space_default::<i32>(|root| {
                 let a = root.spawn_spatial(GridCell::new(0, 1, 2)).id();
                 let b = root.spawn_spatial(GridCell::new(0, 1, 2)).id();
                 let c = root.spawn_spatial(GridCell::new(5, 5, 5)).id();
@@ -247,7 +247,7 @@ mod tests {
         }
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+            commands.spawn_big_space_default::<i32>(|root| {
                 let a = root.spawn_spatial(GridCell::new(0, 0, 0)).id();
                 let b = root.spawn_spatial(GridCell::new(1, 1, 1)).id();
                 let c = root.spawn_spatial(GridCell::new(2, 2, 2)).id();
@@ -298,7 +298,7 @@ mod tests {
         static ROOT: OnceLock<Entity> = OnceLock::new();
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+            commands.spawn_big_space_default::<i32>(|root| {
                 root.spawn_spatial((GridCell::<i32>::ZERO, Player));
                 root.spawn_spatial(GridCell::<i32>::ZERO);
                 root.spawn_spatial(GridCell::<i32>::ZERO);

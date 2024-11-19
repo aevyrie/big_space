@@ -294,23 +294,21 @@ where
             self.stack.push_front((hash, self.spatial_map.get(&hash)?));
             self.visited_cells.insert(hash);
         }
-        while let Some((hash, entry)) = self.stack.pop_back() {
-            for (neighbor_hash, neighbor_entry) in entry
-                .occupied_neighbors
-                .iter()
-                .filter(|neighbor_hash| self.visited_cells.insert(**neighbor_hash))
-                .map(|neighbor_hash| {
-                    let entry = self
-                        .spatial_map
-                        .get(&neighbor_hash)
-                        .expect("Neighbor hashes in SpatialHashEntry are guaranteed to exist.");
-                    (neighbor_hash, entry)
-                })
-            {
-                self.stack.push_front((*neighbor_hash, neighbor_entry));
-            }
-            return Some((hash, entry));
+        let (hash, entry) = self.stack.pop_back()?;
+        for (neighbor_hash, neighbor_entry) in entry
+            .occupied_neighbors
+            .iter()
+            .filter(|neighbor_hash| self.visited_cells.insert(**neighbor_hash))
+            .map(|neighbor_hash| {
+                let entry = self
+                    .spatial_map
+                    .get(neighbor_hash)
+                    .expect("Neighbor hashes in SpatialHashEntry are guaranteed to exist.");
+                (neighbor_hash, entry)
+            })
+        {
+            self.stack.push_front((*neighbor_hash, neighbor_entry));
         }
-        None
+        Some((hash, entry))
     }
 }

@@ -28,15 +28,15 @@ fn setup_scene(
     mut effects: ResMut<Assets<bevy_hanabi::EffectAsset>>,
 ) {
     let effect = effects.add(particle_effect());
-    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
-        root_frame.spawn_spatial(DirectionalLightBundle::default());
-        root_frame.spawn_spatial(PbrBundle {
+    commands.spawn_big_space_default::<i64>(|root| {
+        root.spawn_spatial(DirectionalLightBundle::default());
+        root.spawn_spatial(PbrBundle {
             mesh: meshes.add(Sphere::default()),
-            material: materials.add(Color::from(Color::BLACK)),
+            material: materials.add(Color::BLACK),
             ..default()
         });
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             Camera3dBundle {
                 transform: Transform::from_xyz(0.0, 0.0, 50.0),
                 camera: Camera {
@@ -56,7 +56,7 @@ fn setup_scene(
 
         // Because we want the trail to be fixed in the root reference frame, we spawn it here,
         // instead of on the camera itself.
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             Name::new("effect"),
             bevy_hanabi::ParticleEffectBundle {
                 effect: bevy_hanabi::ParticleEffect::new(effect.clone()),

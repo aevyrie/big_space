@@ -38,7 +38,7 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("deep_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::new(10000.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(ReferenceFrame::new(10000.0, 0.0), |root| {
             let mut parent = root.spawn_frame_default(()).id();
             for _ in 0..N_SPAWN {
                 let child = root
@@ -83,7 +83,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("wide_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::new(10000.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(ReferenceFrame::new(10000.0, 0.0), |root| {
             for _ in 0..N_SPAWN {
                 root.spawn_spatial(());
             }
@@ -125,7 +125,7 @@ fn spatial_hashing(c: &mut Criterion) {
     const N_MOVE: usize = 1_000;
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(ReferenceFrame::new(1.0, 0.0), |root| {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 [
@@ -212,7 +212,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // });
 
     fn setup_uniform<const HALF_EXTENT: i32>(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::new(1.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(ReferenceFrame::new(1.0, 0.0), |root| {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
                     for z in HALF_EXTENT.neg()..HALF_EXTENT {
@@ -303,7 +303,7 @@ fn hash_filtering(c: &mut Criterion) {
         .take(N_ENTITIES)
         .collect();
 
-        commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root| {
+        commands.spawn_big_space_default::<i32>(|root| {
             for (i, pos) in values.iter().enumerate() {
                 let mut cmd = root.spawn_spatial(GridCell::new(pos[0], pos[1], pos[2]));
                 if i < N_PLAYERS {
@@ -390,17 +390,11 @@ fn vs_bevy(c: &mut Criterion) {
     }
 
     fn setup_big(mut commands: Commands) {
-        commands.spawn_big_space(ReferenceFrame::<i32>::default(), |builder| {
+        commands.spawn_big_space_default::<i32>(|root| {
             for _ in 0..N_ENTITIES {
-                builder.spawn_spatial(());
+                root.spawn_spatial(());
             }
-            builder.spawn_spatial(FloatingOrigin);
-        });
-    }
-
-    fn translate(mut transforms: Query<&mut Transform>) {
-        transforms.iter_mut().for_each(|mut transform| {
-            transform.translation += 1.0;
+            root.spawn_spatial(FloatingOrigin);
         });
     }
 
@@ -425,6 +419,12 @@ fn vs_bevy(c: &mut Criterion) {
             black_box(app.update());
         });
     });
+
+    fn translate(mut transforms: Query<&mut Transform>) {
+        transforms.iter_mut().for_each(|mut transform| {
+            transform.translation += 1.0;
+        });
+    }
 
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, TransformPlugin))

@@ -57,34 +57,33 @@ fn setup(
     ));
 
     // Big Space 1
-    commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
-        root_frame
-            .spawn_spatial((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
-                        .looking_to(Vec3::NEG_X, Vec3::Y),
+    commands.spawn_big_space_default::<i32>(|root| {
+        root.spawn_spatial((
+            Camera3dBundle {
+                transform: Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
+                    .looking_to(Vec3::NEG_X, Vec3::Y),
+                ..default()
+            },
+            big_space::camera::CameraController::default().with_smoothness(0.8, 0.8),
+            RenderLayers::layer(2),
+            LeftCamera,
+            FloatingOrigin,
+        ))
+        .with_children(|child_builder| {
+            child_builder.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
+                    material: materials.add(StandardMaterial {
+                        base_color: Color::Srgba(palettes::css::YELLOW),
+                        ..default()
+                    }),
                     ..default()
                 },
-                big_space::camera::CameraController::default().with_smoothness(0.8, 0.8),
                 RenderLayers::layer(2),
-                LeftCamera,
-                FloatingOrigin,
-            ))
-            .with_children(|child_builder| {
-                child_builder.spawn((
-                    PbrBundle {
-                        mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::YELLOW),
-                            ..default()
-                        }),
-                        ..default()
-                    },
-                    RenderLayers::layer(2),
-                ));
-            });
+            ));
+        });
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             RightCameraReplicated,
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
@@ -97,7 +96,7 @@ fn setup(
             RenderLayers::layer(2),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
@@ -111,7 +110,7 @@ fn setup(
             RenderLayers::layer(2),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
@@ -127,38 +126,37 @@ fn setup(
     });
 
     // Big Space 2
-    commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
-        root_frame
-            .spawn_spatial((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(1_000_000.0, 100_005.0, 0.0)
-                        .looking_to(Vec3::NEG_X, Vec3::Y),
-                    camera: Camera {
-                        order: 1,
-                        clear_color: ClearColorConfig::None,
+    commands.spawn_big_space_default::<i32>(|root| {
+        root.spawn_spatial((
+            Camera3dBundle {
+                transform: Transform::from_xyz(1_000_000.0, 100_005.0, 0.0)
+                    .looking_to(Vec3::NEG_X, Vec3::Y),
+                camera: Camera {
+                    order: 1,
+                    clear_color: ClearColorConfig::None,
+                    ..default()
+                },
+                ..default()
+            },
+            RenderLayers::layer(1),
+            RightCamera,
+            FloatingOrigin,
+        ))
+        .with_children(|child_builder| {
+            child_builder.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
+                    material: materials.add(StandardMaterial {
+                        base_color: Color::Srgba(palettes::css::PINK),
                         ..default()
-                    },
+                    }),
                     ..default()
                 },
                 RenderLayers::layer(1),
-                RightCamera,
-                FloatingOrigin,
-            ))
-            .with_children(|child_builder| {
-                child_builder.spawn((
-                    PbrBundle {
-                        mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::PINK),
-                            ..default()
-                        }),
-                        ..default()
-                    },
-                    RenderLayers::layer(1),
-                ));
-            });
+            ));
+        });
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             LeftCameraReplicated,
             PbrBundle {
                 mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
@@ -171,7 +169,7 @@ fn setup(
             RenderLayers::layer(1),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {
@@ -185,7 +183,7 @@ fn setup(
             RenderLayers::layer(1),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             PbrBundle {
                 mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
                 material: materials.add(StandardMaterial {

@@ -442,7 +442,7 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
 
         /// The maximum reference frame tree depth, defensively prevents infinite looping in case
         /// there is a degenerate hierarchy. It might take a while, but at least it's not forever?
-        const MAX_REFERENCE_FRAME_DEPTH: usize = 1_000_000;
+        const MAX_REFERENCE_FRAME_DEPTH: usize = 1_000;
 
         // TODO: because each tree under a root is disjoint, these updates can be done in parallel
         // without aliasing. This will require unsafe, just like bevy's own transform propagation.
