@@ -285,7 +285,7 @@ pub fn camera_controller<P: GridPrecision>(
 
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) =
-            input.target_velocity(&controller, speed, time.delta_seconds_f64());
+            input.target_velocity(&controller, speed, time.delta_secs_f64());
 
         let cam_rot = position.transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera

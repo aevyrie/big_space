@@ -89,7 +89,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         });
 
                     let mut inspect = String::new();
-                    world.inspect_entity(*entity).iter().for_each(|info| {
+                    world.inspect_entity(*entity).for_each(|info| {
                         inspect.push('\t');
                         inspect.push('\t');
                         inspect.push_str(info.name());
@@ -130,7 +130,7 @@ pub(super) mod sealed {
         fn clone_box(&self) -> Box<dyn ValidHierarchyNode>;
     }
 
-    impl<T: ?Sized> CloneHierarchy for T
+    impl<T> CloneHierarchy for T
     where
         T: 'static + ValidHierarchyNode + Clone,
     {
