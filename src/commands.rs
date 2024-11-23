@@ -70,12 +70,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
-                GlobalTransform::default(),
                 GridCell::<P>::default(),
             ))
             .insert(bundle)
@@ -136,12 +131,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
-                GlobalTransform::default(),
                 GridCell::<P>::default(),
                 ReferenceFrame::<P>::default(),
             ))
