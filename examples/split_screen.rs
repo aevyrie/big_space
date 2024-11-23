@@ -55,10 +55,8 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn((
-        DirectionalLightBundle {
-            transform: Transform::default().looking_to(Vec3::NEG_ONE, Vec3::Y),
-            ..default()
-        },
+        DirectionalLight::default(),
+        Transform::default().looking_to(Vec3::NEG_ONE, Vec3::Y),
         RenderLayers::from_layers(&[1, 2]),
     ));
 
@@ -66,11 +64,9 @@ fn setup(
     commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
         root_frame
             .spawn_spatial((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
-                        .looking_to(Vec3::NEG_X, Vec3::Y),
-                    ..default()
-                },
+                Camera3d::default(),
+                Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
+                    .looking_to(Vec3::NEG_X, Vec3::Y),
                 CameraController::default().with_smoothness(0.8, 0.8),
                 RenderLayers::layer(2),
                 LeftCamera,
@@ -78,56 +74,42 @@ fn setup(
             ))
             .with_children(|child_builder| {
                 child_builder.spawn((
-                    PbrBundle {
-                        mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::YELLOW),
-                            ..default()
-                        }),
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::Srgba(palettes::css::YELLOW),
                         ..default()
-                    },
+                    })),
                     RenderLayers::layer(2),
                 ));
             });
 
         root_frame.spawn_spatial((
             RightCameraReplicated,
-            PbrBundle {
-                mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::FUCHSIA),
-                    ..default()
-                }),
+            Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::FUCHSIA),
                 ..default()
-            },
+            })),
             RenderLayers::layer(2),
         ));
 
         root_frame.spawn_spatial((
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::BLUE),
-                    ..default()
-                }),
-                transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
-                    .with_scale(Vec3::splat(100_000.0)),
+            Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::BLUE),
                 ..default()
-            },
+            })),
+            Transform::from_xyz(1_000_000.0, 0.0, 0.0).with_scale(Vec3::splat(100_000.0)),
             RenderLayers::layer(2),
         ));
 
         root_frame.spawn_spatial((
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::GREEN),
-                    ..default()
-                }),
-                transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
-                    .with_scale(Vec3::splat(100_000.0)),
+            Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::GREEN),
                 ..default()
-            },
+            })),
+            Transform::from_xyz(-1_000_000.0, 0.0, 0.0).with_scale(Vec3::splat(100_000.0)),
             RenderLayers::layer(2),
         ));
     });
@@ -136,14 +118,11 @@ fn setup(
     commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
         root_frame
             .spawn_spatial((
-                Camera3dBundle {
-                    transform: Transform::from_xyz(1_000_000.0, 100_005.0, 0.0)
-                        .looking_to(Vec3::NEG_X, Vec3::Y),
-                    camera: Camera {
-                        order: 1,
-                        clear_color: ClearColorConfig::None,
-                        ..default()
-                    },
+                Camera3d::default(),
+                Transform::from_xyz(1_000_000.0, 100_005.0, 0.0).looking_to(Vec3::NEG_X, Vec3::Y),
+                Camera {
+                    order: 1,
+                    clear_color: ClearColorConfig::None,
                     ..default()
                 },
                 RenderLayers::layer(1),
@@ -152,56 +131,42 @@ fn setup(
             ))
             .with_children(|child_builder| {
                 child_builder.spawn((
-                    PbrBundle {
-                        mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::PINK),
-                            ..default()
-                        }),
+                    Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::Srgba(palettes::css::PINK),
                         ..default()
-                    },
+                    })),
                     RenderLayers::layer(1),
                 ));
             });
 
         root_frame.spawn_spatial((
             LeftCameraReplicated,
-            PbrBundle {
-                mesh: meshes.add(Cuboid::new(1.0, 2.0, 1.0)),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::YELLOW),
-                    ..default()
-                }),
+            Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::YELLOW),
                 ..default()
-            },
+            })),
             RenderLayers::layer(1),
         ));
 
         root_frame.spawn_spatial((
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::BLUE),
-                    ..default()
-                }),
-                transform: Transform::from_xyz(1_000_000.0, 0.0, 0.0)
-                    .with_scale(Vec3::splat(100_000.0)),
+            Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::BLUE),
                 ..default()
-            },
+            })),
+            Transform::from_xyz(1_000_000.0, 0.0, 0.0).with_scale(Vec3::splat(100_000.0)),
             RenderLayers::layer(1),
         ));
 
         root_frame.spawn_spatial((
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap()),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::GREEN),
-                    ..default()
-                }),
-                transform: Transform::from_xyz(-1_000_000.0, 0.0, 0.0)
-                    .with_scale(Vec3::splat(100_000.0)),
+            Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::GREEN),
                 ..default()
-            },
+            })),
+            Transform::from_xyz(-1_000_000.0, 0.0, 0.0).with_scale(Vec3::splat(100_000.0)),
             RenderLayers::layer(1),
         ));
     });
