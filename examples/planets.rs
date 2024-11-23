@@ -248,15 +248,11 @@ fn spawn_solar_system(
                         Bloom::default(),
                     ));
 
-                    camera.with_children(|camera| {
-                        camera.spawn((
-                            Spaceship,
-                            SceneRoot(
-                                asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                            ),
-                            Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-                        ));
-                    });
+                    camera.with_child((
+                        Spaceship,
+                        SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+                        Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                    ));
                 });
             });
         });

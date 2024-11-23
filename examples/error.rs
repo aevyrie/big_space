@@ -129,12 +129,10 @@ fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
             distant_grid_cell,
             Rotator,
         ))
-        .with_children(|parent| {
-            parent.spawn((
-                SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
-                Transform::from_xyz(0.0, 0.0, 20.0),
-            ));
-        });
+        .with_child((
+            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            Transform::from_xyz(0.0, 0.0, 20.0),
+        ));
         // light
         root.spawn_spatial((
             DirectionalLight::default(),

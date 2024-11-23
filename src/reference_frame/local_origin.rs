@@ -634,7 +634,7 @@ mod tests {
             ))
             .id();
 
-        app.world_mut().entity_mut(root).add_children(&[child]);
+        app.world_mut().entity_mut(root).add_child(child);
 
         let mut state = SystemState::<ReferenceFramesMut<i64>>::new(app.world_mut());
         let mut reference_frames = state.get_mut(app.world_mut());
@@ -698,7 +698,7 @@ mod tests {
             ))
             .id();
 
-        app.world_mut().entity_mut(root).add_children(&[child]);
+        app.world_mut().entity_mut(root).add_child(child);
 
         let mut state = SystemState::<ReferenceFramesMut<i32>>::new(app.world_mut());
         let mut reference_frames = state.get_mut(app.world_mut());

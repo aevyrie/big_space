@@ -72,16 +72,14 @@ fn setup(
                 LeftCamera,
                 FloatingOrigin,
             ))
-            .with_children(|child_builder| {
-                child_builder.spawn((
-                    Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: Color::Srgba(palettes::css::YELLOW),
-                        ..default()
-                    })),
-                    RenderLayers::layer(2),
-                ));
-            });
+            .with_child((
+                Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::Srgba(palettes::css::YELLOW),
+                    ..default()
+                })),
+                RenderLayers::layer(2),
+            ));
 
         root_frame.spawn_spatial((
             RightCameraReplicated,
@@ -129,16 +127,14 @@ fn setup(
                 RightCamera,
                 FloatingOrigin,
             ))
-            .with_children(|child_builder| {
-                child_builder.spawn((
-                    Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: Color::Srgba(palettes::css::PINK),
-                        ..default()
-                    })),
-                    RenderLayers::layer(1),
-                ));
-            });
+            .with_child((
+                Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::Srgba(palettes::css::PINK),
+                    ..default()
+                })),
+                RenderLayers::layer(1),
+            ));
 
         root_frame.spawn_spatial((
             LeftCameraReplicated,

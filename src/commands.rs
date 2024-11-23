@@ -160,6 +160,13 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .with_children(|child_builder| spawn_children(child_builder));
         self
     }
+
+    /// Spawns the passed bundle which provides this reference frame,
+    /// and adds it to this entity as a child.
+    pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
+        self.commands.entity(self.entity).with_child(bundle);
+        self
+    }
 }
 
 /// Insert the reference frame on drop.
@@ -190,6 +197,12 @@ impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
         self.commands
             .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
+        self
+    }
+
+    /// Spawns the passed bundle and adds it to this entity as a child.
+    pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
+        self.commands.entity(self.entity).with_child(bundle);
         self
     }
 
