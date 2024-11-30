@@ -130,7 +130,7 @@ pub(super) mod sealed {
         fn clone_box(&self) -> Box<dyn ValidHierarchyNode>;
     }
 
-    impl<T: ?Sized> CloneHierarchy for T
+    impl<T> CloneHierarchy for T
     where
         T: 'static + ValidHierarchyNode + Clone,
     {
