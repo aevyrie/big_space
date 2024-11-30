@@ -1,14 +1,13 @@
 //! This example demonstrates error accumulating from parent to children in nested reference frames.
 use bevy::{math::DVec3, prelude::*};
 use bevy_color::palettes;
-use big_space::{commands::BigSpaceCommands, reference_frame::ReferenceFrame, FloatingOrigin};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            big_space::BigSpacePlugin::<i64>::default(),
+            BigSpacePlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
@@ -18,8 +17,17 @@ fn main() {
 
 // The nearby object is NEARBY meters away from us. The distance object is DISTANT meters away from
 // us, and has a child that is DISTANT meters toward us (relative its parent) minus NEARBY meters.
-const DISTANT: DVec3 = DVec3::new(1e10, 1e10, 1e10);
-const SPHERE_RADIUS: f32 = 10.0;
+//
+// The result is two spheres that should perfectly overlap, even though one of those spheres is a
+// child of an object more than one quadrillion meters away. This example intentionally results in a
+// small amount of error, to demonstrate the scales and precision available even between different
+// reference frames.
+//
+// Note that as you increase the distance further, there are still no rendering errors, and the
+// green sphere does not vanish, however, as you move farther away, you will see that the green
+// sphere will pop into neighboring cells due to rounding error.
+const DISTANT: DVec3 = DVec3::new(1e17, 1e17, 1e17);
+const SPHERE_RADIUS: f32 = 1.0;
 const NEARBY: Vec3 = Vec3::new(SPHERE_RADIUS * 20.0, SPHERE_RADIUS * 20.0, 0.0);
 
 fn setup_scene(
@@ -28,13 +36,9 @@ fn setup_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let mesh_handle = meshes.add(Sphere::new(SPHERE_RADIUS).mesh());
-    let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.8, 0.7, 0.6),
-        ..default()
-    });
 
-    commands.spawn_big_space(
-        ReferenceFrame::<i64>::new(SPHERE_RADIUS * 100.0, 0.0),
+    commands.spawn_big_space::<i64>(
+        ReferenceFrame::new(SPHERE_RADIUS * 100.0, 0.0),
         |root_frame| {
             root_frame.spawn_spatial(PbrBundle {
                 mesh: mesh_handle.clone(),
@@ -54,29 +58,27 @@ fn setup_scene(
                         .translation_to_grid(-DISTANT + NEARBY.as_dvec3());
                     parent_frame.insert(PbrBundle {
                         mesh: mesh_handle.clone(),
-                        material: matl_handle.clone(),
+                        material: materials.add(Color::from(palettes::css::RED)),
                         transform: Transform::from_translation(parent.1),
                         ..default()
                     });
                     parent_frame.insert(parent.0);
 
-                    parent_frame.with_children(|child_builder| {
-                        // A green sphere that is a child of the sphere very far from the origin.
-                        // This child is very far from its parent, and should be located exactly at
-                        // the origin (if there was no floating point error). The distance from the
-                        // green sphere to the red sphere is the error caused by float imprecision.
-                        // Note that the sphere does not have any rendering artifacts, its position
-                        // just has a fixed error.
-                        child_builder.spawn((
-                            PbrBundle {
-                                mesh: mesh_handle,
-                                material: materials.add(Color::from(palettes::css::GREEN)),
-                                transform: Transform::from_translation(child.1),
-                                ..default()
-                            },
-                            child.0,
-                        ));
-                    });
+                    // A green sphere that is a child of the sphere very far from the origin. This
+                    // child is very far from its parent, and should be located exactly at the
+                    // NEARBY position (if there was no floating point error). The distance from the
+                    // green sphere to the blue sphere is the error caused by float imprecision.
+                    // Note that the sphere does not have any rendering artifacts, its position just
+                    // has a fixed error.
+                    parent_frame.spawn((
+                        PbrBundle {
+                            mesh: mesh_handle,
+                            material: materials.add(Color::from(palettes::css::GREEN)),
+                            transform: Transform::from_translation(child.1),
+                            ..default()
+                        },
+                        child.0,
+                    ));
                 },
             );
 

@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
@@ -15,11 +16,6 @@ use bevy_render::{
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
 use bevy_utils::HashSet;
-
-use crate::{
-    precision::GridPrecision, reference_frame::local_origin::ReferenceFrames,
-    world_query::GridTransform,
-};
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
@@ -122,11 +118,11 @@ impl CameraController {
 impl Default for CameraController {
     fn default() -> Self {
         Self {
-            smoothness: 0.8,
-            rotational_smoothness: 0.5,
+            smoothness: 0.85,
+            rotational_smoothness: 0.8,
             speed: 1.0,
-            speed_pitch: 1.0,
-            speed_yaw: 1.0,
+            speed_pitch: 2.0,
+            speed_yaw: 2.0,
             speed_roll: 1.0,
             speed_bounds: [1e-17, 1e30],
             slow_near_objects: true,
@@ -221,7 +217,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
         &GlobalTransform,
         &Aabb,
         Option<&RenderLayers>,
-        Option<&InheritedVisibility>,
+        &InheritedVisibility,
     )>,
     mut camera: Query<(
         Entity,
@@ -244,10 +240,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
             let obj_layer = obj_layer.unwrap_or_default();
             cam_layer.intersects(obj_layer)
         })
-        .filter(|(.., visibility)| {
-            let visibility = visibility.copied().unwrap_or(InheritedVisibility::VISIBLE);
-            visibility.get()
-        })
+        .filter(|(.., visibility)| visibility.get())
         .map(|(entity, object_local, obj_pos, aabb, ..)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
@@ -265,11 +258,16 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
-    frames: ReferenceFrames<P>,
+    frames: crate::reference_frame::local_origin::ReferenceFrames<P>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
+    mut camera: Query<(
+        Entity,
+        &mut GridCell<P>,
+        &mut Transform,
+        &mut CameraController,
+    )>,
 ) {
-    for (camera, mut position, mut controller) in camera.iter_mut() {
+    for (camera, mut cell, mut transform, mut controller) in camera.iter_mut() {
         let Some(frame) = frames.parent_frame(camera) else {
             continue;
         };
@@ -288,16 +286,17 @@ pub fn camera_controller<P: GridPrecision>(
         let (vel_t_target, vel_r_target) =
             input.target_velocity(&controller, speed, time.delta_seconds_f64());
 
-        let cam_rot = position.transform.rotation.as_dquat();
+        let cam_rot = transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
         let (cell_offset, new_translation) = frame.translation_to_grid(vel_t_next);
-        *position.cell += cell_offset;
-        position.transform.translation += new_translation;
+        let new = *cell.bypass_change_detection() + cell_offset;
+        cell.set_if_neq(new);
+        transform.translation += new_translation;
 
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
-        position.transform.rotation *= new_rotation.as_quat();
+        transform.rotation *= new_rotation.as_quat();
 
         // Store the new velocity to be used in the next frame
         controller.vel_translation = vel_t_next;

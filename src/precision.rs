@@ -1,8 +1,11 @@
 //! Contains the [`GridPrecision`] trait and its implementations.
 
-use std::{hash::Hash, ops::Add};
+use std::{
+    hash::Hash,
+    ops::{Add, Mul},
+};
 
-use bevy_reflect::Reflect;
+use bevy_reflect::{FromReflect, GetTypeRegistration, Reflect, TypePath};
 
 /// Used to make the floating origin plugin generic over many grid sizes.
 ///
@@ -32,7 +35,7 @@ use bevy_reflect::Reflect;
 /// define a type alias!
 ///
 /// ```
-/// # use big_space::GridCell;
+/// # use big_space::prelude::*;
 /// type GalacticGrid = GridCell<i64>;
 /// ```
 ///
@@ -50,7 +53,12 @@ pub trait GridPrecision:
     + Send
     + Sync
     + Reflect
+    + FromReflect
+    + GetTypeRegistration
+    + TypePath
     + Add
+    + Add<Self, Output = Self>
+    + Mul<Self, Output = Self>
     + std::fmt::Debug
     + std::fmt::Display
     + 'static
@@ -61,6 +69,8 @@ pub trait GridPrecision:
     const ONE: Self;
     /// Adds `rhs` to `self`, wrapping when overflow would occur.
     fn wrapping_add(self, rhs: Self) -> Self;
+    /// Adds `rhs` to `self`, wrapping when overflow would occur.
+    fn wrapping_add_i32(self, rhs: i32) -> Self;
     /// Subtracts `rhs` from `self`, wrapping when overflow would occur.
     fn wrapping_sub(self, rhs: Self) -> Self;
     /// Multiplies `self` by `rhs`.
@@ -80,6 +90,10 @@ impl GridPrecision for i8 {
     #[inline]
     fn wrapping_add(self, rhs: Self) -> Self {
         Self::wrapping_add(self, rhs)
+    }
+    #[inline]
+    fn wrapping_add_i32(self, rhs: i32) -> Self {
+        Self::wrapping_add(self, rhs as Self)
     }
     #[inline]
     fn wrapping_sub(self, rhs: Self) -> Self {
@@ -112,6 +126,10 @@ impl GridPrecision for i16 {
         Self::wrapping_add(self, rhs)
     }
     #[inline]
+    fn wrapping_add_i32(self, rhs: i32) -> Self {
+        Self::wrapping_add(self, rhs as Self)
+    }
+    #[inline]
     fn wrapping_sub(self, rhs: Self) -> Self {
         Self::wrapping_sub(self, rhs)
     }
@@ -140,6 +158,10 @@ impl GridPrecision for i32 {
     #[inline]
     fn wrapping_add(self, rhs: Self) -> Self {
         Self::wrapping_add(self, rhs)
+    }
+    #[inline]
+    fn wrapping_add_i32(self, rhs: i32) -> Self {
+        Self::wrapping_add(self, rhs as Self)
     }
     #[inline]
     fn wrapping_sub(self, rhs: Self) -> Self {
@@ -172,6 +194,10 @@ impl GridPrecision for i64 {
         Self::wrapping_add(self, rhs)
     }
     #[inline]
+    fn wrapping_add_i32(self, rhs: i32) -> Self {
+        Self::wrapping_add(self, rhs as Self)
+    }
+    #[inline]
     fn wrapping_sub(self, rhs: Self) -> Self {
         Self::wrapping_sub(self, rhs)
     }
@@ -200,6 +226,10 @@ impl GridPrecision for i128 {
     #[inline]
     fn wrapping_add(self, rhs: Self) -> Self {
         Self::wrapping_add(self, rhs)
+    }
+    #[inline]
+    fn wrapping_add_i32(self, rhs: i32) -> Self {
+        Self::wrapping_add(self, rhs as Self)
     }
     #[inline]
     fn wrapping_sub(self, rhs: Self) -> Self {

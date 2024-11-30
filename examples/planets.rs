@@ -1,9 +1,7 @@
 use std::collections::VecDeque;
 
-/// Example with spheres at the scale and distance of the earth and moon around the sun, at 1:1
-/// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
-/// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{
+    color::palettes,
     core_pipeline::bloom::BloomSettings,
     math::DVec3,
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
@@ -11,21 +9,15 @@ use bevy::{
     render::camera::Exposure,
     transform::TransformSystem,
 };
-use bevy_color::palettes;
-use big_space::{
-    camera::{CameraController, CameraInput},
-    commands::BigSpaceCommands,
-    reference_frame::ReferenceFrame,
-    FloatingOrigin,
-};
-use rand::Rng;
+use big_space::prelude::*;
+use turborand::{rng::Rng, TurboRand};
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            big_space::BigSpacePlugin::<i64>::new(true),
+            BigSpacePlugin::<i64>::new(true),
             // big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
         ))
@@ -43,7 +35,7 @@ fn main() {
                     .in_set(TransformSystem::TransformPropagate)
                     .after(bevy::transform::systems::sync_simple_transforms)
                     .after(bevy::transform::systems::propagate_transforms)
-                    .after(big_space::FloatingOriginSet::PropagateLowPrecision),
+                    .after(FloatingOriginSystem::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
                     .after(big_space::camera::default_camera_inputs)
@@ -89,7 +81,7 @@ fn lighting(
 }
 
 fn springy_ship(
-    cam_input: Res<CameraInput>,
+    cam_input: Res<big_space::camera::CameraInput>,
     mut ship: Query<&mut Transform, With<Spaceship>>,
     mut desired_dir: Local<(Vec3, Quat)>,
     mut smoothed_rot: Local<VecDeque<Vec3>>,
@@ -153,7 +145,7 @@ fn spawn_solar_system(
         },
     ));
 
-    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
+    commands.spawn_big_space_default::<i64>(|root_frame| {
         root_frame.with_frame_default(|sun| {
             sun.insert((Sun, Name::new("Sun")));
             sun.spawn_spatial((
@@ -243,7 +235,7 @@ fn spawn_solar_system(
                 earth.with_frame_default(|camera| {
                     camera.insert((
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
-                        CameraController::default() // Built-in camera controller
+                        big_space::camera::CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
                             .with_smoothness(0.98, 0.98)
                             .with_speed(1.0),
@@ -264,19 +256,16 @@ fn spawn_solar_system(
                         BloomSettings::default(),
                     ));
 
-                    camera.with_children(|camera| {
-                        camera.spawn((
-                            Spaceship,
-                            SceneBundle {
-                                scene: asset_server
-                                    .load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                                transform: Transform::from_rotation(Quat::from_rotation_y(
-                                    std::f32::consts::PI,
-                                )),
-                                ..default()
-                            },
-                        ));
-                    });
+                    camera.spawn((
+                        Spaceship,
+                        SceneBundle {
+                            scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                            transform: Transform::from_rotation(Quat::from_rotation_y(
+                                std::f32::consts::PI,
+                            )),
+                            ..default()
+                        },
+                    ));
                 });
             });
         });
@@ -287,15 +276,15 @@ fn spawn_solar_system(
             ..default()
         });
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());
-        let mut rng = rand::thread_rng();
+        let rng = Rng::new();
         (0..1000).for_each(|_| {
             root_frame.spawn_spatial((
                 star_mesh_handle.clone(),
                 star_mat.clone(),
                 Transform::from_xyz(
-                    (rng.gen::<f32>() - 0.5) * 1e14,
-                    (rng.gen::<f32>() - 0.5) * 1e14,
-                    (rng.gen::<f32>() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
                 ),
             ));
         });

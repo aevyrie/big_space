@@ -2,15 +2,11 @@
 
 use std::marker::PhantomData;
 
+use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
-use bevy_log::prelude::*;
 use bevy_transform::prelude::*;
-use bevy_utils::HashMap;
-
-use crate::{
-    precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, FloatingOrigin, GridCell,
-};
+use bevy_utils::{HashMap, HashSet};
 
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
@@ -23,9 +19,11 @@ struct ValidatorCaches {
     validator_cache: HashMap<&'static str, Vec<Box<dyn ValidHierarchyNode>>>,
     root_query: Option<QueryState<Entity, Without<Parent>>>,
     stack: Vec<ValidationStackEntry>,
+    /// Only report errors for an entity one time.
+    error_entities: HashSet<Entity>,
 }
 
-/// Validate the entity hierarchy and report errors.
+/// An exclusive system that validate the entity hierarchy and report errors.
 pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut World) {
     world.init_resource::<ValidatorCaches>();
     let mut caches = world.remove_resource::<ValidatorCaches>().unwrap();
@@ -76,27 +74,45 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                 }
                 Some(_) => (), // Matched, but no children to push on the stack
                 None => {
+                    if caches.error_entities.contains(entity) {
+                        continue; // Don't repeat error messages for the same entity
+                    }
+
                     let mut possibilities = String::new();
                     stack_entry
                         .parent_node
                         .allowed_child_nodes()
                         .iter()
                         .for_each(|v| {
-                            possibilities.push('\t');
-                            possibilities.push('\t');
+                            possibilities.push_str("  - ");
                             possibilities.push_str(v.name());
                             possibilities.push('\n');
                         });
 
                     let mut inspect = String::new();
                     world.inspect_entity(*entity).iter().for_each(|info| {
-                        inspect.push('\t');
-                        inspect.push('\t');
+                        inspect.push_str("  - ");
                         inspect.push_str(info.name());
                         inspect.push('\n');
                     });
 
-                    error!("big_space hierarchy validation error:\n\tEntity {:#?} is a child of the node {:#?}, but the entity does not match its parent's validation criteria.\n\tBecause it is a child of a {:#?}, the entity must be one of the following kinds of nodes:\n{}\tHowever, the entity has the following components, which does not match any of the above allowed archetypes:\n{}\tCommon errors include:\n\t  - Using mismatched GridPrecisions, like GridCell<i32> and GridCell<i64>\n\t  - Spawning an entity with a GridCell as a child of an entity without a ReferenceFrame.\n\tIf possible, use commands.spawn_big_space(), which prevents these errors, instead of manually assembling a hierarchy.\n\tSee {} for details.", entity, stack_entry.parent_node.name(), stack_entry.parent_node.name(), possibilities, inspect, file!());
+                    tracing::error!("
+-------------------------------------------
+big_space hierarchy validation error report
+-------------------------------------------
+
+Entity {:#} is a child of a {:#?}, but the components on this entity do not match any of the allowed archetypes for children of this parent.
+                    
+Because it is a child of a {:#?}, the entity must be one of the following:
+{}
+However, the entity has the following components, which does not match any of the allowed archetypes listed above:
+{}
+Common errors include:
+  - Using mismatched GridPrecisions, like GridCell<i32> and GridCell<i64>
+  - Spawning an entity with a GridCell as a child of an entity without a ReferenceFrame.
+
+If possible, use commands.spawn_big_space(), which prevents these errors, instead of manually assembling a hierarchy. See {} for details.", entity, stack_entry.parent_node.name(), stack_entry.parent_node.name(), possibilities, inspect, file!());
+                    caches.error_entities.insert(*entity);
                 }
             }
         }
@@ -123,7 +139,7 @@ pub trait ValidHierarchyNode: sealed::CloneHierarchy + Send + Sync {
     }
 }
 
-pub(super) mod sealed {
+mod sealed {
     use super::ValidHierarchyNode;
 
     pub trait CloneHierarchy {
@@ -151,6 +167,10 @@ pub(super) mod sealed {
 pub struct SpatialHierarchyRoot<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for SpatialHierarchyRoot<P> {
+    fn name(&self) -> &'static str {
+        "Root"
+    }
+
     fn match_self(&self, _: &mut QueryBuilder<(Entity, Option<&Children>)>) {}
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
@@ -166,9 +186,13 @@ impl<P: GridPrecision> ValidHierarchyNode for SpatialHierarchyRoot<P> {
 struct AnyNonSpatial<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for AnyNonSpatial<P> {
+    fn name(&self) -> &'static str {
+        "Any non-spatial entity"
+    }
+
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .without::<GridCell<P>>()
+            .without::<GridCellAny>()
             .without::<Transform>()
             .without::<GlobalTransform>()
             .without::<BigSpace>()
@@ -185,13 +209,17 @@ impl<P: GridPrecision> ValidHierarchyNode for AnyNonSpatial<P> {
 struct RootFrame<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
+    fn name(&self) -> &'static str {
+        "Root of a BigSpace"
+    }
+
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<BigSpace>()
             .with::<ReferenceFrame<P>>()
-            .without::<GridCell<P>>()
+            .with::<GlobalTransform>()
+            .without::<GridCellAny>()
             .without::<Transform>()
-            .without::<GlobalTransform>()
             .without::<Parent>()
             .without::<FloatingOrigin>();
     }
@@ -210,11 +238,15 @@ impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
 struct RootSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for RootSpatialLowPrecision<P> {
+    fn name(&self) -> &'static str {
+        "Root of a Transform hierarchy at the root of the tree outside of any BigSpace"
+    }
+
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .without::<GridCell<P>>()
+            .without::<GridCellAny>()
             .without::<BigSpace>()
             .without::<ReferenceFrame<P>>()
             .without::<Parent>()
@@ -233,6 +265,10 @@ impl<P: GridPrecision> ValidHierarchyNode for RootSpatialLowPrecision<P> {
 struct ChildFrame<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
+    fn name(&self) -> &'static str {
+        "Non-root ReferenceFrame"
+    }
+
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<ReferenceFrame<P>>()
@@ -246,8 +282,36 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
             Box::<ChildFrame<P>>::default(),
-            Box::<ChildSpatialLowPrecision<P>>::default(),
+            Box::<ChildRootSpatialLowPrecision<P>>::default(),
             Box::<ChildSpatialHighPrecision<P>>::default(),
+            Box::<AnyNonSpatial<P>>::default(),
+        ]
+    }
+}
+
+#[derive(Default, Clone)]
+struct ChildRootSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
+
+impl<P: GridPrecision> ValidHierarchyNode for ChildRootSpatialLowPrecision<P> {
+    fn name(&self) -> &'static str {
+        "Root of a low-precision Transform hierarchy, within a BigSpace"
+    }
+
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
+        query
+            .with::<Transform>()
+            .with::<GlobalTransform>()
+            .with::<Parent>()
+            .with::<crate::reference_frame::propagation::LowPrecisionRoot>()
+            .without::<GridCellAny>()
+            .without::<BigSpace>()
+            .without::<ReferenceFrame<P>>()
+            .without::<FloatingOrigin>();
+    }
+
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
+        vec![
+            Box::<ChildSpatialLowPrecision<P>>::default(),
             Box::<AnyNonSpatial<P>>::default(),
         ]
     }
@@ -257,12 +321,16 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
 struct ChildSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
+    fn name(&self) -> &'static str {
+        "Non-root low-precision spatial entity"
+    }
+
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
-            .without::<GridCell<P>>()
+            .without::<GridCellAny>()
             .without::<BigSpace>()
             .without::<ReferenceFrame<P>>()
             .without::<FloatingOrigin>();
@@ -280,6 +348,10 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
 struct ChildSpatialHighPrecision<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialHighPrecision<P> {
+    fn name(&self) -> &'static str {
+        "Non-root high precision spatial entity"
+    }
+
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<GridCell<P>>()
@@ -292,7 +364,7 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialHighPrecision<P> {
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildSpatialLowPrecision<P>>::default(),
+            Box::<ChildRootSpatialLowPrecision<P>>::default(),
             Box::<AnyNonSpatial<P>>::default(),
         ]
     }
