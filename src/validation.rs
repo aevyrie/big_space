@@ -89,7 +89,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         });
 
                     let mut inspect = String::new();
-                    world.inspect_entity(*entity).iter().for_each(|info| {
+                    world.inspect_entity(*entity).for_each(|info| {
                         inspect.push('\t');
                         inspect.push('\t');
                         inspect.push_str(info.name());

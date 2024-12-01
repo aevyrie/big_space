@@ -2,7 +2,7 @@
 
 use std::{hash::Hash, ops::Add};
 
-use bevy_reflect::Reflect;
+use bevy_reflect::{Reflect, Typed};
 
 /// Used to make the floating origin plugin generic over many grid sizes.
 ///
@@ -50,6 +50,7 @@ pub trait GridPrecision:
     + Send
     + Sync
     + Reflect
+    + Typed
     + Add
     + std::fmt::Debug
     + std::fmt::Display

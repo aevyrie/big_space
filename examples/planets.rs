@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 /// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
 /// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{
-    core_pipeline::bloom::BloomSettings,
+    core_pipeline::bloom::Bloom,
     math::DVec3,
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
     prelude::*,
@@ -134,38 +134,32 @@ fn spawn_solar_system(
 
     commands.spawn((
         PrimaryLight,
-        DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                color: Color::WHITE,
-                illuminance: 120_000.,
-                shadows_enabled: true,
-                ..default()
-            },
-            cascade_shadow_config: CascadeShadowConfigBuilder {
-                num_cascades: 4,
-                minimum_distance: 0.1,
-                maximum_distance: 10_000.0,
-                first_cascade_far_bound: 100.0,
-                overlap_proportion: 0.2,
-            }
-            .build(),
+        DirectionalLight {
+            color: Color::WHITE,
+            illuminance: 120_000.,
+            shadows_enabled: true,
             ..default()
         },
+        CascadeShadowConfigBuilder {
+            num_cascades: 4,
+            minimum_distance: 0.1,
+            maximum_distance: 10_000.0,
+            first_cascade_far_bound: 100.0,
+            overlap_proportion: 0.2,
+        }
+        .build(),
     ));
 
     commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
         root_frame.with_frame_default(|sun| {
             sun.insert((Sun, Name::new("Sun")));
             sun.spawn_spatial((
-                PbrBundle {
-                    mesh: sun_mesh_handle,
-                    material: materials.add(StandardMaterial {
-                        base_color: Color::WHITE,
-                        emissive: LinearRgba::rgb(100000., 100000., 100000.),
-                        ..default()
-                    }),
+                Mesh3d(sun_mesh_handle),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: Color::WHITE,
+                    emissive: LinearRgba::rgb(100000., 100000., 100000.),
                     ..default()
-                },
+                })),
                 NotShadowCaster,
             ));
 
@@ -175,18 +169,15 @@ fn spawn_solar_system(
                 earth.insert((
                     Name::new("Earth"),
                     earth_cell,
-                    PbrBundle {
-                        mesh: earth_mesh_handle,
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::BLUE),
-                            perceptual_roughness: 0.8,
-                            reflectance: 1.0,
-                            ..default()
-                        }),
-                        transform: Transform::from_translation(earth_pos)
-                            .with_scale(Vec3::splat(EARTH_RADIUS_M as f32)),
+                    Mesh3d(earth_mesh_handle),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::Srgba(palettes::css::BLUE),
+                        perceptual_roughness: 0.8,
+                        reflectance: 1.0,
                         ..default()
-                    },
+                    })),
+                    Transform::from_translation(earth_pos)
+                        .with_scale(Vec3::splat(EARTH_RADIUS_M as f32)),
                     Rotates(0.000001),
                 ));
 
@@ -195,17 +186,14 @@ fn spawn_solar_system(
                 let (moon_cell, moon_pos) = earth.frame().translation_to_grid(moon_pos);
                 earth.spawn_spatial((
                     Name::new("Moon"),
-                    PbrBundle {
-                        mesh: moon_mesh_handle,
-                        material: materials.add(StandardMaterial {
-                            base_color: Color::Srgba(palettes::css::GRAY),
-                            perceptual_roughness: 1.0,
-                            reflectance: 0.0,
-                            ..default()
-                        }),
-                        transform: Transform::from_translation(moon_pos),
+                    Mesh3d(moon_mesh_handle),
+                    MeshMaterial3d(materials.add(StandardMaterial {
+                        base_color: Color::Srgba(palettes::css::GRAY),
+                        perceptual_roughness: 1.0,
+                        reflectance: 0.0,
                         ..default()
-                    },
+                    })),
+                    Transform::from_translation(moon_pos),
                     moon_cell,
                 ));
 
@@ -215,27 +203,25 @@ fn spawn_solar_system(
                 earth
                     .spawn_spatial((ball_cell, Transform::from_translation(ball_pos)))
                     .with_children(|children| {
-                        children.spawn((PbrBundle {
-                            mesh: ball_mesh_handle,
-                            material: materials.add(StandardMaterial {
+                        children.spawn((
+                            Mesh3d(ball_mesh_handle),
+                            MeshMaterial3d(materials.add(StandardMaterial {
                                 base_color: Color::WHITE,
                                 ..default()
-                            }),
-                            ..default()
-                        },));
+                            })),
+                        ));
 
-                        children.spawn((PbrBundle {
-                            mesh: plane_mesh_handle,
-                            material: materials.add(StandardMaterial {
+                        children.spawn((
+                            Mesh3d(plane_mesh_handle),
+                            MeshMaterial3d(materials.add(StandardMaterial {
                                 base_color: Color::Srgba(palettes::css::DARK_GREEN),
                                 perceptual_roughness: 1.0,
                                 reflectance: 0.0,
                                 ..default()
-                            }),
-                            transform: Transform::from_scale(Vec3::splat(100.0))
+                            })),
+                            Transform::from_scale(Vec3::splat(100.0))
                                 .with_translation(Vec3::X * -5.0),
-                            ..default()
-                        },));
+                        ));
                     });
 
                 let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
@@ -252,31 +238,21 @@ fn spawn_solar_system(
 
                     camera.spawn_spatial((
                         FloatingOrigin,
-                        Camera3dBundle {
-                            transform: Transform::from_xyz(0.0, 4.0, 22.0),
-                            camera: Camera {
-                                hdr: true,
-                                ..default()
-                            },
-                            exposure: Exposure::SUNLIGHT,
+                        Camera3d::default(),
+                        Transform::from_xyz(0.0, 4.0, 22.0),
+                        Camera {
+                            hdr: true,
                             ..default()
                         },
-                        BloomSettings::default(),
+                        Exposure::SUNLIGHT,
+                        Bloom::default(),
                     ));
 
-                    camera.with_children(|camera| {
-                        camera.spawn((
-                            Spaceship,
-                            SceneBundle {
-                                scene: asset_server
-                                    .load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                                transform: Transform::from_rotation(Quat::from_rotation_y(
-                                    std::f32::consts::PI,
-                                )),
-                                ..default()
-                            },
-                        ));
-                    });
+                    camera.with_child((
+                        Spaceship,
+                        SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+                        Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                    ));
                 });
             });
         });
@@ -290,8 +266,8 @@ fn spawn_solar_system(
         let mut rng = rand::thread_rng();
         (0..1000).for_each(|_| {
             root_frame.spawn_spatial((
-                star_mesh_handle.clone(),
-                star_mat.clone(),
+                Mesh3d(star_mesh_handle.clone()),
+                MeshMaterial3d(star_mat.clone()),
                 Transform::from_xyz(
                     (rng.gen::<f32>() - 0.5) * 1e14,
                     (rng.gen::<f32>() - 0.5) * 1e14,
@@ -313,15 +289,15 @@ fn cursor_grab_system(
     };
 
     if btn.just_pressed(MouseButton::Right) {
-        window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
-        window.cursor.visible = false;
+        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+        window.cursor_options.visible = false;
         // window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
     }
 
     if key.just_pressed(KeyCode::Escape) {
-        window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
-        window.cursor.visible = true;
+        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+        window.cursor_options.visible = true;
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }

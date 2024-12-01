@@ -30,8 +30,8 @@ fn movement(
     )>,
 ) {
     let delta_translation = |offset: f32, scale: f32| -> Vec3 {
-        let t_1 = time.elapsed_seconds() * 0.1 + offset;
-        let dt = time.delta_seconds() * 0.1;
+        let t_1 = time.elapsed_secs() * 0.1 + offset;
+        let dt = time.delta_secs() * 0.1;
         let t_0 = t_1 - dt;
         let pos =
             |t: f32| -> Vec3 { Vec3::new(t.cos() * 2.0, t.sin() * 2.0, (t * 1.3).sin() * 2.0) };
@@ -51,7 +51,7 @@ struct Rotator;
 
 fn rotation(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_z(3.0 * time.delta_seconds() * 0.2);
+        transform.rotate_z(3.0 * time.delta_secs() * 0.2);
     }
 }
 
@@ -68,60 +68,42 @@ fn setup(
 
     commands.spawn_big_space(ReferenceFrame::<i64>::new(1.0, 0.01), |root| {
         root.spawn_spatial((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_xyz(0.0, 0.0, 1.0),
-                ..default()
-            },
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(matl_handle.clone()),
+            Transform::from_xyz(0.0, 0.0, 1.0),
             Mover::<1>,
         ));
 
         root.spawn_spatial((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_xyz(1.0, 0.0, 0.0),
-                ..default()
-            },
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(matl_handle.clone()),
+            Transform::from_xyz(1.0, 0.0, 0.0),
             Mover::<2>,
         ));
 
         root.with_frame(ReferenceFrame::new(0.2, 0.01), |new_frame| {
             new_frame.insert((
-                PbrBundle {
-                    mesh: mesh_handle.clone(),
-                    material: matl_handle.clone(),
-                    transform: Transform::from_xyz(0.0, 1.0, 0.0),
-                    ..default()
-                },
+                Mesh3d(mesh_handle.clone()),
+                MeshMaterial3d(matl_handle.clone()),
+                Transform::from_xyz(0.0, 1.0, 0.0),
                 Rotator,
                 Mover::<3>,
             ));
             new_frame.spawn_spatial((
-                PbrBundle {
-                    mesh: mesh_handle,
-                    material: matl_handle,
-                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
-                    ..default()
-                },
+                Mesh3d(mesh_handle),
+                MeshMaterial3d(matl_handle),
+                Transform::from_xyz(0.0, 0.5, 0.0),
                 Mover::<4>,
             ));
         });
 
         // light
-        root.spawn_spatial((PointLightBundle {
-            transform: Transform::from_xyz(4.0, 8.0, 4.0),
-            ..default()
-        },));
+        root.spawn_spatial((PointLight::default(), Transform::from_xyz(4.0, 8.0, 4.0)));
 
         // camera
         root.spawn_spatial((
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                    .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-                ..default()
-            },
+            Camera3d::default(),
+            Transform::from_xyz(0.0, 0.0, 8.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             FloatingOrigin,
         ));
     });

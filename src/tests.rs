@@ -10,9 +10,7 @@ fn changing_floating_origin_updates_global_transform() {
     let first = app
         .world_mut()
         .spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                150.0, 0.0, 0.0,
-            ))),
+            Transform::from_translation(Vec3::new(150.0, 0.0, 0.0)),
             GridCell::<i32>::new(5, 0, 0),
             FloatingOrigin,
         ))
@@ -21,16 +19,14 @@ fn changing_floating_origin_updates_global_transform() {
     let second = app
         .world_mut()
         .spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                0.0, 0.0, 300.0,
-            ))),
+            Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)),
             GridCell::<i32>::new(0, -15, 0),
         ))
         .id();
 
     app.world_mut()
         .spawn(BigSpaceRootBundle::<i32>::default())
-        .push_children(&[first, second]);
+        .add_children(&[first, second]);
 
     app.update();
 
@@ -55,9 +51,7 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
     let first = app
         .world_mut()
         .spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                150.0, 0.0, 0.0,
-            ))),
+            Transform::from_translation(Vec3::new(150.0, 0.0, 0.0)),
             GridCell::<i32>::new(5, 0, 0),
             FloatingOrigin,
         ))
@@ -66,21 +60,15 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
     let second = app
         .world_mut()
         .spawn((
-            TransformBundle::from_transform(Transform::from_translation(Vec3::new(
-                0.0, 0.0, 300.0,
-            ))),
+            Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)),
             GridCell::<i32>::new(0, -15, 0),
         ))
-        .with_children(|parent| {
-            parent.spawn((TransformBundle::from_transform(
-                Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)),
-            ),));
-        })
+        .with_child(Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)))
         .id();
 
     app.world_mut()
         .spawn(BigSpaceRootBundle::<i32>::default())
-        .push_children(&[first, second]);
+        .add_children(&[first, second]);
 
     app.update();
 
