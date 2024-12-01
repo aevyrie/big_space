@@ -41,6 +41,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
 
 /// Per-camera settings for the `big_space` floating origin camera controller.
 #[derive(Clone, Debug, Reflect, Component)]
+#[reflect(Component)]
 pub struct CameraController {
     /// Smoothness of translation, from `0.0` to `1.0`.
     pub smoothness: f64,
