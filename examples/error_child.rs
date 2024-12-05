@@ -36,12 +36,11 @@ fn setup_scene(
     commands.spawn_big_space(
         ReferenceFrame::<i64>::new(SPHERE_RADIUS * 100.0, 0.0),
         |root_frame| {
-            root_frame.spawn_spatial(PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: materials.add(Color::from(palettes::css::BLUE)),
-                transform: Transform::from_translation(NEARBY),
-                ..default()
-            });
+            root_frame.spawn_spatial((
+                Mesh3d(mesh_handle.clone()),
+                MeshMaterial3d(materials.add(Color::from(palettes::css::BLUE))),
+                Transform::from_translation(NEARBY),
+            ));
 
             let parent = root_frame.frame().translation_to_grid(DISTANT);
             root_frame.with_frame(
@@ -52,51 +51,41 @@ fn setup_scene(
                     let child = parent_frame
                         .frame()
                         .translation_to_grid(-DISTANT + NEARBY.as_dvec3());
-                    parent_frame.insert(PbrBundle {
-                        mesh: mesh_handle.clone(),
-                        material: matl_handle.clone(),
-                        transform: Transform::from_translation(parent.1),
-                        ..default()
-                    });
+                    parent_frame.insert((
+                        Mesh3d(mesh_handle.clone()),
+                        MeshMaterial3d(matl_handle.clone()),
+                        Transform::from_translation(parent.1),
+                    ));
                     parent_frame.insert(parent.0);
 
-                    parent_frame.with_children(|child_builder| {
-                        // A green sphere that is a child of the sphere very far from the origin.
-                        // This child is very far from its parent, and should be located exactly at
-                        // the origin (if there was no floating point error). The distance from the
-                        // green sphere to the red sphere is the error caused by float imprecision.
-                        // Note that the sphere does not have any rendering artifacts, its position
-                        // just has a fixed error.
-                        child_builder.spawn((
-                            PbrBundle {
-                                mesh: mesh_handle,
-                                material: materials.add(Color::from(palettes::css::GREEN)),
-                                transform: Transform::from_translation(child.1),
-                                ..default()
-                            },
-                            child.0,
-                        ));
-                    });
+                    // A green sphere that is a child of the sphere very far from the origin.
+                    // This child is very far from its parent, and should be located exactly at
+                    // the origin (if there was no floating point error). The distance from the
+                    // green sphere to the red sphere is the error caused by float imprecision.
+                    // Note that the sphere does not have any rendering artifacts, its position
+                    // just has a fixed error.
+                    parent_frame.with_child((
+                        Mesh3d(mesh_handle),
+                        MeshMaterial3d(materials.add(Color::from(palettes::css::GREEN))),
+                        Transform::from_translation(child.1),
+                        child.0,
+                    ));
                 },
             );
 
-            root_frame.spawn_spatial(DirectionalLightBundle {
-                transform: Transform::from_xyz(4.0, -10.0, -4.0),
-                ..default()
-            });
+            root_frame.spawn_spatial((
+                DirectionalLight::default(),
+                Transform::from_xyz(4.0, -10.0, -4.0),
+            ));
 
             root_frame.spawn_spatial((
-                Camera3dBundle {
-                    transform: Transform::from_translation(
-                        NEARBY + Vec3::new(0.0, 0.0, SPHERE_RADIUS * 10.0),
-                    )
+                Camera3d::default(),
+                Transform::from_translation(NEARBY + Vec3::new(0.0, 0.0, SPHERE_RADIUS * 10.0))
                     .looking_at(NEARBY, Vec3::Y),
-                    projection: Projection::Perspective(PerspectiveProjection {
-                        near: (SPHERE_RADIUS * 0.1).min(0.1),
-                        ..default()
-                    }),
+                Projection::Perspective(PerspectiveProjection {
+                    near: (SPHERE_RADIUS * 0.1).min(0.1),
                     ..default()
-                },
+                }),
                 FloatingOrigin,
                 big_space::camera::CameraController::default() // Built-in camera controller
                     .with_speed_bounds([10e-18, 10e35])

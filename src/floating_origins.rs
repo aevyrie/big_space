@@ -29,6 +29,8 @@ pub struct FloatingOrigin;
 /// that `BigSpace`.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
+// We do not require ReferenceFrame, because we want more control over when the reference frame is
+// inserted, especially with the command extension.
 pub struct BigSpace {
     /// Set the entity to use as the floating origin within this high precision hierarchy.
     pub floating_origin: Option<Entity>,

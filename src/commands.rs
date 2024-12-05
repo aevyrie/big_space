@@ -70,12 +70,7 @@ impl<P: GridPrecision> ReferenceFrameCommands<'_, P> {
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
-                GlobalTransform::default(),
                 GridCell::<P>::default(),
             ))
             .insert(bundle)
@@ -136,12 +131,7 @@ impl<P: GridPrecision> ReferenceFrameCommands<'_, P> {
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
-                GlobalTransform::default(),
                 GridCell::<P>::default(),
                 ReferenceFrame::<P>::default(),
             ))
@@ -168,6 +158,13 @@ impl<P: GridPrecision> ReferenceFrameCommands<'_, P> {
         self.commands
             .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
+        self
+    }
+
+    /// Spawns the passed bundle which provides this reference frame,
+    /// and adds it to this entity as a child.
+    pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
+        self.commands.entity(self.entity).with_child(bundle);
         self
     }
 }
@@ -200,6 +197,12 @@ impl<P: GridPrecision> SpatialEntityCommands<'_, P> {
         self.commands
             .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
+        self
+    }
+
+    /// Spawns the passed bundle and adds it to this entity as a child.
+    pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
+        self.commands.entity(self.entity).with_child(bundle);
         self
     }
 

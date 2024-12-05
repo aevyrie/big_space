@@ -17,6 +17,7 @@ use self::{precision::GridPrecision, reference_frame::ReferenceFrame};
 /// that cell.
 #[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
+#[require(Transform, GlobalTransform)]
 pub struct GridCell<P: GridPrecision> {
     /// The x-index of the cell.
     pub x: P,
