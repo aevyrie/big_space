@@ -4,9 +4,9 @@ use std::marker::PhantomData;
 
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
-use bevy_log::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::HashMap;
+use tracing::error;
 
 use crate::{
     precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, FloatingOrigin, GridCell,

@@ -10,9 +10,9 @@ use bevy_ecs::{
     },
 };
 use bevy_hierarchy::prelude::*;
-use bevy_log::prelude::*;
 use bevy_math::{prelude::*, DAffine3, DQuat};
 use bevy_transform::prelude::*;
+use tracing::error;
 
 pub use inner::LocalFloatingOrigin;
 

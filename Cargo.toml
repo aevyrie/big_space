@@ -1,6 +1,6 @@
 [package]
 name = "big_space"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 description = "A floating origin plugin for bevy"
 license = "MIT OR Apache-2.0"
@@ -9,13 +9,15 @@ repository = "https://github.com/aevyrie/big_space"
 documentation = "https://docs.rs/crate/big_space/latest"
 
 [dependencies]
+tracing = { version = "0.1", default-features = false }
 bevy_app = { version = "0.15.0", default-features = false }
 bevy_ecs = { version = "0.15.0", default-features = false }
 bevy_hierarchy = { version = "0.15.0", default-features = false }
-bevy_log = { version = "0.15.0", default-features = false }
 bevy_math = { version = "0.15.0", default-features = false }
 bevy_reflect = { version = "0.15.0", default-features = false }
-bevy_transform = { version = "0.15.0", default-features = false }
+bevy_transform = { version = "0.15.0", default-features = false, features = [
+    "bevy-support",
+] }
 bevy_utils = { version = "0.15.0", default-features = false }
 # Optional
 bevy_color = { version = "0.15.0", default-features = false, optional = true }

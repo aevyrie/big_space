@@ -2,9 +2,9 @@
 
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
-use bevy_log::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_utils::HashMap;
+use tracing::error;
 
 /// Marks the entity to use as the floating origin.
 ///
