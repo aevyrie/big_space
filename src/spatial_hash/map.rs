@@ -161,7 +161,7 @@ where
     pub fn nearby<'a>(
         &'a self,
         entry: &'a SpatialHashEntry<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, &SpatialHashEntry<P>)> + '_ {
+    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> + 'a {
         entry.occupied_neighbors.iter().map(|neighbor_hash| {
             // We can unwrap here because occupied_neighbors are guaranteed to be occupied
             let neighbor_entry = self.get(neighbor_hash).unwrap();
@@ -173,7 +173,7 @@ where
     pub fn nearby_flat<'a>(
         &'a self,
         entry: &'a SpatialHashEntry<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, Entity)> + '_ {
+    ) -> impl Iterator<Item = (SpatialHash<P>, Entity)> + 'a {
         self.nearby(entry)
             .flat_map(|(hash, entry)| entry.entities.iter().map(move |entity| (hash, *entity)))
     }

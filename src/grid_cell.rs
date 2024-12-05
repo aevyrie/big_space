@@ -1,7 +1,7 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::{component::StorageType, prelude::*};
+use bevy_ecs::{component::ComponentId, prelude::*, world::DeferredWorld};
 use bevy_hierarchy::prelude::*;
 use bevy_math::{DVec3, IVec3};
 use bevy_reflect::prelude::*;
@@ -31,8 +31,10 @@ pub struct GridCellAny;
 ///
 /// Entities and an entity hierarchies are only allowed to have a single type of `GridCell`, you
 /// cannot mix [`GridPrecision`]s.
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
+#[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
+#[require(Transform, GlobalTransform)]
+#[component(storage = "Table", on_add = Self::on_add, on_remove = Self::on_remove)]
 pub struct GridCell<P: GridPrecision> {
     /// The x-index of the cell.
     pub x: P,
@@ -42,21 +44,16 @@ pub struct GridCell<P: GridPrecision> {
     pub z: P,
 }
 
-impl<P: GridPrecision> Component for GridCell<P> {
-    const STORAGE_TYPE: StorageType = StorageType::Table;
-
-    fn register_component_hooks(hooks: &mut bevy_ecs::component::ComponentHooks) {
-        hooks.on_add(|mut world, entity, _| {
-            assert!(world.get::<GridCellAny>(entity).is_none(), "Adding multiple GridCell<P>s with different generic values on the same entity is not supported");
-            world.commands().entity(entity).insert(GridCellAny);
-        });
-        hooks.on_remove(|mut world, entity, _| {
-            world.commands().entity(entity).remove::<GridCellAny>();
-        });
-    }
-}
-
 impl<P: GridPrecision> GridCell<P> {
+    fn on_add(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
+        assert!(world.get::<GridCellAny>(entity).is_none(), "Adding multiple GridCell<P>s with different generic values on the same entity is not supported");
+        world.commands().entity(entity).insert(GridCellAny);
+    }
+
+    fn on_remove(mut world: DeferredWorld, entity: Entity, _: ComponentId) {
+        world.commands().entity(entity).remove::<GridCellAny>();
+    }
+
     /// Construct a new [`GridCell`].
     pub fn new(x: P, y: P, z: P) -> Self {
         Self { x, y, z }

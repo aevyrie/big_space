@@ -331,10 +331,8 @@ mod tests {
                     ))
                     .with_children(|spatial| {
                         spatial.spawn((
-                            SpatialBundle {
-                                transform: Transform::from_xyz(1.0, 2.0, 3.0),
-                                ..default()
-                            },
+                            Transform::from_xyz(1.0, 2.0, 3.0),
+                            Visibility::default(),
                             Test,
                         ));
                     });

@@ -11,17 +11,17 @@ fn main() {
             BigSpacePlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
-            bevy_hanabi::HanabiPlugin,
+            // bevy_hanabi::HanabiPlugin, // TODO fix once hanabi updates to bevy 0.15
         ))
-        .add_systems(Startup, setup_scene)
-        .add_systems(
-            PostUpdate,
-            update_trail.after(TransformSystem::TransformPropagate),
-        )
+        // .add_systems(Startup, setup_scene)
+        // .add_systems(
+        //     PostUpdate,
+        //     update_trail.after(TransformSystem::TransformPropagate),
+        // )
         .run();
 }
 
-fn setup_scene(
+/* fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -165,3 +165,4 @@ fn particle_effect() -> bevy_hanabi::EffectAsset {
         })
         .render_groups(render_color, ParticleGroupSet::single(1))
 }
+ */

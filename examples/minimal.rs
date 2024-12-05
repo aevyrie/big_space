@@ -41,16 +41,13 @@ fn setup_scene(
             .translation_to_grid(DVec3::splat(BIG_DISTANCE));
 
         // `spawn_spatial` will spawn a high-precision spatial entity with floating origin support.
-        root_frame.spawn_spatial(DirectionalLightBundle::default());
+        root_frame.spawn_spatial(DirectionalLight::default());
 
         // Spawn a sphere mesh with high precision.
         root_frame.spawn_spatial((
-            PbrBundle {
-                mesh: meshes.add(Sphere::default()),
-                material: materials.add(Color::WHITE),
-                transform: Transform::from_translation(cell_offset),
-                ..default()
-            },
+            Mesh3d(meshes.add(Sphere::default())),
+            MeshMaterial3d(materials.add(Color::WHITE)),
+            Transform::from_translation(cell_offset),
             grid_cell,
         ));
 
@@ -58,21 +55,16 @@ fn setup_scene(
         // entities (with a GridCell), is also supported. We demonstrate this here by loading in a
         // GLTF scene, which will be added as a child of this entity using low precision Transforms.
         root_frame.spawn_spatial((
-            SceneBundle {
-                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                transform: Transform::from_translation(cell_offset - 10.0),
-                ..default()
-            },
+            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            Transform::from_translation(cell_offset - 10.0),
             grid_cell,
         ));
 
         // Any spatial entity can be the floating origin. Attaching it to the camera ensures the
         // camera will never see floating point precision rendering artifacts.
         root_frame.spawn_spatial((
-            Camera3dBundle {
-                transform: Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
-                ..Default::default()
-            },
+            Camera3d::default(),
+            Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
             grid_cell,
             FloatingOrigin,
             big_space::camera::CameraController::default(),

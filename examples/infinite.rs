@@ -20,8 +20,8 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let sphere = meshes.add(Sphere::default());
-    let matl = materials.add(Color::WHITE);
+    let sphere = Mesh3d(meshes.add(Sphere::default()));
+    let matl = MeshMaterial3d(materials.add(Color::WHITE));
 
     commands.spawn_big_space::<i8>(ReferenceFrame::default(), |root_frame| {
         let width = || -8..8;
@@ -30,11 +30,8 @@ fn setup_scene(
             .flat_map(|(x, y)| width().map(move |z| (x, y, z)))
         {
             root_frame.spawn_spatial((
-                PbrBundle {
-                    mesh: sphere.clone(),
-                    material: matl.clone(),
-                    ..default()
-                },
+                sphere.clone(),
+                matl.clone(),
                 GridCell::<i8> {
                     x: x * 16,
                     y: y * 16,
@@ -42,12 +39,10 @@ fn setup_scene(
                 },
             ));
         }
-        root_frame.spawn_spatial(DirectionalLightBundle::default());
+        root_frame.spawn_spatial(DirectionalLight::default());
         root_frame.spawn_spatial((
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, 10.0),
-                ..Default::default()
-            },
+            Camera3d::default(),
+            Transform::from_xyz(0.0, 0.0, 10.0),
             FloatingOrigin,
             big_space::camera::CameraController::default()
                 .with_speed(10.)

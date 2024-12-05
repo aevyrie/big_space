@@ -35,15 +35,12 @@ fn setup(
 ) {
     commands.spawn_big_space_default::<i128>(|root| {
         root.spawn_spatial((
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                    .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-                projection: Projection::Perspective(PerspectiveProjection {
-                    near: 1e-18,
-                    ..default()
-                }),
+            Camera3d::default(),
+            Projection::Perspective(PerspectiveProjection {
+                near: 1e-18,
                 ..default()
-            },
+            }),
+            Transform::from_xyz(0.0, 0.0, 8.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             FloatingOrigin, // Important: marks the floating origin entity for rendering.
             CameraController::default() // Built-in camera controller
                 .with_speed_bounds([10e-18, 10e35])
@@ -66,20 +63,16 @@ fn setup(
             translation.x += j / 2.0 + k;
             translation.y = j / 2.0;
 
-            root.spawn_spatial(PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_scale(Vec3::splat(j)).with_translation(translation),
-                ..default()
-            });
+            root.spawn_spatial((
+                Mesh3d(mesh_handle.clone()),
+                MeshMaterial3d(matl_handle.clone()),
+                Transform::from_scale(Vec3::splat(j)).with_translation(translation),
+            ));
         }
 
         // light
-        root.spawn_spatial(DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                illuminance: 10_000.0,
-                ..default()
-            },
+        root.spawn_spatial(DirectionalLight {
+            illuminance: 10_000.0,
             ..default()
         });
     });
@@ -93,41 +86,37 @@ pub struct FunFactText;
 
 fn ui_setup(mut commands: Commands) {
     commands.spawn((
-        TextBundle::from_section(
-            "",
-            TextStyle {
-                font_size: 18.0,
-                color: Color::WHITE,
-                ..default()
-            },
-        )
-        .with_text_justify(JustifyText::Left)
-        .with_style(Style {
+        Text::default(),
+        TextFont {
+            font_size: 18.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        TextLayout::new_with_justify(JustifyText::Left),
+        Node {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
             left: Val::Px(10.0),
             ..default()
-        }),
+        },
         BigSpaceDebugText,
     ));
 
     commands.spawn((
-        TextBundle::from_section(
-            "",
-            TextStyle {
-                font_size: 52.0,
-                color: Color::WHITE,
-                ..default()
-            },
-        )
-        .with_style(Style {
+        Text::default(),
+        TextFont {
+            font_size: 52.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        TextLayout::new_with_justify(JustifyText::Center),
+        Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(10.0),
             right: Val::Px(10.0),
             left: Val::Px(10.0),
             ..default()
-        })
-        .with_text_justify(JustifyText::Center),
+        },
         FunFactText,
     ));
 }
@@ -148,7 +137,6 @@ fn highlight_nearest_sphere(
     gizmos
         .sphere(
             translation,
-            Quat::IDENTITY, // Bevy likes to explode on non-normalized quats in gizmos,
             scale.x * 0.505,
             Color::Srgba(palettes::basic::RED),
         )
@@ -166,7 +154,7 @@ fn ui_text_system(
     time: Res<Time>,
     origin: Query<(Entity, GridTransformReadOnly<i128>), With<FloatingOrigin>>,
     camera: Query<&CameraController>,
-    objects: Query<&Transform, With<Handle<Mesh>>>,
+    objects: Query<&Transform, With<Mesh3d>>,
 ) {
     let (origin_entity, origin_pos) = origin.single();
     let translation = origin_pos.transform.translation;
@@ -196,7 +184,7 @@ fn ui_text_system(
     );
 
     let velocity = camera.single().velocity();
-    let speed = velocity.0.length() / time.delta_seconds_f64();
+    let speed = velocity.0.length() / time.delta_secs_f64();
     let camera_text = if speed > 3.0e8 {
         format!("Speed: {:.0e} * speed of light", speed / 3.0e8)
     } else {
@@ -220,11 +208,11 @@ fn ui_text_system(
 
     let mut debug_text = debug_text.single_mut();
 
-    debug_text.0.sections[0].value = format!(
+    debug_text.0.0 = format!(
         "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
     );
 
-    fun_text.single_mut().sections[0].value = fact_text
+    fun_text.single_mut().0 = fact_text
 }
 
 fn closest<'a>(diameter: f32) -> (f32, &'a str) {
@@ -280,15 +268,15 @@ fn cursor_grab_system(
     };
 
     if btn.just_pressed(MouseButton::Left) {
-        window.cursor.grab_mode = CursorGrabMode::Locked;
-        window.cursor.visible = false;
+        window.cursor_options.grab_mode = CursorGrabMode::Locked;
+        window.cursor_options.visible = false;
         // window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
     }
 
     if key.just_pressed(KeyCode::Escape) {
-        window.cursor.grab_mode = CursorGrabMode::None;
-        window.cursor.visible = true;
+        window.cursor_options.grab_mode = CursorGrabMode::None;
+        window.cursor_options.visible = true;
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }

@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, time::Duration};
 
 use bevy::{
-    core_pipeline::{bloom::BloomSettings, fxaa::Fxaa, tonemapping::Tonemapping},
+    core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
     prelude::*,
 };
 use bevy_math::DVec3;
@@ -18,7 +18,6 @@ fn main() {
             SpatialHashPlugin::<i32>::default(),
             big_space::camera::CameraControllerPlugin::<i32>::default(),
         ))
-        .insert_resource(Msaa::Off)
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(
             PostUpdate,
@@ -83,9 +82,9 @@ fn move_player(
     >,
     mut non_player: Query<
         (&mut Transform, &mut GridCell<i32>, &Parent),
-        (Without<Player>, With<Handle<Mesh>>),
+        (Without<Player>, With<Mesh3d>),
     >,
-    mut materials: Query<&mut Handle<StandardMaterial>, Without<Player>>,
+    mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
     reference_frame: Query<&ReferenceFrame<i32>>,
     spatial_hash_map: Res<SpatialHashMap<i32>>,
@@ -96,11 +95,11 @@ fn move_player(
 ) {
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
-            *material = material_presets.default.clone_weak();
+            **material = material_presets.default.clone_weak();
         }
     }
 
-    let t = time.elapsed_seconds() * 1.0;
+    let t = time.elapsed_secs() * 1.0;
     let scale = MOVEMENT_SPEED / (N_ENTITIES as f32 * HALF_WIDTH);
     if scale.abs() > 0.0 {
         // Avoid change detection
@@ -113,7 +112,7 @@ fn move_player(
         }
     }
 
-    let t = time.elapsed_seconds() * 0.01;
+    let t = time.elapsed_secs() * 0.01;
     let (mut transform, mut cell, parent, hash) = player.single_mut();
     let entry = spatial_hash_map.get(hash).unwrap();
     let absolute_pos = HALF_WIDTH
@@ -133,7 +132,7 @@ fn move_player(
             for entity in &entry.entities {
                 neighbors.push(*entity);
                 if let Ok(mut material) = materials.get_mut(*entity) {
-                    *material = material_presets.flood.clone_weak();
+                    **material = material_presets.flood.clone_weak();
                 }
             }
             // let frame = reference_frame.get(entry.reference_frame).unwrap();
@@ -147,7 +146,7 @@ fn move_player(
     spatial_hash_map.nearby_flat(entry).for_each(|(_, entity)| {
         neighbors.push(entity);
         if let Ok(mut material) = materials.get_mut(entity) {
-            *material = material_presets.highlight.clone_weak();
+            **material = material_presets.highlight.clone_weak();
         }
     });
 
@@ -171,7 +170,7 @@ fn move_player(
         .iter()
         .sum::<Duration>()
         .div_f32(stats.0.len() as f32);
-    text.sections[0].value = format!(
+    text.0 = format!(
         "\
 Population: {: >8} Entities
 
@@ -243,25 +242,23 @@ fn spawn(
     commands.spawn_big_space::<i32>(ReferenceFrame::new(CELL_WIDTH, 0.0), |root| {
         root.spawn_spatial((
             FloatingOrigin,
-            Camera3dBundle {
-                camera: Camera {
-                    hdr: true,
-                    ..Default::default()
-                },
-                tonemapping: Tonemapping::AcesFitted,
-                transform: Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
+            Camera3d::default(),
+            Camera {
+                hdr: true,
                 ..Default::default()
             },
+            Tonemapping::AcesFitted,
+            Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
             big_space::camera::CameraController::default()
                 .with_smoothness(0.98, 0.93)
                 .with_slowing(false)
                 .with_speed(15.0),
             Fxaa::default(),
-            BloomSettings::default(),
+            Bloom::default(),
             GridCell::new(0, 0, HALF_WIDTH as i32 / 2),
         ))
         .with_children(|b| {
-            b.spawn(DirectionalLightBundle::default());
+            b.spawn(DirectionalLight::default());
         });
 
         for (i, value) in values.iter().enumerate() {
@@ -271,19 +268,20 @@ fn spawn(
             },));
             if i == 0 {
                 sphere_builder.insert((
-                    meshes.add(Sphere::new(1.0)),
                     Player,
-                    materials.add(Color::from(Srgba::new(20.0, 20.0, 0.0, 1.0))),
+                    Mesh3d(meshes.add(Sphere::new(1.0))),
+                    MeshMaterial3d(materials.add(Color::from(Srgba::new(20.0, 20.0, 0.0, 1.0)))),
                     Transform::from_scale(Vec3::splat(2.0)),
                 ));
             } else {
                 sphere_builder.insert((
-                    material_presets.default.clone_weak(),
+                    Mesh3d(sphere_mesh_lq.clone()),
+                    MeshMaterial3d(material_presets.default.clone_weak()),
                     VisibilityRange {
                         start_margin: 1.0..5.0,
                         end_margin: HALF_WIDTH * CELL_WIDTH * 2.0..HALF_WIDTH * CELL_WIDTH * 3.0,
+                        use_aabb: false,
                     },
-                    sphere_mesh_lq.clone(),
                 ));
             }
         }
@@ -295,8 +293,8 @@ struct StatsText(VecDeque<Duration>);
 
 fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn((NodeBundle {
-            style: Style {
+        .spawn((
+            Node {
                 width: Val::Auto,
                 height: Val::Auto,
                 padding: UiRect::all(Val::Px(16.)),
@@ -304,21 +302,18 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 border: UiRect::all(Val::Px(1.)),
                 ..default()
             },
-            border_radius: BorderRadius::all(Val::Px(8.0)),
-            border_color: Color::linear_rgba(0.03, 0.03, 0.03, 0.95).into(),
-            background_color: Color::linear_rgba(0.012, 0.012, 0.012, 0.95).into(),
-            ..default()
-        },))
+            BorderRadius::all(Val::Px(8.0)),
+            BorderColor(Color::linear_rgba(0.03, 0.03, 0.03, 0.95)),
+            BackgroundColor(Color::linear_rgba(0.012, 0.012, 0.012, 0.95)),
+        ))
         .with_children(|parent| {
             parent.spawn((
-                TextBundle::from_section(
-                    "",
-                    TextStyle {
-                        font: asset_server.load("fonts/FiraMono-Regular.ttf"),
-                        font_size: 14.0,
-                        ..default()
-                    },
-                ),
+                Text::default(),
+                TextFont {
+                    font: asset_server.load("fonts/FiraMono-Regular.ttf"),
+                    font_size: 14.0,
+                    ..default()
+                },
                 StatsText(Default::default()),
             ));
         });
@@ -331,11 +326,11 @@ fn cursor_grab(
 ) {
     let mut primary_window = windows.single_mut();
     if mouse.just_pressed(MouseButton::Left) {
-        primary_window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
-        primary_window.cursor.visible = false;
+        primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+        primary_window.cursor_options.visible = false;
     }
     if keyboard.just_pressed(KeyCode::Escape) {
-        primary_window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
-        primary_window.cursor.visible = true;
+        primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+        primary_window.cursor_options.visible = true;
     }
 }

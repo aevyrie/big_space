@@ -170,7 +170,7 @@ impl<P: GridPrecision> SpatialHash<P> {
                 thread_commands.scope(|tl| tl.push((entity, spatial_hash, fast_hash)));
                 thread_changed_hashes.scope(|tl| tl.push(entity));
             });
-        for (entity, spatial_hash, fast_hash) in thread_commands.drain::<Vec<_>>() {
+        for (entity, spatial_hash, fast_hash) in thread_commands.drain() {
             commands.entity(entity).insert((spatial_hash, fast_hash));
         }
 
@@ -186,9 +186,7 @@ impl<P: GridPrecision> SpatialHash<P> {
             },
         );
 
-        changed_hashes
-            .list
-            .extend(thread_changed_hashes.drain::<Vec<Entity>>());
+        changed_hashes.list.extend(thread_changed_hashes.drain());
 
         if let Some(ref mut stats) = stats {
             stats.hash_update_duration += start.elapsed();

@@ -11,6 +11,7 @@ use bevy_utils::HashMap;
 /// [`BigSpace`] will be computed relative to this floating origin. There should always be exactly
 /// one entity marked with this component within a [`BigSpace`].
 #[derive(Component, Reflect)]
+#[reflect(Component)]
 pub struct FloatingOrigin;
 
 /// A "big space" is a hierarchy of high precision reference frames, rendered with a floating
@@ -26,6 +27,9 @@ pub struct FloatingOrigin;
 /// [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all spatial entities within
 /// that `BigSpace`.
 #[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+// We do not require ReferenceFrame, because we want more control over when the reference frame is
+// inserted, especially with the command extension.
 pub struct BigSpace {
     /// Set the entity to use as the floating origin within this high precision hierarchy.
     pub floating_origin: Option<Entity>,

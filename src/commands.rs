@@ -86,12 +86,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
-                GlobalTransform::default(),
                 GridCell::<P>::default(),
             ))
             .insert(bundle)
@@ -151,12 +146,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::InheritedVisibility::default(),
-                #[cfg(feature = "bevy_render")]
-                bevy_render::view::ViewVisibility::default(),
                 Transform::default(),
-                GlobalTransform::default(),
                 GridCell::<P>::default(),
                 ReferenceFrame::<P>::default(),
             ))
@@ -183,16 +173,23 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
     pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
         &mut self.commands
     }
+
+    /// Spawns the passed bundle which provides this reference frame,
+    /// and adds it to this entity as a child.
+    pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
+        self.commands.entity(self.entity).with_child(bundle);
+        self
+    }
 }
 
 /// Insert the reference frame on drop.
-impl<'a, P: GridPrecision> Drop for ReferenceFrameCommands<'a, P> {
+impl<P: GridPrecision> Drop for ReferenceFrameCommands<'_, P> {
     fn drop(&mut self) {
         let entity = self.entity;
         self.commands
             .entity(entity)
             .insert(std::mem::take(&mut self.reference_frame))
-            .push_children(&self.children);
+            .add_children(&self.children);
     }
 }
 
@@ -204,7 +201,7 @@ pub struct SpatialEntityCommands<'a, P: GridPrecision> {
 }
 
 impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
-    /// Insert a component on this spatial entity.
+    /// Insert a component on this reference frame
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
         self.commands.entity(self.entity).insert(bundle);
         self
@@ -224,6 +221,12 @@ impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
         self.commands
             .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
+        self
+    }
+
+    /// Spawns the passed bundle and adds it to this entity as a child.
+    pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
+        self.commands.entity(self.entity).with_child(bundle);
         self
     }
 

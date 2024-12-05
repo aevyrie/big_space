@@ -381,10 +381,10 @@ fn vs_bevy(c: &mut Criterion) {
 
     fn setup_bevy(mut commands: Commands) {
         commands
-            .spawn(SpatialBundle::default())
+            .spawn((Transform::default(), Visibility::default()))
             .with_children(|builder| {
                 for _ in 0..N_ENTITIES {
-                    builder.spawn(SpatialBundle::default());
+                    builder.spawn((Transform::default(), Visibility::default()));
                 }
             });
     }

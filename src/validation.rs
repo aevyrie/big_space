@@ -8,6 +8,10 @@ use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::{HashMap, HashSet};
 
+use crate::{
+    precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, FloatingOrigin, GridCell,
+};
+
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
     children: Vec<Entity>,
@@ -90,7 +94,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         });
 
                     let mut inspect = String::new();
-                    world.inspect_entity(*entity).iter().for_each(|info| {
+                    world.inspect_entity(*entity).for_each(|info| {
                         inspect.push_str("  - ");
                         inspect.push_str(info.name());
                         inspect.push('\n');

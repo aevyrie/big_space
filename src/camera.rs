@@ -37,6 +37,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
 
 /// Per-camera settings for the `big_space` floating origin camera controller.
 #[derive(Clone, Debug, Reflect, Component)]
+#[reflect(Component)]
 pub struct CameraController {
     /// Smoothness of translation, from `0.0` to `1.0`.
     pub smoothness: f64,
@@ -283,7 +284,7 @@ pub fn camera_controller<P: GridPrecision>(
 
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) =
-            input.target_velocity(&controller, speed, time.delta_seconds_f64());
+            input.target_velocity(&controller, speed, time.delta_secs_f64());
 
         let cam_rot = transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera

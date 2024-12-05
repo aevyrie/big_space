@@ -207,6 +207,7 @@ pub mod prelude {
     use crate::*;
     pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
     pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};
+    #[cfg(feature = "debug")]
     pub use debug::FloatingOriginDebugPlugin;
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid_cell::{GridCell, GridCellAny};

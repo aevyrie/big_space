@@ -80,7 +80,7 @@ fn toggle_plugin(
             .join(",") // separator
     };
 
-    text.single_mut().sections[0].value =
+    text.single_mut().0 =
         format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nMesh distance from origin: {}", thousands(dist), thousands(DISTANCE))
 }
 
@@ -89,26 +89,24 @@ struct Rotator;
 
 fn rotator_system(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_y(time.delta_seconds());
+        transform.rotate_y(time.delta_secs());
     }
 }
 
 fn setup_ui(mut commands: Commands) {
-    commands.spawn(
-        TextBundle::from_section(
-            "",
-            TextStyle {
-                font_size: 30.0,
-                ..default()
-            },
-        )
-        .with_style(Style {
+    commands.spawn((
+        Text::default(),
+        TextFont {
+            font_size: 30.0,
+            ..default()
+        },
+        Node {
             position_type: PositionType::Absolute,
             top: Val::Px(12.0),
             left: Val::Px(12.0),
             ..default()
-        }),
-    );
+        },
+    ));
 }
 
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -122,35 +120,25 @@ fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
         root.spawn_spatial((distant_grid_cell, FloatingOrigin));
 
         root.spawn_spatial((
-            SceneBundle {
-                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                transform: Transform::from_scale(Vec3::splat(0.2)),
-                ..default()
-            },
+            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            Transform::from_scale(Vec3::splat(0.2)),
             distant_grid_cell,
             Rotator,
         ))
-        .with_children(|parent| {
-            parent.spawn(SceneBundle {
-                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                transform: Transform::from_xyz(0.0, 0.0, 20.0),
-                ..default()
-            });
-        });
+        .with_child((
+            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            Transform::from_xyz(0.0, 0.0, 20.0),
+        ));
         // light
         root.spawn_spatial((
-            DirectionalLightBundle {
-                transform: Transform::from_xyz(4.0, -10.0, -4.0),
-                ..default()
-            },
+            DirectionalLight::default(),
+            Transform::from_xyz(4.0, -10.0, -4.0),
             distant_grid_cell,
         ));
         // camera
         root.spawn_spatial((
-            Camera3dBundle {
-                transform: Transform::from_xyz(8.0, 8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
-                ..default()
-            },
+            Camera3d::default(),
+            Transform::from_xyz(8.0, 8.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
             distant_grid_cell,
         ));
     });

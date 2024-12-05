@@ -1,6 +1,6 @@
 [package]
 name = "big_space"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 description = "A floating origin plugin for bevy"
 license = "MIT OR Apache-2.0"
@@ -16,26 +16,26 @@ camera = ["bevy_render", "bevy_time", "bevy_input"]
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
 smallvec = "1.13.2" # Already used by bevy in commands
-bevy_app = { version = "0.14.0", default-features = false }
-bevy_ecs = { version = "0.14.0", default-features = false }
-bevy_hierarchy = { version = "0.14.0", default-features = false }
-bevy_math = { version = "0.14.0", default-features = false }
-bevy_reflect = { version = "0.14.0", default-features = false }
-bevy_transform = { version = "0.14.0", default-features = false, features = [
+bevy_app = { version = "0.15.0", default-features = false }
+bevy_ecs = { version = "0.15.0", default-features = true }
+bevy_hierarchy = { version = "0.15.0", default-features = false }
+bevy_math = { version = "0.15.0", default-features = false }
+bevy_reflect = { version = "0.15.0", default-features = false }
+bevy_transform = { version = "0.15.0", default-features = false, features = [
     "bevy-support",
 ] }
-bevy_utils = { version = "0.14.0", default-features = false }
+bevy_utils = { version = "0.15.0", default-features = false }
 # Optional
-bevy_color = { version = "0.14.0", default-features = false, optional = true }
-bevy_gizmos = { version = "0.14.0", default-features = false, optional = true }
-bevy_render = { version = "0.14.0", default-features = false, optional = true }
-bevy_input = { version = "0.14.0", default-features = false, optional = true }
-bevy_time = { version = "0.14.0", default-features = false, optional = true }
+bevy_color = { version = "0.15.0", default-features = false, optional = true }
+bevy_gizmos = { version = "0.15.0", default-features = false, optional = true }
+bevy_render = { version = "0.15.0", default-features = false, optional = true }
+bevy_input = { version = "0.15.0", default-features = false, optional = true }
+bevy_time = { version = "0.15.0", default-features = false, optional = true }
 
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
-bevy = { version = "0.14.0", default-features = false, features = [
+bevy = { version = "0.15.0", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
     "bevy_gltf",
@@ -44,6 +44,8 @@ bevy = { version = "0.14.0", default-features = false, features = [
     "bevy_ui",
     "bevy_pbr",
     "bevy_gizmos",
+    "animation",
+    "bevy_window",
     "x11",
     "tonemapping_luts",
     "multi_threaded",
@@ -56,9 +58,10 @@ bevy_hanabi = "0.13"
 
 [[bench]]
 name = "benchmarks"
+
+
 harness = false
-
-
+rand = "0.8.5"
 [[example]]
 name = "demo"
 path = "examples/demo.rs"

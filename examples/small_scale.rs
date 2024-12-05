@@ -42,17 +42,14 @@ fn setup_scene(
     let small_reference_frame_grid = ReferenceFrame::<i128>::new(SMALL_SCALE * 1_000.0, 0.0);
 
     commands.spawn_big_space(small_reference_frame_grid, |root_frame| {
-        root_frame.spawn_spatial(DirectionalLightBundle::default());
+        root_frame.spawn_spatial(DirectionalLight::default());
 
         // A carbon atom at the origin
         root_frame.spawn_spatial((
             Atom,
-            PbrBundle {
-                mesh: meshes.add(Sphere::default()),
-                material: materials.add(Color::WHITE),
-                transform: Transform::from_scale(Vec3::splat(SMALL_SCALE)),
-                ..default()
-            },
+            Mesh3d(meshes.add(Sphere::default())),
+            MeshMaterial3d(materials.add(Color::WHITE)),
+            Transform::from_scale(Vec3::splat(SMALL_SCALE)),
         ));
 
         // Compute the grid cell for the far away objects
@@ -63,26 +60,19 @@ fn setup_scene(
         // A carbon atom at the other side of the milky way
         root_frame.spawn_spatial((
             Atom,
-            PbrBundle {
-                mesh: meshes.add(Sphere::default()),
-                material: materials.add(Color::WHITE),
-                transform: Transform::from_translation(cell_offset)
-                    .with_scale(Vec3::splat(SMALL_SCALE))
-                    .with_translation(SMALL_SCALE * 499.0 * Vec3::ONE),
-                ..default()
-            },
+            Mesh3d(meshes.add(Sphere::default())),
+            MeshMaterial3d(materials.add(Color::WHITE)),
+            Transform::from_translation(cell_offset).with_scale(Vec3::splat(SMALL_SCALE)),
             grid_cell,
         ));
 
         root_frame.spawn_spatial((
-            Camera3dBundle {
-                projection: Projection::Perspective(PerspectiveProjection {
-                    near: SMALL_SCALE * 0.01, // Without this, the atom would be clipped
-                    ..Default::default()
-                }),
-                transform: Transform::from_xyz(0.0, 0.0, SMALL_SCALE * 2.0),
+            Camera3d::default(),
+            Projection::Perspective(PerspectiveProjection {
+                near: SMALL_SCALE * 0.01, // Without this, the atom would be clipped
                 ..Default::default()
-            },
+            }),
+            Transform::from_xyz(0.0, 0.0, SMALL_SCALE * 2.0),
             grid_cell,
             FloatingOrigin,
             big_space::camera::CameraController::default(),
@@ -90,28 +80,21 @@ fn setup_scene(
 
         // A space ship
         root_frame.spawn_spatial((
-            SceneBundle {
-                scene: asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
-                transform: Transform::from_xyz(0.0, 0.0, 2.5)
-                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-                ..default()
-            },
+            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            Transform::from_xyz(0.0, 0.0, 2.5)
+                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
             grid_cell,
         ));
     });
 
-    commands.spawn(TextBundle {
-        text: Text::from_section(
-            format!("Press `T` to teleport between the origin and ship {BIG_DISTANCE}m away."),
-            TextStyle::default(),
-        ),
-        ..Default::default()
-    });
+    commands.spawn(Text::new(format!(
+        "Press `T` to teleport between the origin and ship {BIG_DISTANCE}m away."
+    )));
 }
 
 fn bounce_atoms(mut atoms: Query<&mut Transform, With<Atom>>, time: Res<Time>) {
     for mut atom in atoms.iter_mut() {
-        atom.translation.y = time.elapsed_seconds().sin() * SMALL_SCALE;
+        atom.translation.y = time.elapsed_secs().sin() * SMALL_SCALE;
     }
 }
 
