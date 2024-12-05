@@ -115,8 +115,7 @@
 //! # Usage
 //!
 //! To start using this plugin, you will first need to choose how big your world should be! Do you
-//! need an i8, or an i128? See [`GridPrecision`](crate::precision::GridPrecision) for more details
-//! and documentation.
+//! need an i8, or an i128? See [`GridPrecision`] for more details and documentation.
 //!
 //! 1. Disable Bevy's transform plugin: `DefaultPlugins.build().disable::<TransformPlugin>()`
 //! 2. Add the [`BigSpacePlugin`] to your `App`
@@ -179,9 +178,10 @@
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
 
-use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+#[allow(unused_imports)] // For docs
 use bevy_transform::prelude::*;
+#[allow(unused_imports)] // For docs
+use prelude::*;
 
 pub mod bundles;
 pub mod commands;
@@ -190,6 +190,8 @@ pub mod grid_cell;
 pub mod plugin;
 pub mod precision;
 pub mod reference_frame;
+pub mod spatial_hash;
+pub mod timing;
 pub mod validation;
 pub mod world_query;
 
@@ -200,9 +202,25 @@ pub mod debug;
 #[cfg(test)]
 mod tests;
 
-pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
-pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};
-pub use floating_origins::{BigSpace, FloatingOrigin};
-pub use grid_cell::GridCell;
-pub use plugin::{BigSpacePlugin, FloatingOriginSet};
-pub use reference_frame::ReferenceFrame;
+/// Common big_space imports.
+pub mod prelude {
+    use crate::*;
+    pub use bundles::{BigReferenceFrameBundle, BigSpaceRootBundle, BigSpatialBundle};
+    pub use commands::{BigSpaceCommands, ReferenceFrameCommands, SpatialEntityCommands};
+    #[cfg(feature = "debug")]
+    pub use debug::FloatingOriginDebugPlugin;
+    pub use floating_origins::{BigSpace, FloatingOrigin};
+    pub use grid_cell::{GridCell, GridCellAny};
+    pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
+    pub use precision::GridPrecision;
+    pub use reference_frame::{
+        local_origin::{LocalFloatingOrigin, ReferenceFrames, ReferenceFramesMut},
+        ReferenceFrame,
+    };
+    pub use spatial_hash::{
+        component::{FastSpatialHash, SpatialHash},
+        map::SpatialHashMap,
+        SpatialHashPlugin, SpatialHashSystem,
+    };
+    pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
+}

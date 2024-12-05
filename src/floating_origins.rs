@@ -4,7 +4,6 @@ use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_utils::HashMap;
-use tracing::error;
 
 /// Marks the entity to use as the floating origin.
 ///
@@ -74,7 +73,7 @@ impl BigSpace {
                 let space_origins = spaces_set.entry(root).or_default();
                 *space_origins += 1;
                 if *space_origins > 1 {
-                    error!(
+                    tracing::error!(
                         "BigSpace {root:#?} has multiple floating origins. There must be exactly one. Resetting this big space and disabling the floating origin to avoid unexpected propagation behavior.",
                     );
                     space.floating_origin = None
@@ -90,7 +89,7 @@ impl BigSpace {
             .filter(|(_k, v)| **v == 0)
             .map(|(k, _v)| k)
         {
-            error!("BigSpace {space:#?} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",)
+            tracing::error!("BigSpace {space:#} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",)
         }
     }
 }
