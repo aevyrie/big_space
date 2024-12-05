@@ -47,7 +47,7 @@ pub struct ReferenceFrameCommands<'a, P: GridPrecision> {
     reference_frame: ReferenceFrame<P>,
 }
 
-impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
+impl<P: GridPrecision> ReferenceFrameCommands<'_, P> {
     /// Get a reference to the current reference frame.
     pub fn frame(&mut self) -> &ReferenceFrame<P> {
         &self.reference_frame
@@ -173,7 +173,7 @@ impl<'a, P: GridPrecision> ReferenceFrameCommands<'a, P> {
 }
 
 /// Insert the reference frame on drop.
-impl<'a, P: GridPrecision> Drop for ReferenceFrameCommands<'a, P> {
+impl<P: GridPrecision> Drop for ReferenceFrameCommands<'_, P> {
     fn drop(&mut self) {
         self.commands
             .entity(self.entity)
@@ -188,7 +188,7 @@ pub struct SpatialEntityCommands<'a, P: GridPrecision> {
     phantom: PhantomData<P>,
 }
 
-impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
+impl<P: GridPrecision> SpatialEntityCommands<'_, P> {
     /// Insert a component on this reference frame
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
         self.commands.entity(self.entity).insert(bundle);
