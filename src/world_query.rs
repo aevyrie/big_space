@@ -21,7 +21,7 @@ pub struct GridTransform<P: GridPrecision> {
     pub cell: &'static mut GridCell<P>,
 }
 
-impl<'w, P: GridPrecision> GridTransformItem<'w, P> {
+impl<P: GridPrecision> GridTransformItem<'_, P> {
     /// Compute the global position with double precision.
     pub fn position_double(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
         reference_frame.grid_position_double(&self.cell, &self.transform)
@@ -41,7 +41,7 @@ impl<'w, P: GridPrecision> GridTransformItem<'w, P> {
     }
 }
 
-impl<'w, P: GridPrecision> GridTransformReadOnlyItem<'w, P> {
+impl<P: GridPrecision> GridTransformReadOnlyItem<'_, P> {
     /// Compute the global position with double precision.
     pub fn position_double(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
         reference_frame.grid_position_double(self.cell, self.transform)

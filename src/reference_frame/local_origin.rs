@@ -230,7 +230,7 @@ pub struct ReferenceFrames<'w, 's, P: GridPrecision> {
     frame_query: Query<'w, 's, (Entity, Read<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
 
-impl<'w, 's, P: GridPrecision> ReferenceFrames<'w, 's, P> {
+impl<P: GridPrecision> ReferenceFrames<'_, '_, P> {
     /// Get a [`ReferenceFrame`] from its `Entity`.
     pub fn get(&self, frame_entity: Entity) -> &ReferenceFrame<P> {
         self.frame_query
@@ -301,7 +301,7 @@ pub struct ReferenceFramesMut<'w, 's, P: GridPrecision> {
     frame_query: Query<'w, 's, (Entity, Write<ReferenceFrame<P>>, Option<Read<Parent>>)>,
 }
 
-impl<'w, 's, P: GridPrecision> ReferenceFramesMut<'w, 's, P> {
+impl<P: GridPrecision> ReferenceFramesMut<'_, '_, P> {
     /// Get mutable access to the [`ReferenceFrame`], and run the provided function or closure,
     /// optionally returning data.
     ///
