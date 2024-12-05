@@ -35,6 +35,8 @@ pub mod propagation;
 /// worse, around the center of the galaxy.
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Component)]
+// We do not require the Transform, GlobalTransform, or GridCell, because these are not required in
+// all cases: e.g. BigSpace should not have a Transform or GridCell.
 pub struct ReferenceFrame<P: GridPrecision + Reflect> {
     /// The high-precision position of the floating origin's current grid cell local to this
     /// reference frame.

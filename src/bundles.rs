@@ -36,12 +36,6 @@ pub struct BigReferenceFrameBundle<P: GridPrecision> {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
-    /// The inherited visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub inherited: bevy_render::view::InheritedVisibility,
-    /// The view visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub view: bevy_render::view::ViewVisibility,
     /// The transform of the entity.
     pub transform: Transform,
     /// The global transform of the entity for rendering, computed relative to the floating origin.
@@ -58,12 +52,6 @@ pub struct BigSpaceRootBundle<P: GridPrecision> {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
-    /// The inherited visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub inherited: bevy_render::view::InheritedVisibility,
-    /// The view visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub view: bevy_render::view::ViewVisibility,
     /// The root reference frame
     pub reference_frame: ReferenceFrame<P>,
     /// Tracks the current floating origin
