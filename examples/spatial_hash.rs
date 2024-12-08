@@ -28,7 +28,7 @@ fn main() {
         .run();
 }
 
-const N_ENTITIES: usize = 100_000;
+const N_ENTITIES: usize = 50_000;
 const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
@@ -127,7 +127,7 @@ fn move_player(
     neighbors.clear();
 
     spatial_hash_map
-        .nearby_flood(hash)
+        .iter_flood(hash)
         .for_each(|(_hash, entry)| {
             for entity in &entry.entities {
                 neighbors.push(*entity);
@@ -143,7 +143,7 @@ fn move_player(
             // gizmos.cuboid(transform, Color::linear_rgba(1.0, 1.0, 1.0, 0.2));
         });
 
-    spatial_hash_map.nearby_flat(entry).for_each(|(_, entity)| {
+    spatial_hash_map.nearby_entities(entry).for_each(|entity| {
         neighbors.push(entity);
         if let Ok(mut material) = materials.get_mut(entity) {
             **material = material_presets.highlight.clone_weak();
@@ -157,7 +157,7 @@ fn move_player(
     // The neighbor query is lazy, which means it only does work when we consume the iterator.
     let lookup_start = Instant::now();
     let total = spatial_hash_map
-        .nearby_flood(hash)
+        .iter_flood(hash)
         .map(|(.., entry)| entry.entities.len())
         .sum::<usize>();
     let elapsed = lookup_start.elapsed();

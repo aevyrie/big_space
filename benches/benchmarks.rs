@@ -169,7 +169,7 @@ fn spatial_hashing(c: &mut Criterion) {
 
     let map = app.world().resource::<SpatialHashMap<i32>>();
     let first = map
-        .iter()
+        .all_entries()
         .find(|(_, entry)| !entry.entities.is_empty())
         .unwrap();
     group.bench_function("SpatialHashMap::get", |b| {
@@ -238,15 +238,15 @@ fn spatial_hashing(c: &mut Criterion) {
     let hash = SpatialHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
-    assert_eq!(spatial_map.nearby(entry).count(), 26);
+    assert_eq!(spatial_map.nearby(entry).count(), 27);
     group.bench_function("nearby 1 population 1_000", |b| {
         b.iter(|| {
             black_box(spatial_map.nearby(entry).count());
         });
     });
 
-    assert_eq!(spatial_map.nearby_flood(&hash).count(), 1_000);
-    let flood = || spatial_map.nearby_flood(&hash).count();
+    assert_eq!(spatial_map.iter_flood(&hash).count(), 1_000);
+    let flood = || spatial_map.iter_flood(&hash).count();
     group.bench_function("nearby flood population 1_000", |b| {
         b.iter(|| black_box(flood()));
     });
@@ -266,16 +266,16 @@ fn spatial_hashing(c: &mut Criterion) {
     let hash = SpatialHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
-    assert_eq!(spatial_map.nearby(entry).count(), 26);
+    assert_eq!(spatial_map.nearby(entry).count(), 27);
     group.bench_function("nearby 1 population 1_000_000", |b| {
         b.iter(|| {
             black_box(spatial_map.nearby(entry).count());
         });
     });
 
-    assert_eq!(spatial_map.nearby_flood(&hash).count(), 1_000_000);
+    assert_eq!(spatial_map.iter_flood(&hash).count(), 1_000_000);
     group.bench_function("nearby flood population 1_000_000", |b| {
-        b.iter(|| black_box(spatial_map.nearby_flood(&hash).count()));
+        b.iter(|| black_box(spatial_map.iter_flood(&hash).count()));
     });
 }
 

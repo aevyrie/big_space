@@ -58,10 +58,8 @@ bevy_hanabi = "0.13"
 
 [[bench]]
 name = "benchmarks"
-
-
 harness = false
-rand = "0.8.5"
+
 [[example]]
 name = "demo"
 path = "examples/demo.rs"

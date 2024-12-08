@@ -23,7 +23,7 @@ impl Hash for FastSpatialHash {
     }
 }
 
-/// A`Component` used to create a unique spatial hash of any entity within this [`GridCell`].
+/// A unique spatial hash shared by all entities in the same [`GridCell`] and [`ReferenceFrame`].
 ///
 /// Once computed, a spatial hash can be used to rapidly check if any two entities are in the same
 /// cell, by comparing the hashes. You can also get a list of all entities within a cell
@@ -40,6 +40,7 @@ pub struct SpatialHash<P: GridPrecision> {
 }
 
 impl<P: GridPrecision> PartialEq for SpatialHash<P> {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         // Comparing the hash is redundant.
         //
@@ -115,7 +116,7 @@ impl<P: GridPrecision> SpatialHash<P> {
 
     /// Returns an iterator over all neighboring grid cells and their hashes, within the
     /// `cell_radius`. This iterator will not visit `cell`.
-    pub fn neighbors(
+    pub fn adjacent(
         &self,
         cell_radius: u8,
     ) -> impl Iterator<Item = (SpatialHash<P>, GridCell<P>)> + '_ {
@@ -191,5 +192,10 @@ impl<P: GridPrecision> SpatialHash<P> {
         if let Some(ref mut stats) = stats {
             stats.hash_update_duration += start.elapsed();
         }
+    }
+
+    /// The [`GridCell`] associated with this spatial hash.
+    pub fn cell(&self) -> GridCell<P> {
+        self.cell
     }
 }

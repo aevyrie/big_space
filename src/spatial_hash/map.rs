@@ -11,12 +11,14 @@ use bevy_utils::{
 
 use super::SpatialHashFilter;
 
-/// An entry in a [`SpatialHashMap`].
+/// An entry in a [`SpatialHashMap`], accessed with a [`SpatialHash`].
 #[derive(Clone, Debug)]
 pub struct SpatialHashEntry<P: GridPrecision> {
     /// All the entities located in this grid cell.
     pub entities: HashSet<Entity, PassHash>,
     /// Precomputed hashes to direct neighbors.
+    // TODO: computation cheap, heap slow. Can this be replaced with a u32 bitmask of occupied cells
+    // (only need 26 bits), with the hashes computed based on the neighbor's relative position?
     pub occupied_neighbors: Vec<SpatialHash<P>>,
 }
 
@@ -74,21 +76,162 @@ where
     }
 }
 
-impl<P, F> SpatialHashMap<P, F>
-where
-    P: GridPrecision,
-    F: SpatialHashFilter,
-{
+/// Public Interface
+impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
+    /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].
+    #[inline]
+    pub fn get(&self, hash: &SpatialHash<P>) -> Option<&SpatialHashEntry<P>> {
+        self.map.inner.get(hash)
+    }
+
+    /// An iterator visiting all spatial hash cells and their contents in arbitrary order.
+    #[inline]
+    pub fn all_entries(&self) -> impl Iterator<Item = (&SpatialHash<P>, &SpatialHashEntry<P>)> {
+        self.map.inner.iter()
+    }
+
+    /// Iterate over this and non-empty neighboring cells.
+    ///
+    /// `SpatialHashEntry`s cache information about their neighbors as the spatial map is updated,
+    /// making it faster to look up neighboring entries when compared to computing all neighbor
+    /// hashes and checking if they exist.
+    pub fn nearby<'a>(
+        &'a self,
+        entry: &'a SpatialHashEntry<P>,
+    ) -> impl Iterator<Item = &'a SpatialHashEntry<P>> + 'a {
+        std::iter::once(entry).chain(entry.occupied_neighbors.iter().map(|neighbor_hash| {
+            // We can unwrap because occupied_neighbors are guaranteed to be occupied
+            self.get(neighbor_hash).unwrap()
+        }))
+    }
+
+    /// Iterate over entities in this and neighboring cells.
+    ///
+    /// This is a flattened version of [`SpatialHashMap::nearby`].
+    pub fn nearby_entities<'a>(
+        &'a self,
+        entry: &'a SpatialHashEntry<P>,
+    ) -> impl Iterator<Item = Entity> + 'a {
+        self.nearby(entry)
+            .flat_map(|entry| entry.entities.iter().copied())
+    }
+
+    /// Iterate over all [`SpatialHashEntry`]s within a cube with `center` and `radius`.
+    ///
+    /// ### Warning
+    ///
+    /// This can become expensive very quickly! The number of cells that need to be checked is
+    /// exponential, a radius of 1 will access 26 cells, a radius of 2, will access 124 cells, and
+    /// radius 5 will access 1,330 cells.
+    ///
+    /// Additionally, unlike `nearby`, this function cannot rely on cached information about
+    /// neighbors. If you are using this function when `hash` is an occupied cell and `radius` is
+    /// `1`, you should probably be using [`SpatialHashMap::nearby`] instead.
+    pub fn nearby_radius<'a>(
+        &'a self,
+        center: &'a SpatialHash<P>,
+        radius: u8,
+    ) -> impl Iterator<Item = &'a SpatialHashEntry<P>> + 'a {
+        std::iter::once(*center)
+            .chain(center.adjacent(radius).map(|(hash, ..)| hash))
+            .filter_map(|hash| self.get(&hash))
+    }
+
+    /// Iterate over all entities within a cube with `center` and `radius`.
+    ///
+    /// This is a flattened version of [`SpatialHashMap::nearby_radius`].
+    ///
+    /// ### Warning
+    ///
+    /// See the performance warning on [`SpatialHashMap::nearby_radius`].
+    pub fn nearby_radius_entities<'a>(
+        &'a self,
+        center: &'a SpatialHash<P>,
+        radius: u8,
+    ) -> impl Iterator<Item = Entity> + 'a {
+        self.nearby_radius(center, radius)
+            .flat_map(|entry| entry.entities.iter().copied())
+    }
+
+    /// Iterate over all contiguous neighboring cells with a breadth-first "flood fill" traversal.
+    /// Worst case, this could iterate over every cell in the map once.
+    pub fn iter_flood<'a>(
+        &'a self,
+        starting_cell: &SpatialHash<P>,
+    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> {
+        ContiguousNeighborsIter {
+            initial_hash: Some(*starting_cell),
+            spatial_map: self,
+            stack: Default::default(),
+            visited_cells: Default::default(),
+        }
+    }
+
+    /// Iterate over all contiguous neighboring cells with a breadth-first "flood fill" traversal,
+    /// limited to `max_depth`.
+    ///
+    /// Like [`SpatialHashMap::iter_flood`], but limits the extents of the breadth-first flood fill
+    /// traversal with a maximum search depth.
+    ///
+    /// This will exit the breadth first traversal as soon as the depth is exceeded. While this
+    /// measurement is the same as the radius, the function is not called "with_max_radius" because
+    /// it will not necessarily visit all cells within the radius - it will only visit cells within
+    /// this radius *and* search depth.
+    ///
+    /// Consider the case of a long thin U-shaped set of connected cells. While iterating from one
+    /// end of the "U" to the other with this flood fill, if any of the cells near the base of the
+    /// "U" exceed the max_depth (radius), iteration will stop. Even if the "U" loops back within
+    /// the radius, those cells will never be visited.
+    ///
+    /// Also note that the `max_depth` (radius) is a chebyshev distance, not a euclidean distance.
+    pub fn iter_flood_with_max_depth<'a>(
+        &'a self,
+        starting_cell: &SpatialHash<P>,
+        max_depth: P,
+    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> {
+        let starting_cell_cell = starting_cell.cell();
+        self.iter_flood(starting_cell).take_while(move |(hash, _)| {
+            let dist = hash.cell() - starting_cell_cell;
+            dist.x <= max_depth && dist.y <= max_depth && dist.z <= max_depth
+        })
+    }
+
+    /// The set of cells that were inserted in the last update to the spatial hash map.
+    ///
+    /// These are cells that were previously empty, but now contain at least one entity.
+    ///
+    /// Useful for incrementally updating data structures that extend the functionality of
+    /// [`SpatialHashMap`]. Updated in [`SpatialHashSystem::UpdateMap`].
+    pub fn just_inserted(&self) -> &HashSet<SpatialHash<P>, PassHash> {
+        &self.map.just_inserted
+    }
+
+    /// The set of cells that were removed in the last update to the spatial hash map.
+    ///
+    /// These are cells that were previously occupied, but now contain no entities.
+    ///
+    /// Useful for incrementally updating data structures that extend the functionality of
+    /// [`SpatialHashMap`]. Updated in [`SpatialHashSystem::UpdateMap`].
+    pub fn just_removed(&self) -> &HashSet<SpatialHash<P>, PassHash> {
+        &self.map.just_removed
+    }
+}
+
+/// Private Systems
+impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     /// Update the [`SpatialHashMap`] with entities that have changed [`SpatialHash`]es, and meet
     /// the optional [`SpatialHashFilter`].
     pub(super) fn update(
-        mut spatial_map: ResMut<SpatialHashMap<P, F>>,
+        mut spatial_map: ResMut<Self>,
         mut changed_hashes: ResMut<super::ChangedSpatialHashes<P, F>>,
         all_hashes: Query<(Entity, &SpatialHash<P>), F>,
         mut removed: RemovedComponents<SpatialHash<P>>,
         mut stats: Option<ResMut<crate::timing::SpatialHashStats>>,
     ) {
         let start = Instant::now();
+
+        spatial_map.map.just_inserted.clear();
+        spatial_map.map.just_removed.clear();
 
         for entity in removed.read() {
             spatial_map.remove(entity)
@@ -111,7 +254,11 @@ where
             stats.map_update_duration += start.elapsed();
         }
     }
+}
 
+/// Private Methods
+impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
+    /// Insert an entity into the [`SpatialHashMap`], updating any existing entries.
     #[inline]
     fn insert(&mut self, entity: Entity, hash: SpatialHash<P>) {
         // If this entity is already in the maps, we need to remove and update it.
@@ -135,64 +282,36 @@ where
             self.map.remove(entity, old_hash)
         }
     }
-
-    /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].
-    #[inline]
-    pub fn get(&self, hash: &SpatialHash<P>) -> Option<&SpatialHashEntry<P>> {
-        self.map.inner.get(hash)
-    }
-
-    /// An iterator visiting all spatial hash cells and their contents in arbitrary order.
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&SpatialHash<P>, &SpatialHashEntry<P>)> {
-        self.map.inner.iter()
-    }
-
-    /// Find entities in this and neighboring cells, within `cell_radius`.
-    ///
-    /// A radius of `1` will search all cells within a Chebyshev distance of `1`, or a total of 9
-    /// cells. You can also think of this as a cube centered on the specified cell, expanded in each
-    /// direction by `radius`.
-    ///
-    /// Returns an iterator over all non-empty neighboring cells and the set of entities in those
-    /// cells.
-    ///
-    /// This is a lazy query, if you don't consume the iterator, it won't do any work!
-    pub fn nearby<'a>(
-        &'a self,
-        entry: &'a SpatialHashEntry<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> + 'a {
-        entry.occupied_neighbors.iter().map(|neighbor_hash| {
-            // We can unwrap here because occupied_neighbors are guaranteed to be occupied
-            let neighbor_entry = self.get(neighbor_hash).unwrap();
-            (*neighbor_hash, neighbor_entry)
-        })
-    }
-
-    /// Like [`Self::nearby`], but flattens the included set of entities into a flat list.
-    pub fn nearby_flat<'a>(
-        &'a self,
-        entry: &'a SpatialHashEntry<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, Entity)> + 'a {
-        self.nearby(entry)
-            .flat_map(|(hash, entry)| entry.entities.iter().map(move |entity| (hash, *entity)))
-    }
-
-    /// Iterates over all contiguous neighboring cells. Worst case, this could iterate over every
-    /// cell in the map once.
-    pub fn nearby_flood<'a>(
-        &'a self,
-        starting_cell: &SpatialHash<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> {
-        ContiguousNeighborsIter {
-            initial_hash: Some(*starting_cell),
-            spatial_map: self,
-            stack: Default::default(),
-            visited_cells: Default::default(),
-        }
-    }
 }
 
+/// The primary spatial hash extracted into its own type to help uphold invariants around insertions
+/// and removals.
+//
+// TODO: Performance
+//
+// Improve the data locality of neighbors. Completely random access in a hot loop is probably
+// unlikely, we should instead optimize for the case of wanting to look up neighbors of the current
+// cell. We know neighbor lookups are a common need, and are a bottleneck currently.
+//
+//  - To do this, we could store neighboring entities together in the same entry, so they fill the
+//    cache line during a lookup. Getting a neighbor in the current entry should then be super fast,
+//    as it is already loaded on the cache.
+//  - Not sure what the group size would be, probably depends on a bunch of factors, though will be
+//    limited by common cache line sizes in practice, the decision is probably between whether to
+//    group 2x2x2 or 3x3x3 blocks of cells into the same entry.
+//  - Considering the entity hash set is stored on the heap, it might also make sense to group all
+//    of these into a single collection. Iterating over all neighbors would then only need to access
+//    this single hash set, and scan through it linear, instead of grabbing 8 (2x2x2) or 27 (3x3x3)
+//    independent sets each at a different memory location.
+//      - Not sure how you would efficiently partition this for each cell however. It could be a
+//        hashmap whose value is the cell? Iterating over the entities in a single cell would then
+//        require filtering out other cells. This might not be a big deal because iteration go brrr.
+//        Unique insertion would be an issue though, e.g. the hash set for each cell ensures the
+//        entity is unique.
+//
+//  - Another wild idea is to not change the hashmap structure at all, but store all entries in
+//    Z-order in *another* collection (BTreeMap?) to improve locality for sequential lookups of
+//    spatial neighbors. Would ordering cause hitches with insertions?
 #[derive(Debug, Clone, Default)]
 struct InnerSpatialHashMap<P: GridPrecision> {
     inner: HashMap<SpatialHash<P>, SpatialHashEntry<P>, PassHash>,
@@ -203,6 +322,10 @@ struct InnerSpatialHashMap<P: GridPrecision> {
     /// <https://en.wikipedia.org/wiki/Object_pool_pattern>.
     hash_set_pool: Vec<HashSet<Entity, PassHash>>,
     neighbor_pool: Vec<Vec<SpatialHash<P>>>,
+    /// Cells that were added because they were empty but now contain entities.
+    just_inserted: HashSet<SpatialHash<P>, PassHash>,
+    /// Cells that were removed because all entities vacated the cell.
+    just_removed: HashSet<SpatialHash<P>, PassHash>,
 }
 
 impl<P: GridPrecision> InnerSpatialHashMap<P> {
@@ -216,7 +339,7 @@ impl<P: GridPrecision> InnerSpatialHashMap<P> {
 
             let mut occupied_neighbors = self.neighbor_pool.pop().unwrap_or_default();
             occupied_neighbors.extend(
-                hash.neighbors(1)
+                hash.adjacent(1)
                     .filter(|(neighbor, _)| {
                         self.inner
                             .get_mut(neighbor)
@@ -236,6 +359,12 @@ impl<P: GridPrecision> InnerSpatialHashMap<P> {
                     occupied_neighbors,
                 },
             );
+
+            if !self.just_removed.remove(&hash) {
+                // If a cell is removed then added within the same update, it can't be considered
+                // "just added" because it *already existed* at the start of the update.
+                self.just_inserted.insert(hash);
+            }
         }
     }
 
@@ -265,12 +394,18 @@ impl<P: GridPrecision> InnerSpatialHashMap<P> {
 
             // Add the allocated structs to their object pools, to reuse the allocations.
             self.hash_set_pool.push(removed_entry.entities);
-            self.neighbor_pool.push(removed_entry.occupied_neighbors)
+            self.neighbor_pool.push(removed_entry.occupied_neighbors);
+
+            if !self.just_inserted.remove(&old_hash) {
+                // If a cell is added then removed within the same update, it can't be considered
+                // "just removed" because it *already didn't exist* at the start of the update.
+                self.just_removed.insert(old_hash);
+            }
         }
     }
 }
 
-/// An iterator over the neighbors of a cell.
+/// An iterator over the neighbors of a cell, breadth-first.
 pub struct ContiguousNeighborsIter<'a, P, F>
 where
     P: GridPrecision,

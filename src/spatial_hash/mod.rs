@@ -96,6 +96,11 @@ impl<P: GridPrecision, F: SpatialHashFilter> Default for ChangedSpatialHashes<P,
     }
 }
 
+// TODO:
+//
+// - When an entity is re-parented, is is removed/updated in the spatial map?
+// - Entities are hashed with their parent - what happens if an entity is moved to the root? Is the
+//   hash ever recomputed? Is it removed? Is the spatial map updated?
 #[cfg(test)]
 mod tests {
     use std::sync::OnceLock;
@@ -258,7 +263,7 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins(SpatialHashPlugin::<i32>::default())
-            .add_systems(Update, setup);
+            .add_systems(Startup, setup);
 
         app.update();
 
@@ -271,15 +276,14 @@ mod tests {
 
         let map = app.world().resource::<SpatialHashMap<i32>>();
         let entry = map.get(&SpatialHash::new(parent, &GridCell::ZERO)).unwrap();
-        let neighbors: HashSet<Entity> =
-            map.nearby_flat(entry).map(|(.., entity)| entity).collect();
+        let neighbors: HashSet<Entity> = map.nearby_entities(entry).collect();
 
-        assert!(!neighbors.contains(&entities.a));
+        assert!(neighbors.contains(&entities.a));
         assert!(neighbors.contains(&entities.b));
         assert!(!neighbors.contains(&entities.c));
 
         let flooded: HashSet<Entity> = map
-            .nearby_flood(&SpatialHash::new(parent, &GridCell::ZERO))
+            .iter_flood(&SpatialHash::new(parent, &GridCell::ZERO))
             .flat_map(|(_hash, entry)| entry.entities.iter().copied())
             .collect();
 
@@ -312,7 +316,7 @@ mod tests {
             SpatialHashPlugin::<i32, With<Player>>::default(),
             SpatialHashPlugin::<i32, Without<Player>>::default(),
         ))
-        .add_systems(Update, setup)
+        .add_systems(Startup, setup)
         .update();
 
         let zero_hash = SpatialHash::from_parent(*ROOT.get().unwrap(), &GridCell::ZERO);
@@ -339,5 +343,83 @@ mod tests {
             2,
             "There are two entities without the player component"
         );
+    }
+
+    /// Verify that [`SpatialHashMap::just_removed`] and [`SpatialHashMap::just_inserted`] work
+    /// correctly when entities are spawned and move between cells.
+    #[test]
+    fn spatial_map_changed_cell_tracking() {
+        use bevy::prelude::*;
+
+        #[derive(Resource, Clone)]
+        struct Entities {
+            a: Entity,
+            b: Entity,
+            c: Entity,
+        }
+
+        let setup = |mut commands: Commands| {
+            commands.spawn_big_space_default::<i32>(|root| {
+                let a = root.spawn_spatial(GridCell::new(0, 0, 0)).id();
+                let b = root.spawn_spatial(GridCell::new(1, 1, 1)).id();
+                let c = root.spawn_spatial(GridCell::new(2, 2, 2)).id();
+
+                root.commands().insert_resource(Entities { a, b, c });
+            });
+        };
+
+        let mut app = App::new();
+        app.add_plugins((
+            BigSpacePlugin::<i32>::default(),
+            SpatialHashPlugin::<i32>::default(),
+        ))
+        .add_systems(Startup, setup);
+
+        app.update();
+
+        let entities = app.world().resource::<Entities>().clone();
+        let get_hash = |app: &mut App, entity| {
+            *app.world_mut()
+                .query::<&SpatialHash<i32>>()
+                .get(app.world(), entity)
+                .unwrap()
+        };
+
+        let a_hash_t0 = get_hash(&mut app, entities.a);
+        let b_hash_t0 = get_hash(&mut app, entities.b);
+        let c_hash_t0 = get_hash(&mut app, entities.c);
+        let map = app.world().resource::<SpatialHashMap<i32>>();
+        assert!(map.just_inserted().contains(&a_hash_t0));
+        assert!(map.just_inserted().contains(&b_hash_t0));
+        assert!(map.just_inserted().contains(&c_hash_t0));
+
+        // Move entities and run an update
+        app.world_mut()
+            .entity_mut(entities.a)
+            .get_mut::<GridCell<i32>>()
+            .unwrap()
+            .z += 1;
+        app.world_mut()
+            .entity_mut(entities.b)
+            .get_mut::<Transform>()
+            .unwrap()
+            .translation
+            .z += 1e10;
+        app.update();
+
+        let a_hash_t1 = get_hash(&mut app, entities.a);
+        let b_hash_t1 = get_hash(&mut app, entities.b);
+        let c_hash_t1 = get_hash(&mut app, entities.c);
+        let map = app.world().resource::<SpatialHashMap<i32>>();
+
+        // Last frame
+        assert!(map.just_removed().contains(&a_hash_t0)); // Moved cell
+        assert!(map.just_removed().contains(&b_hash_t0)); // Moved cell via transform
+        assert!(!map.just_removed().contains(&c_hash_t0)); // Did not move
+
+        // Current frame
+        assert!(map.just_inserted().contains(&a_hash_t1)); // Moved cell
+        assert!(map.just_inserted().contains(&b_hash_t1)); // Moved cell via transform
+        assert!(!map.just_inserted().contains(&c_hash_t1)); // Did not move
     }
 }
