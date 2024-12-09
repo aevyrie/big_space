@@ -15,10 +15,8 @@ use turborand::{rng::Rng, TurboRand};
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
+            DefaultPlugins,
             BigSpacePlugin::<i64>::new(true),
-            // big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))

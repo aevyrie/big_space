@@ -6,7 +6,7 @@ use big_space::prelude::*;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(), // Replaced by big_space
+            DefaultPlugins,
             BigSpacePlugin::<i8>::default(),
             FloatingOriginDebugPlugin::<i8>::default(), // Draws cell AABBs and reference frames
             big_space::camera::CameraControllerPlugin::<i8>::default(), // Compatible controller

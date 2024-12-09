@@ -16,7 +16,7 @@ const SMALL_SCALE: f32 = 0.000_000_000_154; // Diameter of a carbon atom
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(), // Replaced by big_space
+            DefaultPlugins,
             BigSpacePlugin::<i128>::default(),
             FloatingOriginDebugPlugin::<i128>::default(), // Draws cell AABBs and reference frames
             big_space::camera::CameraControllerPlugin::<i128>::default(), // Compatible controller

@@ -114,7 +114,6 @@ fn move_player(
 
     let t = time.elapsed_secs() * 0.01;
     let (mut transform, mut cell, parent, hash) = player.single_mut();
-    let entry = spatial_hash_map.get(hash).unwrap();
     let absolute_pos = HALF_WIDTH
         * CELL_WIDTH
         * 0.8
@@ -127,14 +126,14 @@ fn move_player(
     neighbors.clear();
 
     spatial_hash_map
-        .iter_flood(hash)
-        .for_each(|(_hash, entry)| {
-            for entity in &entry.entities {
-                neighbors.push(*entity);
-                if let Ok(mut material) = materials.get_mut(*entity) {
-                    **material = material_presets.flood.clone_weak();
-                }
+        .flood(hash, i32::MAX)
+        .entities()
+        .for_each(|entity| {
+            neighbors.push(entity);
+            if let Ok(mut material) = materials.get_mut(entity) {
+                **material = material_presets.flood.clone_weak();
             }
+
             // let frame = reference_frame.get(entry.reference_frame).unwrap();
             // let transform = frame.global_transform(
             //     &entry.cell,
@@ -143,12 +142,17 @@ fn move_player(
             // gizmos.cuboid(transform, Color::linear_rgba(1.0, 1.0, 1.0, 0.2));
         });
 
-    spatial_hash_map.nearby_entities(entry).for_each(|entity| {
-        neighbors.push(entity);
-        if let Ok(mut material) = materials.get_mut(entity) {
-            **material = material_presets.highlight.clone_weak();
-        }
-    });
+    spatial_hash_map
+        .get(hash)
+        .unwrap()
+        .nearby(&spatial_hash_map)
+        .entities()
+        .for_each(|entity| {
+            neighbors.push(entity);
+            if let Ok(mut material) = materials.get_mut(entity) {
+                **material = material_presets.highlight.clone_weak();
+            }
+        });
 
     // Time this separately, otherwise we just ending up timing how long allocations and pushing
     // to a vec take. Here, we just want to measure how long it takes to library to fulfill the
@@ -157,8 +161,8 @@ fn move_player(
     // The neighbor query is lazy, which means it only does work when we consume the iterator.
     let lookup_start = Instant::now();
     let total = spatial_hash_map
-        .iter_flood(hash)
-        .map(|(.., entry)| entry.entities.len())
+        .flood(hash, i32::MAX)
+        .map(|neighbor| neighbor.1.entities.len())
         .sum::<usize>();
     let elapsed = lookup_start.elapsed();
 

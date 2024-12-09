@@ -13,7 +13,7 @@ use big_space::{
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
+            DefaultPlugins,
             BigSpacePlugin::<i128>::default(),
             FloatingOriginDebugPlugin::<i128>::default(),
             big_space::camera::CameraControllerPlugin::<i128>::default(),

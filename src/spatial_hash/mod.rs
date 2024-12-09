@@ -105,7 +105,7 @@ impl<P: GridPrecision, F: SpatialHashFilter> Default for ChangedSpatialHashes<P,
 mod tests {
     use std::sync::OnceLock;
 
-    use crate::prelude::*;
+    use crate::{prelude::*, spatial_hash::map::SpatialEntryToEntities};
     use bevy_utils::hashbrown::HashSet;
 
     #[test]
@@ -276,15 +276,15 @@ mod tests {
 
         let map = app.world().resource::<SpatialHashMap<i32>>();
         let entry = map.get(&SpatialHash::new(parent, &GridCell::ZERO)).unwrap();
-        let neighbors: HashSet<Entity> = map.nearby_entities(entry).collect();
+        let neighbors: HashSet<Entity> = map.nearby(entry).entities().collect();
 
         assert!(neighbors.contains(&entities.a));
         assert!(neighbors.contains(&entities.b));
         assert!(!neighbors.contains(&entities.c));
 
         let flooded: HashSet<Entity> = map
-            .iter_flood(&SpatialHash::new(parent, &GridCell::ZERO))
-            .flat_map(|(_hash, entry)| entry.entities.iter().copied())
+            .flood(&SpatialHash::new(parent, &GridCell::ZERO), i32::MAX)
+            .entities()
             .collect();
 
         assert!(flooded.contains(&entities.a));

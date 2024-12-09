@@ -10,7 +10,7 @@ const BIG_DISTANCE: f64 = 1_000_000_000_000_000_000.0;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(), // Replaced by big_space
+            DefaultPlugins,
             BigSpacePlugin::<i64>::default(),
             FloatingOriginDebugPlugin::<i64>::default(), // Draws cell AABBs and reference frames
             big_space::camera::CameraControllerPlugin::<i64>::default(), // Compatible controller

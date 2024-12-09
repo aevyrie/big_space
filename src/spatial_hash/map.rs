@@ -31,6 +31,46 @@ impl<P: GridPrecision> SpatialHashEntry<P> {
             .rev() // recently added cells are more likely to be removed
             .find_map(|(i, h)| (h == hash).then_some(i))
     }
+
+    /// Iterate over this cell and its non-empty adjacent neighbors.
+    ///
+    /// See [`SpatialHashMap::nearby`].
+    pub fn nearby<'a, F: SpatialHashFilter>(
+        &'a self,
+        map: &'a SpatialHashMap<P, F>,
+    ) -> impl Iterator<Item = &'a SpatialHashEntry<P>> + 'a {
+        map.nearby(self)
+    }
+}
+
+/// Trait extension that adds `.entities()` to any iterator of [`SpatialHashEntry`]s.
+pub trait SpatialEntryToEntities<'a> {
+    /// Flatten an iterator of [`SpatialHashEntry`]s into an iterator of [`Entity`]s.
+    fn entities(self) -> impl Iterator<Item = Entity> + 'a;
+}
+
+impl<'a, T, I> SpatialEntryToEntities<'a> for T
+where
+    T: Iterator<Item = I> + 'a,
+    I: SpatialEntryToEntities<'a>,
+{
+    fn entities(self) -> impl Iterator<Item = Entity> + 'a {
+        self.flat_map(|entry| entry.entities())
+    }
+}
+
+impl<'a, P: GridPrecision> SpatialEntryToEntities<'a> for &'a SpatialHashEntry<P> {
+    #[inline]
+    fn entities(self) -> impl Iterator<Item = Entity> + 'a {
+        self.entities.iter().copied()
+    }
+}
+
+impl<'a, P: GridPrecision> SpatialEntryToEntities<'a> for Neighbor<'a, P> {
+    #[inline]
+    fn entities(self) -> impl Iterator<Item = Entity> + 'a {
+        self.1.entities.iter().copied()
+    }
 }
 
 /// A global spatial hash map for quickly finding entities in a grid cell.
@@ -76,7 +116,6 @@ where
     }
 }
 
-/// Public Interface
 impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].
     #[inline]
@@ -90,30 +129,26 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
         self.map.inner.iter()
     }
 
-    /// Iterate over this and non-empty neighboring cells.
+    /// Iterate over this cell and its non-empty adjacent neighbors.
     ///
     /// `SpatialHashEntry`s cache information about their neighbors as the spatial map is updated,
     /// making it faster to look up neighboring entries when compared to computing all neighbor
     /// hashes and checking if they exist.
+    ///
+    /// This function intentionally accepts [`SpatialHashEntry`] instead of [`SpatialHash`], because
+    /// it is not a general radius test; it only works for occupied cells with a
+    /// [`SpatialHashEntry`]. This API makes the above optimization possible, while preventing
+    /// misuse and foot guns.
+    #[inline]
     pub fn nearby<'a>(
         &'a self,
         entry: &'a SpatialHashEntry<P>,
     ) -> impl Iterator<Item = &'a SpatialHashEntry<P>> + 'a {
+        // Use `std::iter::once` to avoid returning a function-local variable.
         std::iter::once(entry).chain(entry.occupied_neighbors.iter().map(|neighbor_hash| {
-            // We can unwrap because occupied_neighbors are guaranteed to be occupied
-            self.get(neighbor_hash).unwrap()
+            self.get(neighbor_hash)
+                .expect("occupied_neighbors should be occupied")
         }))
-    }
-
-    /// Iterate over entities in this and neighboring cells.
-    ///
-    /// This is a flattened version of [`SpatialHashMap::nearby`].
-    pub fn nearby_entities<'a>(
-        &'a self,
-        entry: &'a SpatialHashEntry<P>,
-    ) -> impl Iterator<Item = Entity> + 'a {
-        self.nearby(entry)
-            .flat_map(|entry| entry.entities.iter().copied())
     }
 
     /// Iterate over all [`SpatialHashEntry`]s within a cube with `center` and `radius`.
@@ -127,56 +162,27 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     /// Additionally, unlike `nearby`, this function cannot rely on cached information about
     /// neighbors. If you are using this function when `hash` is an occupied cell and `radius` is
     /// `1`, you should probably be using [`SpatialHashMap::nearby`] instead.
-    pub fn nearby_radius<'a>(
+    #[inline]
+    pub fn within_cube<'a>(
         &'a self,
         center: &'a SpatialHash<P>,
         radius: u8,
     ) -> impl Iterator<Item = &'a SpatialHashEntry<P>> + 'a {
+        // Use `std::iter::once` to avoid returning a function-local variable.
         std::iter::once(*center)
             .chain(center.adjacent(radius).map(|(hash, ..)| hash))
             .filter_map(|hash| self.get(&hash))
     }
 
-    /// Iterate over all entities within a cube with `center` and `radius`.
+    /// Iterate over all connected neighboring cells with a breadth-first "flood fill" traversal
+    /// starting at `seed`. Limits the extents of the breadth-first flood fill traversal with a
+    /// `max_depth`.
     ///
-    /// This is a flattened version of [`SpatialHashMap::nearby_radius`].
-    ///
-    /// ### Warning
-    ///
-    /// See the performance warning on [`SpatialHashMap::nearby_radius`].
-    pub fn nearby_radius_entities<'a>(
-        &'a self,
-        center: &'a SpatialHash<P>,
-        radius: u8,
-    ) -> impl Iterator<Item = Entity> + 'a {
-        self.nearby_radius(center, radius)
-            .flat_map(|entry| entry.entities.iter().copied())
-    }
-
-    /// Iterate over all contiguous neighboring cells with a breadth-first "flood fill" traversal.
-    /// Worst case, this could iterate over every cell in the map once.
-    pub fn iter_flood<'a>(
-        &'a self,
-        starting_cell: &SpatialHash<P>,
-    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> {
-        ContiguousNeighborsIter {
-            initial_hash: Some(*starting_cell),
-            spatial_map: self,
-            stack: Default::default(),
-            visited_cells: Default::default(),
-        }
-    }
-
-    /// Iterate over all contiguous neighboring cells with a breadth-first "flood fill" traversal,
-    /// limited to `max_depth`.
-    ///
-    /// Like [`SpatialHashMap::iter_flood`], but limits the extents of the breadth-first flood fill
-    /// traversal with a maximum search depth.
+    /// ## Depth Limit
     ///
     /// This will exit the breadth first traversal as soon as the depth is exceeded. While this
-    /// measurement is the same as the radius, the function is not called "with_max_radius" because
-    /// it will not necessarily visit all cells within the radius - it will only visit cells within
-    /// this radius *and* search depth.
+    /// measurement is the same as the radius, it will not necessarily visit all cells within the
+    /// radius - it will only visit cells within this radius *and* search depth.
     ///
     /// Consider the case of a long thin U-shaped set of connected cells. While iterating from one
     /// end of the "U" to the other with this flood fill, if any of the cells near the base of the
@@ -184,13 +190,20 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     /// the radius, those cells will never be visited.
     ///
     /// Also note that the `max_depth` (radius) is a chebyshev distance, not a euclidean distance.
-    pub fn iter_flood_with_max_depth<'a>(
+    #[doc(alias = "bfs")]
+    pub fn flood<'a>(
         &'a self,
-        starting_cell: &SpatialHash<P>,
+        seed: &SpatialHash<P>,
         max_depth: P,
-    ) -> impl Iterator<Item = (SpatialHash<P>, &'a SpatialHashEntry<P>)> {
-        let starting_cell_cell = starting_cell.cell();
-        self.iter_flood(starting_cell).take_while(move |(hash, _)| {
+    ) -> impl Iterator<Item = Neighbor<'a, P>> {
+        let starting_cell_cell = seed.cell();
+        ContiguousNeighborsIter {
+            initial_hash: Some(*seed),
+            spatial_map: self,
+            stack: Default::default(),
+            visited_cells: Default::default(),
+        }
+        .take_while(move |Neighbor(hash, _)| {
             let dist = hash.cell() - starting_cell_cell;
             dist.x <= max_depth && dist.y <= max_depth && dist.z <= max_depth
         })
@@ -413,23 +426,27 @@ where
 {
     initial_hash: Option<SpatialHash<P>>,
     spatial_map: &'a SpatialHashMap<P, F>,
-    stack: VecDeque<(SpatialHash<P>, &'a SpatialHashEntry<P>)>,
+    stack: VecDeque<Neighbor<'a, P>>,
     visited_cells: HashSet<SpatialHash<P>>,
 }
+
+/// Newtype used for adding useful extensions like `.entities()`.
+pub struct Neighbor<'a, P: GridPrecision>(pub SpatialHash<P>, pub &'a SpatialHashEntry<P>);
 
 impl<'a, P, F> Iterator for ContiguousNeighborsIter<'a, P, F>
 where
     P: GridPrecision,
     F: SpatialHashFilter,
 {
-    type Item = (SpatialHash<P>, &'a SpatialHashEntry<P>);
+    type Item = Neighbor<'a, P>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(hash) = self.initial_hash.take() {
-            self.stack.push_front((hash, self.spatial_map.get(&hash)?));
+            self.stack
+                .push_front(Neighbor(hash, self.spatial_map.get(&hash)?));
             self.visited_cells.insert(hash);
         }
-        let (hash, entry) = self.stack.pop_back()?;
+        let Neighbor(hash, entry) = self.stack.pop_back()?;
         for (neighbor_hash, neighbor_entry) in entry
             .occupied_neighbors
             .iter()
@@ -442,8 +459,9 @@ where
                 (neighbor_hash, entry)
             })
         {
-            self.stack.push_front((*neighbor_hash, neighbor_entry));
+            self.stack
+                .push_front(Neighbor(*neighbor_hash, neighbor_entry));
         }
-        Some((hash, entry))
+        Some(Neighbor(hash, entry))
     }
 }
