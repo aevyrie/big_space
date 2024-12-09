@@ -1,7 +1,6 @@
 //! Component bundles for big_space.
 
-use crate::{precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, GridCell};
-
+use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_transform::prelude::*;
 
@@ -40,9 +39,9 @@ pub struct BigReferenceFrameBundle<P: GridPrecision> {
     pub transform: Transform,
     /// The global transform of the entity for rendering, computed relative to the floating origin.
     pub global_transform: GlobalTransform,
-    /// The grid position of the entity within
+    /// The grid position of the reference frame within its parent reference frame.
     pub cell: GridCell<P>,
-    /// The reference frame
+    /// The reference frame.
     pub reference_frame: ReferenceFrame<P>,
 }
 
@@ -54,6 +53,8 @@ pub struct BigSpaceRootBundle<P: GridPrecision> {
     pub visibility: bevy_render::view::Visibility,
     /// The root reference frame
     pub reference_frame: ReferenceFrame<P>,
-    /// Tracks the current floating origin
+    /// The rendered position of the root frame relative to the floating origin.
+    pub global_transform: GlobalTransform,
+    /// Tracks the current floating origin.
     pub root: BigSpace,
 }

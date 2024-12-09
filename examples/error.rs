@@ -6,18 +6,11 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::{
-    commands::BigSpaceCommands,
-    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
-    FloatingOrigin, GridCell,
-};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i128>::default(),
-        ))
+        .add_plugins((DefaultPlugins, BigSpacePlugin::<i128>::default()))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
         .run();
@@ -114,7 +107,7 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
+    commands.spawn_big_space_default::<i128>(|root| {
         let d = DISTANCE / root.frame().cell_edge_length() as i128;
         let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
