@@ -8,6 +8,7 @@ use bevy_ecs::{prelude::*, query::QueryFilter};
 
 pub mod component;
 pub mod map;
+pub mod partition;
 
 /// Add spatial hashing acceleration to `big_space`, accessible through the [`SpatialHashMap`]
 /// resource, and [`SpatialHash`] components.
@@ -54,6 +55,8 @@ pub enum SpatialHashSystem {
     UpdateHash,
     /// [`SpatialHashMap`] updated.
     UpdateMap,
+    /// [`SpatialPartitionMap`] updated.
+    UpdatePartition,
 }
 
 /// Used as a [`QueryFilter`] to include or exclude certain types of entities from spatial
@@ -283,7 +286,7 @@ mod tests {
         assert!(!neighbors.contains(&entities.c));
 
         let flooded: HashSet<Entity> = map
-            .flood(&SpatialHash::new(parent, &GridCell::ZERO), i32::MAX)
+            .flood(&SpatialHash::new(parent, &GridCell::ZERO), None)
             .entities()
             .collect();
 

@@ -245,8 +245,8 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    assert_eq!(spatial_map.flood(&hash, i32::MAX).count(), 1_000);
-    let flood = || spatial_map.flood(&hash, i32::MAX).count();
+    assert_eq!(spatial_map.flood(&hash, None).count(), 1_000);
+    let flood = || spatial_map.flood(&hash, None).count();
     group.bench_function("nearby flood population 1_000", |b| {
         b.iter(|| black_box(flood()));
     });
@@ -273,9 +273,9 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    assert_eq!(spatial_map.flood(&hash, i32::MAX).count(), 1_000_000);
+    assert_eq!(spatial_map.flood(&hash, None).count(), 1_000_000);
     group.bench_function("nearby flood population 1_000_000", |b| {
-        b.iter(|| black_box(spatial_map.flood(&hash, i32::MAX).count()));
+        b.iter(|| black_box(spatial_map.flood(&hash, None).count()));
     });
 }
 

@@ -219,6 +219,9 @@ pub mod prelude {
     pub use spatial_hash::{
         component::{FastSpatialHash, SpatialHash},
         map::{SpatialEntryToEntities, SpatialHashMap},
+        partition::{
+            SpatialPartition, SpatialPartitionId, SpatialPartitionMap, SpatialPartitionPlugin,
+        },
         SpatialHashPlugin, SpatialHashSystem,
     };
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};

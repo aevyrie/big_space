@@ -54,11 +54,16 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.19.0"
-bevy_hanabi = "0.13"
+bevy_hanabi = "0.14"
 
 [[bench]]
 name = "benchmarks"
 harness = false
+
+[[example]]
+name = "debug"
+path = "examples/debug.rs"
+doc-scrape-examples = true
 
 [[example]]
 name = "demo"
@@ -66,8 +71,8 @@ path = "examples/demo.rs"
 doc-scrape-examples = true
 
 [[example]]
-name = "debug"
-path = "examples/debug.rs"
+name = "error_child"
+path = "examples/error_child.rs"
 doc-scrape-examples = true
 
 [[example]]
@@ -76,8 +81,18 @@ path = "examples/error.rs"
 doc-scrape-examples = true
 
 [[example]]
-name = "error_child"
-path = "examples/error_child.rs"
+name = "infinite"
+path = "examples/infinite.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "minimal"
+path = "examples/minimal.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "particles"
+path = "examples/particles.rs"
 doc-scrape-examples = true
 
 [[example]]

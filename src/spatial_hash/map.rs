@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy_ecs::{entity::EntityHash, prelude::*};
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},
     PassHash,
@@ -15,7 +15,7 @@ use super::SpatialHashFilter;
 #[derive(Clone, Debug)]
 pub struct SpatialHashEntry<P: GridPrecision> {
     /// All the entities located in this grid cell.
-    pub entities: HashSet<Entity, PassHash>,
+    pub entities: HashSet<Entity, EntityHash>,
     /// Precomputed hashes to direct neighbors.
     // TODO: computation cheap, heap slow. Can this be replaced with a u32 bitmask of occupied cells
     // (only need 26 bits), with the hashes computed based on the neighbor's relative position?
@@ -117,10 +117,17 @@ where
 }
 
 impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
-    /// Get a list of all entities in the same [`GridCell`] using a [`SpatialHash`].
+    /// Get information about all entities located at this [`SpatialHash`], as well as its
+    /// neighbors.
     #[inline]
     pub fn get(&self, hash: &SpatialHash<P>) -> Option<&SpatialHashEntry<P>> {
         self.map.inner.get(hash)
+    }
+
+    /// Returns `true` if this [`SpatialHash`] is occupied.
+    #[inline]
+    pub fn contains(&self, hash: &SpatialHash<P>) -> bool {
+        self.map.inner.contains_key(hash)
     }
 
     /// An iterator visiting all spatial hash cells and their contents in arbitrary order.
@@ -194,7 +201,7 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     pub fn flood<'a>(
         &'a self,
         seed: &SpatialHash<P>,
-        max_depth: P,
+        max_depth: Option<P>,
     ) -> impl Iterator<Item = Neighbor<'a, P>> {
         let starting_cell_cell = seed.cell();
         ContiguousNeighborsIter {
@@ -204,6 +211,9 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
             visited_cells: Default::default(),
         }
         .take_while(move |Neighbor(hash, _)| {
+            let Some(max_depth) = max_depth else {
+                return true;
+            };
             let dist = hash.cell() - starting_cell_cell;
             dist.x <= max_depth && dist.y <= max_depth && dist.z <= max_depth
         })
@@ -333,7 +343,7 @@ struct InnerSpatialHashMap<P: GridPrecision> {
     /// need to construct a new hash set of entities, we can grab one here.
     ///
     /// <https://en.wikipedia.org/wiki/Object_pool_pattern>.
-    hash_set_pool: Vec<HashSet<Entity, PassHash>>,
+    hash_set_pool: Vec<HashSet<Entity, EntityHash>>,
     neighbor_pool: Vec<Vec<SpatialHash<P>>>,
     /// Cells that were added because they were empty but now contain entities.
     just_inserted: HashSet<SpatialHash<P>, PassHash>,

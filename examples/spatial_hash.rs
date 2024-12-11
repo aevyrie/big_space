@@ -16,6 +16,7 @@ fn main() {
             DefaultPlugins,
             BigSpacePlugin::<i32>::default(),
             SpatialHashPlugin::<i32>::default(),
+            SpatialPartitionPlugin::<i32>::default(),
             big_space::camera::CameraControllerPlugin::<i32>::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
@@ -28,7 +29,7 @@ fn main() {
         .run();
 }
 
-const N_ENTITIES: usize = 50_000;
+const N_ENTITIES: usize = 100_000;
 const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
@@ -126,7 +127,7 @@ fn move_player(
     neighbors.clear();
 
     spatial_hash_map
-        .flood(hash, i32::MAX)
+        .flood(hash, None)
         .entities()
         .for_each(|entity| {
             neighbors.push(entity);
@@ -161,7 +162,7 @@ fn move_player(
     // The neighbor query is lazy, which means it only does work when we consume the iterator.
     let lookup_start = Instant::now();
     let total = spatial_hash_map
-        .flood(hash, i32::MAX)
+        .flood(hash, None)
         .map(|neighbor| neighbor.1.entities.len())
         .sum::<usize>();
     let elapsed = lookup_start.elapsed();
