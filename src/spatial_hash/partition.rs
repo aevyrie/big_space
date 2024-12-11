@@ -4,7 +4,10 @@ use std::{hash::Hash, marker::PhantomData};
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_utils::{hashbrown::HashSet, HashMap, PassHash};
+use bevy_utils::{
+    hashbrown::{HashMap, HashSet},
+    PassHash,
+};
 
 use super::{GridPrecision, SpatialHash, SpatialHashFilter, SpatialHashMap, SpatialHashSystem};
 
@@ -61,6 +64,7 @@ where
     F: SpatialHashFilter,
 {
     partitions: HashMap<SpatialPartitionId, SpatialPartition<P>>,
+    reverse_map: HashMap<SpatialHash<P>, SpatialPartitionId, PassHash>,
     next_partition: u64,
     spooky: PhantomData<F>,
 }
@@ -73,6 +77,7 @@ where
     fn default() -> Self {
         Self {
             partitions: HashMap::default(),
+            reverse_map: HashMap::default(),
             next_partition: 0,
             spooky: PhantomData,
         }
@@ -93,10 +98,8 @@ where
     /// Searches for the [`SpatialPartition`] that contains this `hash`, returning the partition's
     /// [`SpatialPartitionId`] if the hash is found in any partition.
     #[inline]
-    pub fn find(&self, hash: &SpatialHash<P>) -> Option<SpatialPartitionId> {
-        self.partitions
-            .iter()
-            .find_map(|(i, partition)| partition.contains(hash).then_some(*i))
+    pub fn find(&self, hash: &SpatialHash<P>) -> Option<&SpatialPartitionId> {
+        self.reverse_map.get(hash)
     }
 
     /// Iterates over all [`SpatialPartition`]s.
@@ -105,12 +108,10 @@ where
     }
 
     #[inline]
-    fn get_mut(&mut self, partition: &SpatialPartitionId) -> Option<&mut SpatialPartition<P>> {
-        self.partitions.get_mut(partition)
-    }
-
-    #[inline]
     fn insert(&mut self, partition: SpatialPartitionId, set: HashSet<SpatialHash<P>, PassHash>) {
+        for hash in set.iter() {
+            self.reverse_map.insert(*hash, partition);
+        }
         self.partitions
             .insert(partition, SpatialPartition { tables: vec![set] });
     }
@@ -120,25 +121,16 @@ where
         if let Some(partition) = self.partitions.get_mut(partition) {
             partition.insert(*hash)
         }
+        self.reverse_map.insert(*hash, *partition);
     }
 
     #[inline]
     fn remove(&mut self, hash: &SpatialHash<P>) {
-        let Some((id, partition)) = self.partitions.iter_mut().find_map(|(i, partition)| {
-            partition
-                .tables
-                .iter_mut()
-                .any(|table| table.remove(hash))
-                .then_some((*i, partition))
-        }) else {
+        let Some(old_id) = self.reverse_map.remove(hash) else {
             return;
         };
-
-        // Clean up
-        // TODO: store removed tables in an object pool for reuse.
-        partition.tables.retain(|table| !table.is_empty());
-        if partition.tables.is_empty() {
-            self.partitions.remove(&id);
+        if let Some(partition) = self.partitions.get_mut(&old_id) {
+            partition.tables.iter_mut().any(|table| table.remove(hash));
         }
     }
 
@@ -165,6 +157,11 @@ where
             let Some(partition) = self.partitions.remove(id) else {
                 continue;
             };
+
+            partition.iter().for_each(|hash| {
+                self.reverse_map.insert(*hash, *first_partition);
+            });
+
             self.partitions
                 .get_mut(first_partition)
                 .expect("partition should exist")
@@ -220,7 +217,17 @@ where
         for removed_cell in map.just_removed().iter() {
             partitions.remove(removed_cell);
         }
+        drop(remove_span);
 
+        let cleanup_span = tracing::info_span!("cleanup").entered();
+        // Clean up empty tables and partitions
+        partitions.partitions.retain(|_id, partition| {
+            partition.tables.retain(|table| !table.is_empty());
+            !partition.tables.is_empty()
+        });
+        drop(cleanup_span);
+
+        let affected_span = tracing::info_span!("affected").entered();
         for removed_cell in map.just_removed().iter() {
             // Group occupied neighbor cells by partition, so we can check if they are still
             // connected to each other after this removal.
@@ -239,23 +246,21 @@ where
             // aren't adding cells that were just removed but not yet processed.
             removed_cell
                 .adjacent(1)
-                .peekable()
                 .filter(|(hash, _)| map.contains(hash))
                 .filter_map(|(hash, _)| partitions.find(&hash).zip(Some(hash)))
                 .for_each(|(id, hash)| {
-                    affected_cells.entry(id).or_default().insert(hash);
+                    affected_cells.entry(*id).or_default().insert(hash);
                 });
         }
-        drop(remove_span);
-
-        let split_span = tracing::info_span!("split").entered();
+        drop(affected_span);
 
         // Finally, we need to test for partitions being split apart by a removal (removing a bridge
         // in graph theory).
-
+        let split_span = tracing::info_span!("split").entered();
         let mut new_partitions = Vec::new();
         let mut scratch_set = HashSet::default();
 
+        dbg!(affected_cells.values().flat_map(|p| p.iter()).count());
         'partitions: for (partition_id, affected_hashes) in affected_cells.iter_mut() {
             new_partitions.clear();
             let mut counter = 0;
@@ -287,15 +292,23 @@ where
             new_partitions.sort_unstable_by_key(|v| v.len());
             new_partitions.reverse();
             if let Some(partition) = new_partitions.pop() {
-                let tables = &mut partitions.get_mut(partition_id).unwrap().tables;
-                // TODO: keep these in an object pool to reuse allocs
-                tables.drain(1..);
-                if let Some(table) = tables.get_mut(0) {
-                    *table = partition;
-                } else {
-                    tables.push(partition);
+                if let Some(tables) = partitions
+                    .partitions
+                    .get_mut(partition_id)
+                    .map(|p| &mut p.tables)
+                {
+                    // TODO: keep these in an object pool to reuse allocs
+                    tables.drain(1..);
+                    if let Some(table) = tables.get_mut(0) {
+                        *table = partition;
+                    } else {
+                        tables.push(partition);
+                    }
                 }
             }
+
+            // At this point the reverse map will be out of date. However, `partitions.insert()`
+            // will update all hashes that now have a new partition, with their new ID.
             for partition_set in new_partitions.drain(..) {
                 let new_id = partitions.create();
                 partitions.insert(new_id, partition_set);
