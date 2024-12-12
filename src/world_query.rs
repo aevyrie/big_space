@@ -1,12 +1,10 @@
 //! A helper query argument that ensures you don't forget to handle
 //! the [`GridCell`] when you work with a [`Transform`].
 
+use crate::prelude::*;
 use bevy_ecs::query::QueryData;
 use bevy_math::{prelude::*, DVec3};
 use bevy_transform::prelude::*;
-
-use crate::GridCell;
-use crate::{precision::GridPrecision, reference_frame::ReferenceFrame};
 
 #[derive(QueryData)]
 #[query_data(mutable)]
