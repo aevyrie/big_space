@@ -1,6 +1,6 @@
 //! Detect and update groups of nearby occupied cells.
 
-use std::{hash::Hash, marker::PhantomData};
+use std::{hash::Hash, marker::PhantomData, ops::Deref};
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -48,6 +48,13 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpatialPartitionId(u64);
 
+impl SpatialPartitionId {
+    /// The inner partition id.
+    pub fn id(&self) -> u64 {
+        self.0
+    }
+}
+
 impl Hash for SpatialPartitionId {
     #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -84,6 +91,18 @@ where
     }
 }
 
+impl<P, F> Deref for SpatialPartitionMap<P, F>
+where
+    P: GridPrecision,
+    F: SpatialHashFilter,
+{
+    type Target = HashMap<SpatialPartitionId, SpatialPartition<P>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.partitions
+    }
+}
+
 impl<P, F> SpatialPartitionMap<P, F>
 where
     P: GridPrecision,
@@ -103,23 +122,33 @@ where
     }
 
     /// Iterates over all [`SpatialPartition`]s.
-    pub fn partitions(&self) -> impl Iterator<Item = &SpatialPartition<P>> {
-        self.partitions.values()
+    pub fn iter(&self) -> impl Iterator<Item = (&SpatialPartitionId, &SpatialPartition<P>)> {
+        self.partitions.iter()
     }
 
     #[inline]
     fn insert(&mut self, partition: SpatialPartitionId, set: HashSet<SpatialHash<P>, PassHash>) {
+        let Some(hash) = set.iter().next() else {
+            return;
+        };
         for hash in set.iter() {
             self.reverse_map.insert(*hash, partition);
         }
-        self.partitions
-            .insert(partition, SpatialPartition { tables: vec![set] });
+        self.partitions.insert(
+            partition,
+            SpatialPartition {
+                reference_frame: hash.reference_frame(),
+                tables: vec![set],
+            },
+        );
     }
 
     #[inline]
     fn push(&mut self, partition: &SpatialPartitionId, hash: &SpatialHash<P>) {
         if let Some(partition) = self.partitions.get_mut(partition) {
             partition.insert(*hash)
+        } else {
+            return;
         }
         self.reverse_map.insert(*hash, *partition);
     }
@@ -134,14 +163,8 @@ where
         }
     }
 
-    fn create(&mut self) -> SpatialPartitionId {
+    fn new_id(&mut self) -> SpatialPartitionId {
         let id = SpatialPartitionId(self.next_partition);
-        self.partitions.insert(
-            id,
-            SpatialPartition {
-                tables: Vec::default(),
-            },
-        );
         self.next_partition += 1;
         id
     }
@@ -199,8 +222,8 @@ where
                 partitions.push(first_partition, added_hash);
                 partitions.merge(scratch_partitions.iter());
             } else {
-                let new_partition = partitions.create();
-                partitions.push(&new_partition, added_hash);
+                let new_partition = partitions.new_id();
+                partitions.insert(new_partition, [*added_hash].into_iter().collect());
             }
         }
 
@@ -313,7 +336,7 @@ where
             // At this point the reverse map will be out of date. However, `partitions.insert()`
             // will update all hashes that now have a new partition, with their new ID.
             for partition_set in new_partitions.drain(..) {
-                let new_id = partitions.create();
+                let new_id = partitions.new_id();
                 partitions.insert(new_id, partition_set);
             }
         }
@@ -328,6 +351,7 @@ struct SplitResult<P: GridPrecision> {
 /// A set of [`crate::GridCell`]s in an island disconnected from all other [`crate::GridCell`]s.
 #[derive(Debug)]
 pub struct SpatialPartition<P: GridPrecision> {
+    reference_frame: Entity,
     tables: Vec<HashSet<SpatialHash<P>, PassHash>>,
 }
 impl<P: GridPrecision> SpatialPartition<P> {
@@ -389,5 +413,10 @@ impl<P: GridPrecision> SpatialPartition<P> {
                 self.tables.push(table);
             }
         }
+    }
+
+    /// The reference frame this partition resides in.
+    pub fn reference_frame(&self) -> Entity {
+        self.reference_frame
     }
 }

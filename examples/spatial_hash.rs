@@ -22,7 +22,10 @@ fn main() {
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(
             PostUpdate,
-            move_player.after(TransformSystem::TransformPropagate),
+            (
+                move_player.after(TransformSystem::TransformPropagate),
+                draw_partitions.after(SpatialSystem::UpdatePartition),
+            ),
         )
         .add_systems(Update, cursor_grab)
         .init_resource::<MaterialPresets>()
@@ -67,6 +70,45 @@ impl FromWorld for MaterialPresets {
             highlight: materials.add(h),
             flood: materials.add(f),
         }
+    }
+}
+
+fn draw_partitions(
+    mut gizmos: Gizmos,
+    partitions: Res<SpatialPartitionMap<i32>>,
+    frames: Query<(&GlobalTransform, &ReferenceFrame<i32>)>,
+) {
+    for (id, p) in partitions.iter() {
+        let Ok((transform, frame)) = frames.get(p.reference_frame()) else {
+            return;
+        };
+        let l = frame.cell_edge_length();
+
+        let Some(min) = p
+            .iter()
+            .map(|h| [h.cell().x, h.cell().y, h.cell().z])
+            .reduce(|[ax, ay, az], [ix, iy, iz]| [ax.min(ix), ay.min(iy), az.min(iz)])
+            .map(|v| IVec3::from(v).as_vec3() * l)
+        else {
+            continue;
+        };
+
+        let Some(max) = p
+            .iter()
+            .map(|h| [h.cell().x, h.cell().y, h.cell().z])
+            .reduce(|[ax, ay, az], [ix, iy, iz]| [ax.max(ix), ay.max(iy), az.max(iz)])
+            .map(|v| IVec3::from(v).as_vec3() * l)
+        else {
+            continue;
+        };
+
+        let size = max - min;
+        let center = min + (size) * 0.5;
+        let local_trans = Transform::from_translation(center).with_scale(size + l);
+        gizmos.cuboid(
+            transform.mul_transform(local_trans),
+            Hsla::hsl(id.id() as f32 / partitions.len() as f32 * 360.0, 1.0, 0.5),
+        );
     }
 }
 

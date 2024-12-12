@@ -35,7 +35,7 @@ impl Hash for FastSpatialHash {
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct SpatialHash<P: GridPrecision> {
     cell: GridCell<P>,
-    parent: Entity,
+    reference_frame: Entity,
     pre_hash: u64,
 }
 
@@ -47,7 +47,7 @@ impl<P: GridPrecision> PartialEq for SpatialHash<P> {
         // TODO benchmark adding a hash comparison at the front, may help early out for most
         // comparisons? It might not be a win, because many of the comparisons could be coming from
         // hashmaps, in which case we already know the hashes are the same.
-        self.cell == other.cell && self.parent == other.parent
+        self.cell == other.cell && self.reference_frame == other.reference_frame
     }
 }
 
@@ -78,7 +78,7 @@ impl<P: GridPrecision> SpatialHash<P> {
 
         SpatialHash {
             cell: *cell,
-            parent,
+            reference_frame: parent,
             pre_hash: hasher.finish(),
         }
     }
@@ -131,7 +131,7 @@ impl<P: GridPrecision> SpatialHash<P> {
             .map(move |offset| {
                 let neighbor_cell = self.cell + offset;
                 (
-                    SpatialHash::from_parent(self.parent, &neighbor_cell),
+                    SpatialHash::from_parent(self.reference_frame, &neighbor_cell),
                     neighbor_cell,
                 )
             })
@@ -197,5 +197,10 @@ impl<P: GridPrecision> SpatialHash<P> {
     /// The [`GridCell`] associated with this spatial hash.
     pub fn cell(&self) -> GridCell<P> {
         self.cell
+    }
+
+    /// The [`Parent`] [`ReferenceFrame`] of this spatial hash.
+    pub fn reference_frame(&self) -> Entity {
+        self.reference_frame
     }
 }
