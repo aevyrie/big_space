@@ -1,9 +1,10 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{collections::VecDeque, hash::Hasher, time::Duration};
 
 use bevy::{
     core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
     prelude::*,
 };
+use bevy_ecs::entity::EntityHasher;
 use bevy_math::DVec3;
 use bevy_render::view::VisibilityRange;
 use bevy_utils::Instant;
@@ -105,9 +106,15 @@ fn draw_partitions(
         let size = max - min;
         let center = min + (size) * 0.5;
         let local_trans = Transform::from_translation(center).with_scale(size + l);
+
+        let mut hasher = EntityHasher::default();
+        hasher.write_u64(id.id());
+        let f = hasher.finish();
+        let hue = (f % 360) as f32;
+
         gizmos.cuboid(
             transform.mul_transform(local_trans),
-            Hsla::hsl(id.id() as f32 / partitions.len() as f32 * 360.0, 1.0, 0.5),
+            Hsla::hsl(hue, 1.0, 0.5),
         );
     }
 }
