@@ -33,11 +33,14 @@ const N_ENTITIES: usize = 100_000;
 const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
-const MOVEMENT_SPEED: f32 = 8e4;
+const MOVEMENT_SPEED: f32 = 1e5;
 const PERCENT_STATIC: f32 = 0.9;
 
 #[derive(Component)]
 struct Player;
+
+#[derive(Component)]
+struct NonPlayer;
 
 #[derive(Resource)]
 struct MaterialPresets {
@@ -83,7 +86,7 @@ fn move_player(
     >,
     mut non_player: Query<
         (&mut Transform, &mut GridCell<i32>, &Parent),
-        (Without<Player>, With<Mesh3d>),
+        (Without<Player>, With<NonPlayer>),
     >,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
@@ -226,7 +229,7 @@ fn spawn(
 
     let rng = || loop {
         let noise_scale = 5.0;
-        let threshold = 0.5;
+        let threshold = 0.6;
         let rng_val = || rng.f64_normalized() * noise_scale;
         let coord = [rng_val(), rng_val(), rng_val()];
         if noise.get(coord) > threshold {
@@ -280,6 +283,7 @@ fn spawn(
                 ));
             } else {
                 sphere_builder.insert((
+                    NonPlayer,
                     Mesh3d(sphere_mesh_lq.clone()),
                     MeshMaterial3d(material_presets.default.clone_weak()),
                     VisibilityRange {

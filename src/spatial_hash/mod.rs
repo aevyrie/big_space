@@ -31,13 +31,12 @@ impl<P: GridPrecision, F: SpatialHashFilter> Plugin for SpatialHashPlugin<P, F> 
                 PostUpdate,
                 (
                     SpatialHash::<P>::update::<F>
-                        .in_set(SpatialHashSystem::UpdateHash)
+                        .in_set(SpatialSystem::UpdateHash)
                         .after(FloatingOriginSystem::RecenterLargeTransforms),
                     SpatialHashMap::<P, F>::update
-                        .in_set(SpatialHashSystem::UpdateMap)
-                        .after(SpatialHashSystem::UpdateHash),
-                )
-                    .in_set(bevy_transform::TransformSystem::TransformPropagate),
+                        .in_set(SpatialSystem::UpdateMap)
+                        .after(SpatialSystem::UpdateHash),
+                ),
             );
     }
 }
@@ -50,7 +49,7 @@ impl<P: GridPrecision, F: SpatialHashFilter> Default for SpatialHashPlugin<P, F>
 
 /// System sets for [`SpatialHashPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
-pub enum SpatialHashSystem {
+pub enum SpatialSystem {
     /// [`SpatialHash`] updated.
     UpdateHash,
     /// [`SpatialHashMap`] updated.

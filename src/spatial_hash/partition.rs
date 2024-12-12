@@ -4,12 +4,13 @@ use std::{hash::Hash, marker::PhantomData};
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},
     PassHash,
 };
 
-use super::{GridPrecision, SpatialHash, SpatialHashFilter, SpatialHashMap, SpatialHashSystem};
+use super::{GridPrecision, SpatialHash, SpatialHashFilter, SpatialHashMap, SpatialSystem};
 
 /// Adds support for spatial partitioning. Requires [`SpatialHashPlugin`](super::SpatialHashPlugin).
 pub struct SpatialPartitionPlugin<P, F = ()>(PhantomData<(P, F)>)
@@ -37,9 +38,8 @@ where
             .add_systems(
                 PostUpdate,
                 SpatialPartitionMap::<P, F>::update
-                    .in_set(bevy_transform::TransformSystem::TransformPropagate)
-                    .in_set(SpatialHashSystem::UpdatePartition)
-                    .after(SpatialHashSystem::UpdateMap),
+                    .in_set(SpatialSystem::UpdatePartition)
+                    .after(SpatialSystem::UpdateMap),
             );
     }
 }
@@ -169,18 +169,15 @@ where
         }
     }
 
-    fn update(mut partitions: ResMut<Self>, map: Res<SpatialHashMap<P, F>>) {
-        dbg!(map.just_inserted().len());
-        dbg!(map.just_removed().len());
-        dbg!(partitions.partitions.len());
-        dbg!(partitions
-            .partitions
-            .values()
-            .flat_map(|p| p.tables.iter())
-            .count());
-
-        let add_span = tracing::info_span!("add").entered();
-        let mut scratch_partitions = Vec::default();
+    fn update(
+        mut partitions: ResMut<Self>,
+        map: Res<SpatialHashMap<P, F>>,
+        // Scratch space allocations
+        mut scratch_partitions: Local<Vec<SpatialPartitionId>>,
+        mut affected_cells: Local<HashMap<SpatialPartitionId, HashSet<SpatialHash<P>, PassHash>>>,
+        mut affected_cells_vec: Local<Vec<(SpatialPartitionId, HashSet<SpatialHash<P>, PassHash>)>>,
+        mut split_results: Local<Vec<Vec<SplitResult<P>>>>,
+    ) {
         for (added_cell, added_hash) in map
             .just_inserted()
             .iter()
@@ -206,28 +203,19 @@ where
                 partitions.push(&new_partition, added_hash);
             }
         }
-        drop(add_span);
 
-        let remove_span = tracing::info_span!("remove").entered();
         // Track the cells neighboring removed cells. These may now be disconnected from the rest of
         // their partition.
-        let mut affected_cells =
-            HashMap::<SpatialPartitionId, HashSet<SpatialHash<P>, PassHash>>::default();
-
         for removed_cell in map.just_removed().iter() {
             partitions.remove(removed_cell);
         }
-        drop(remove_span);
 
-        let cleanup_span = tracing::info_span!("cleanup").entered();
         // Clean up empty tables and partitions
         partitions.partitions.retain(|_id, partition| {
             partition.tables.retain(|table| !table.is_empty());
             !partition.tables.is_empty()
         });
-        drop(cleanup_span);
 
-        let affected_span = tracing::info_span!("affected").entered();
         for removed_cell in map.just_removed().iter() {
             // Group occupied neighbor cells by partition, so we can check if they are still
             // connected to each other after this removal.
@@ -252,49 +240,64 @@ where
                     affected_cells.entry(*id).or_default().insert(hash);
                 });
         }
-        drop(affected_span);
 
         // Finally, we need to test for partitions being split apart by a removal (removing a bridge
         // in graph theory).
-        let split_span = tracing::info_span!("split").entered();
-        let mut new_partitions = Vec::new();
-        let mut scratch_set = HashSet::default();
+        *affected_cells_vec = affected_cells.drain().collect::<Vec<_>>();
+        *split_results = affected_cells_vec.par_splat_map_mut(
+            ComputeTaskPool::get(),
+            None,
+            |_, affected_cells| {
+                let _task_span = tracing::info_span!("parallel partition split").entered();
+                affected_cells
+                    .iter_mut()
+                    .filter_map(|(original_partition, affected_hashes)| {
+                        let mut new_partitions = Vec::with_capacity(0);
+                        let mut counter = 0;
+                        while let Some(this_cell) = affected_hashes.iter().next().copied() {
+                            for cell in map.flood(&this_cell, None) {
+                                // Note: first visited cell is this_cell
+                                affected_hashes.remove(&cell.0);
+                                if affected_hashes.is_empty() {
+                                    break;
+                                }
+                            }
+                            // At this point, we have either visited all affected cells, or the
+                            // flood fill ran out of cells to visit.
+                            if affected_hashes.is_empty() && counter == 0 {
+                                // If it only took a single iteration to connect all affected cells,
+                                // it means the partition has not been split, and we can continue to
+                                // the next // partition.
+                                return None;
+                            } else {
+                                new_partitions
+                                    .push(map.flood(&this_cell, None).map(|n| n.0).collect());
+                            }
+                            counter += 1;
+                        }
 
-        dbg!(affected_cells.values().flat_map(|p| p.iter()).count());
-        'partitions: for (partition_id, affected_hashes) in affected_cells.iter_mut() {
-            new_partitions.clear();
-            let mut counter = 0;
-            while let Some(this_cell) = affected_hashes.iter().next().copied() {
-                counter += 1;
-                affected_hashes.remove(&this_cell);
-                scratch_set.extend(
-                    map.flood(&this_cell, None)
-                        .take_while(|neighbor| {
-                            affected_hashes.remove(&neighbor.0);
-                            !affected_hashes.is_empty()
+                        Some(SplitResult {
+                            original_partition: *original_partition,
+                            new_partitions,
                         })
-                        .map(|n| n.0),
-                );
+                    })
+                    .collect::<Vec<_>>()
+            },
+        );
 
-                if affected_hashes.is_empty() && counter == 1 {
-                    // If it only took a single iteration to connect all affected cells, it means
-                    // the partition has not been split, and we can continue to the next partition.
-                    scratch_set.clear();
-                    continue 'partitions;
-                } else {
-                    let set = std::mem::take(&mut scratch_set);
-                    new_partitions.push(set);
-                }
-            }
-            if counter == 1 {
-                continue;
-            }
+        for SplitResult {
+            original_partition,
+            ref mut new_partitions,
+        } in split_results.iter_mut().flatten()
+        {
+            // We want the original partition to retain the most cells to ensure that the smaller
+            // sets are the ones that are assigned a new partition ID.
             new_partitions.sort_unstable_by_key(|v| v.len());
             new_partitions.reverse();
             if let Some(partition) = new_partitions.pop() {
                 if let Some(tables) = partitions
                     .partitions
-                    .get_mut(partition_id)
+                    .get_mut(original_partition)
                     .map(|p| &mut p.tables)
                 {
                     // TODO: keep these in an object pool to reuse allocs
@@ -314,8 +317,12 @@ where
                 partitions.insert(new_id, partition_set);
             }
         }
-        drop(split_span);
     }
+}
+
+struct SplitResult<P: GridPrecision> {
+    original_partition: SpatialPartitionId,
+    new_partitions: Vec<HashSet<SpatialHash<P>, PassHash>>,
 }
 
 /// A set of [`crate::GridCell`]s in an island disconnected from all other [`crate::GridCell`]s.

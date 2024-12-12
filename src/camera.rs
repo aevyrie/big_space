@@ -230,6 +230,9 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
     let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.get_single_mut() else {
         return;
     };
+    if !camera.slow_near_objects {
+        return;
+    }
     let cam_layer = cam_layer.to_owned().unwrap_or_default();
     let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
 

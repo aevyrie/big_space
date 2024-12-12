@@ -224,7 +224,7 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     /// These are cells that were previously empty, but now contain at least one entity.
     ///
     /// Useful for incrementally updating data structures that extend the functionality of
-    /// [`SpatialHashMap`]. Updated in [`SpatialHashSystem::UpdateMap`].
+    /// [`SpatialHashMap`]. Updated in [`SpatialSystem::UpdateMap`].
     pub fn just_inserted(&self) -> &HashSet<SpatialHash<P>, PassHash> {
         &self.map.just_inserted
     }
@@ -234,7 +234,7 @@ impl<P: GridPrecision, F: SpatialHashFilter> SpatialHashMap<P, F> {
     /// These are cells that were previously occupied, but now contain no entities.
     ///
     /// Useful for incrementally updating data structures that extend the functionality of
-    /// [`SpatialHashMap`]. Updated in [`SpatialHashSystem::UpdateMap`].
+    /// [`SpatialHashMap`]. Updated in [`SpatialSystem::UpdateMap`].
     pub fn just_removed(&self) -> &HashSet<SpatialHash<P>, PassHash> {
         &self.map.just_removed
     }

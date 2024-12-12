@@ -222,7 +222,7 @@ pub mod prelude {
         partition::{
             SpatialPartition, SpatialPartitionId, SpatialPartitionMap, SpatialPartitionPlugin,
         },
-        SpatialHashPlugin, SpatialHashSystem,
+        SpatialHashPlugin, SpatialSystem,
     };
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
 }

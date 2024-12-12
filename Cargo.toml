@@ -21,6 +21,7 @@ bevy_ecs = { version = "0.15.0", default-features = true }
 bevy_hierarchy = { version = "0.15.0", default-features = false }
 bevy_math = { version = "0.15.0", default-features = false }
 bevy_reflect = { version = "0.15.0", default-features = false }
+bevy_tasks = { version = "0.15.0", default-features = false }
 bevy_transform = { version = "0.15.0", default-features = false, features = [
     "bevy-support",
 ] }
@@ -54,7 +55,7 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.19.0"
-bevy_hanabi = "0.14"
+# bevy_hanabi = "0.14"
 
 [[bench]]
 name = "benchmarks"
