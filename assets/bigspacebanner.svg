@@ -1,13 +1,13 @@
-<svg id="euLMgtNW1nx1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+<svg id="eNV8LJcXja21" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
     viewBox="0 0 4500 1500" shape-rendering="geometricPrecision" text-rendering="geometricPrecision"
-    project-id="47d1651bff2f4cfe832946c8a5be3cb8" export-id="0b0760b99d33420ea69f50ed00b7b78e" cached="false">
+    project-id="47d1651bff2f4cfe832946c8a5be3cb8" export-id="50265fec888b4027b9f0845ed763babb" cached="false">
     <style>
         <![CDATA[
-        #euLMgtNW1nx2 {
-            animation: euLMgtNW1nx2_c_o 4000ms linear 1 normal forwards
+        #eNV8LJcXja22 {
+            animation: eNV8LJcXja22_c_o 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx2_c_o {
+        @keyframes eNV8LJcXja22_c_o {
             0% {
                 opacity: 0;
                 animation-timing-function: step-end
@@ -27,11 +27,11 @@
             }
         }
 
-        #euLMgtNW1nx36 {
-            animation: euLMgtNW1nx36_c_o 4000ms linear 1 normal forwards
+        #eNV8LJcXja236 {
+            animation: eNV8LJcXja236_c_o 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx36_c_o {
+        @keyframes eNV8LJcXja236_c_o {
             0% {
                 opacity: 0;
                 animation-timing-function: step-end
@@ -61,11 +61,11 @@
             }
         }
 
-        #euLMgtNW1nx99_to {
-            animation: euLMgtNW1nx99_to__to 4000ms linear 1 normal forwards
+        #eNV8LJcXja299_to {
+            animation: eNV8LJcXja299_to__to 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx99_to__to {
+        @keyframes eNV8LJcXja299_to__to {
             0% {
                 offset-distance: 0%;
                 animation-timing-function: cubic-bezier(0.445, 0.05, 0.55, 0.95)
@@ -81,11 +81,11 @@
             }
         }
 
-        #euLMgtNW1nx99_tr {
-            animation: euLMgtNW1nx99_tr__tr 4000ms linear 1 normal forwards
+        #eNV8LJcXja299_tr {
+            animation: eNV8LJcXja299_tr__tr 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx99_tr__tr {
+        @keyframes eNV8LJcXja299_tr__tr {
             0% {
                 transform: rotate(134.423712deg)
             }
@@ -99,11 +99,11 @@
             }
         }
 
-        #euLMgtNW1nx104_ts {
-            animation: euLMgtNW1nx104_ts__ts 4000ms linear 1 normal forwards
+        #eNV8LJcXja2104_ts {
+            animation: eNV8LJcXja2104_ts__ts 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx104_ts__ts {
+        @keyframes eNV8LJcXja2104_ts__ts {
             0% {
                 transform: translate(2398.154932px, 988.833378px) rotate(180deg) scale(0.257452, 0.177652);
                 animation-timing-function: cubic-bezier(0.445, 0.05, 0.55, 0.95)
@@ -189,11 +189,11 @@
             }
         }
 
-        #euLMgtNW1nx116_tr {
-            animation: euLMgtNW1nx116_tr__tr 4000ms linear 1 normal forwards
+        #eNV8LJcXja2116_tr {
+            animation: eNV8LJcXja2116_tr__tr 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx116_tr__tr {
+        @keyframes eNV8LJcXja2116_tr__tr {
             0% {
                 transform: translate(135.33781px, 207.03926px) rotate(720deg);
                 animation-timing-function: cubic-bezier(0.415, 0.08, 0.115, 0.955)
@@ -204,11 +204,11 @@
             }
         }
 
-        #euLMgtNW1nx116 {
-            animation: euLMgtNW1nx116_f_p 4000ms linear 1 normal forwards
+        #eNV8LJcXja2116 {
+            animation: eNV8LJcXja2116_f_p 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx116_f_p {
+        @keyframes eNV8LJcXja2116_f_p {
             0% {
                 fill: #d2dbed
             }
@@ -218,11 +218,11 @@
             }
         }
 
-        #euLMgtNW1nx117_tr {
-            animation: euLMgtNW1nx117_tr__tr 4000ms linear 1 normal forwards
+        #eNV8LJcXja2117_tr {
+            animation: eNV8LJcXja2117_tr__tr 4000ms linear infinite normal forwards
         }
 
-        @keyframes euLMgtNW1nx117_tr__tr {
+        @keyframes eNV8LJcXja2117_tr__tr {
             0% {
                 transform: translate(11.12px, 29.9px) rotate(-720deg);
                 animation-timing-function: cubic-bezier(0.415, 0.08, 0.115, 0.955)
@@ -234,7 +234,7 @@
         }
         ]]>
     </style>
-    <g id="euLMgtNW1nx2" transform="matrix(1.206877 0 0 1.206894 2834.664559-168.515296)" opacity="0"
+    <g id="eNV8LJcXja22" transform="matrix(1.206877 0 0 1.206894 2834.664559-168.515296)" opacity="0"
         clip-rule="evenodd">
         <g transform="translate(-153.496002-310.113007)" clip-rule="evenodd">
             <path d="M1181.82,519.29h138.2c78.71,0,142.6,63.896,142.6,142.598v150.897" clip-rule="evenodd" fill="none"
@@ -319,7 +319,7 @@
                 stroke-linejoin="round" stroke-miterlimit="1.5" />
         </g>
     </g>
-    <g id="euLMgtNW1nx36" transform="matrix(1.206877 0 0 1.206894 1335.320855-167.965941)" opacity="0"
+    <g id="eNV8LJcXja236" transform="matrix(1.206877 0 0 1.206894 1335.320855-167.965941)" opacity="0"
         clip-rule="evenodd">
         <g transform="translate(-153.496002-310.113007)" clip-rule="evenodd">
             <path d="M1181.82,519.29h138.2c78.71,0,142.6,63.896,142.6,142.598v150.897" clip-rule="evenodd" fill="none"
@@ -374,7 +374,7 @@
                 stroke-miterlimit="1.5" />
         </g>
         <g transform="translate(-148.080002-316.514008)" clip-rule="evenodd">
-            <g clip-path="url(#euLMgtNW1nx88)" clip-rule="evenodd">
+            <g clip-path="url(#eNV8LJcXja288)" clip-rule="evenodd">
                 <g>
                     <g transform="matrix(.965926-.258819 0.258819 0.965926 342.171997-37.540699)" clip-rule="evenodd">
                         <rect width="379.470001" height="839.249023" rx="0" ry="0"
@@ -461,7 +461,7 @@
                             stroke-linejoin="round" stroke-miterlimit="1.5" />
                     </g>
                 </g>
-                <clipPath id="euLMgtNW1nx88">
+                <clipPath id="eNV8LJcXja288">
                     <circle r="327.447998" transform="translate(905.120972 1085.439941)" clip-rule="evenodd"
                         fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="1.5" />
                 </clipPath>
@@ -473,7 +473,7 @@
                 stroke-linejoin="round" stroke-miterlimit="1.5" />
         </g>
         <g transform="matrix(-2.74187 2.74187-2.4602-2.4602 6184.259766 1039.949951)" clip-rule="evenodd">
-            <g clip-path="url(#euLMgtNW1nx97)" clip-rule="evenodd">
+            <g clip-path="url(#eNV8LJcXja297)" clip-rule="evenodd">
                 <g>
                     <path
                         d="M940.441,1130.07c77.229,0,139.929,13.9,139.929,31.03c0,17.12-62.7,31.03-139.929,31.03-77.226,0-139.923-13.91-139.923-31.03c0-17.13,62.697-31.03,139.923-31.03Zm0,7.75c57.92,0,104.939,10.43,104.939,23.28c0,12.84-47.019,23.27-104.939,23.27-57.919,0-104.942-10.43-104.942-23.27c0-12.85,47.023-23.28,104.942-23.28Z"
@@ -484,7 +484,7 @@
                         clip-rule="evenodd" fill="#f08" fill-rule="evenodd" stroke-linecap="round"
                         stroke-linejoin="round" stroke-miterlimit="1.5" />
                 </g>
-                <clipPath id="euLMgtNW1nx97">
+                <clipPath id="eNV8LJcXja297">
                     <rect width="279.847992" height="90.426003" rx="0" ry="0"
                         transform="translate(800.518005 1071.739991)" clip-rule="evenodd" fill-rule="evenodd"
                         stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="1.5" />
@@ -492,9 +492,9 @@
             </g>
         </g>
     </g>
-    <g id="euLMgtNW1nx99_to"
+    <g id="eNV8LJcXja299_to"
         style="offset-path:path('M494.837641,776.199755C494.837641,1413.042637,4020.668856,1364.083355,4020.668856,769.787458C4020.668856,213.217594,483.406256,133.703232,498.094003,774.762314');offset-rotate:0deg">
-        <g id="euLMgtNW1nx99_tr" transform="rotate(134.423712)">
+        <g id="eNV8LJcXja299_tr" transform="rotate(134.423712)">
             <g transform="translate(-2394.940063,-786.915863)" clip-rule="evenodd">
                 <g transform="matrix(1.60893 0 0 1.59288 211.364902-3526.032591)" clip-rule="evenodd">
                     <path
@@ -508,7 +508,7 @@
                         clip-rule="evenodd" fill="#fff" fill-rule="evenodd" stroke="#000" stroke-width="95.059998"
                         stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="1.5" />
                 </g>
-                <g id="euLMgtNW1nx104_ts"
+                <g id="eNV8LJcXja2104_ts"
                     transform="translate(2398.154932,988.833378) rotate(180) scale(0.257452,0.177652)">
                     <g transform="translate(-311.348426,-2657.478463)" clip-rule="evenodd">
                         <path
