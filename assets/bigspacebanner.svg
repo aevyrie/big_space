@@ -100,7 +100,7 @@
         }
 
         #eNV8LJcXja2104_ts {
-            animation: eNV8LJcXja2104_ts__ts 10000ms linear infinite normal forwards
+            animation: eNV8LJcXja2104_ts__ts 2000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja2104_ts__ts {
