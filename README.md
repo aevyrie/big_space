@@ -2,14 +2,14 @@
   
 # Big Space
 
-[![crates.io](https://img.shields.io/crates/v/big_space)](https://crates.io/crates/big_space)
-[![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
-[![test suite](https://github.com/aevyrie/big_space/actions/workflows/rust.yml/badge.svg)](https://github.com/aevyrie/big_space/actions/workflows/rust.yml)
-
 <img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="80%">
 
 Huge worlds, high performance, no dependencies, ecosystem compatibility.
  [Read the docs](https://docs.rs/big_space)
+ 
+[![crates.io](https://img.shields.io/crates/v/big_space)](https://crates.io/crates/big_space)
+[![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
+[![test suite](https://github.com/aevyrie/big_space/actions/workflows/rust.yml/badge.svg)](https://github.com/aevyrie/big_space/actions/workflows/rust.yml)
 
 </div>
 
