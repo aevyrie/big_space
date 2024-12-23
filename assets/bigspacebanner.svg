@@ -4,7 +4,7 @@
     <style>
         <![CDATA[
         #eNV8LJcXja22 {
-            animation: eNV8LJcXja22_c_o 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja22_c_o 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja22_c_o {
@@ -28,7 +28,7 @@
         }
 
         #eNV8LJcXja236 {
-            animation: eNV8LJcXja236_c_o 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja236_c_o 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja236_c_o {
@@ -62,7 +62,7 @@
         }
 
         #eNV8LJcXja299_to {
-            animation: eNV8LJcXja299_to__to 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja299_to__to 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja299_to__to {
@@ -82,7 +82,7 @@
         }
 
         #eNV8LJcXja299_tr {
-            animation: eNV8LJcXja299_tr__tr 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja299_tr__tr 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja299_tr__tr {
@@ -100,7 +100,7 @@
         }
 
         #eNV8LJcXja2104_ts {
-            animation: eNV8LJcXja2104_ts__ts 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja2104_ts__ts 2000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja2104_ts__ts {
@@ -190,7 +190,7 @@
         }
 
         #eNV8LJcXja2116_tr {
-            animation: eNV8LJcXja2116_tr__tr 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja2116_tr__tr 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja2116_tr__tr {
@@ -205,7 +205,7 @@
         }
 
         #eNV8LJcXja2116 {
-            animation: eNV8LJcXja2116_f_p 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja2116_f_p 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja2116_f_p {
@@ -219,7 +219,7 @@
         }
 
         #eNV8LJcXja2117_tr {
-            animation: eNV8LJcXja2117_tr__tr 4000ms linear infinite normal forwards
+            animation: eNV8LJcXja2117_tr__tr 10000ms linear infinite normal forwards
         }
 
         @keyframes eNV8LJcXja2117_tr__tr {
