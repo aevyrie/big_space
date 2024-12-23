@@ -6,7 +6,7 @@
 [![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
 [![test suite](https://github.com/aevyrie/big_space/actions/workflows/rust.yml/badge.svg)](https://github.com/aevyrie/big_space/actions/workflows/rust.yml)
 
-![Big space logo](https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg)
+<img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="70%">
 
 Huge worlds, high performance, no dependencies, ecosystem compatibility.
  [Read the docs](https://docs.rs/big_space)
@@ -15,7 +15,7 @@ Huge worlds, high performance, no dependencies, ecosystem compatibility.
 
 ## Highlights
 
-- Enough precision to render protons across the observable universe.
+- Enough precision to render proton-sized meshes across the observable universe.
 - Uses `Transform`, making it compatible with most of the Bevy ecosystem.
 - No added dependencies.
 - Absolute coordinates without drift, unlike camera-relative or periodic recentering solutions.
