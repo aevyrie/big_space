@@ -2,12 +2,12 @@
     html_logo_url = "https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspace.svg"
 )]
 
-//! ![big_space-logo](https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg)
+//! A floating origin plugin that uses integer grids to extend bevy's [`Transform`] component with
+//! up to 128 bits of added precision. The plugin propagates and computes [`GlobalTransform`]s
+//! relative to floating origins, making the most of 32 bit rendering precision by reducing error
+//! near the camera.
 //!
-//! A floating origin plugin that uses integer grids to extend the precision of bevy's [`Transform`]
-//! component with up to 128 bits of added precision. The plugin propagates and computes
-//! [`GlobalTransform`]s relative to a floating origin, maximizing limited 32 bit rendering
-//! precision where error is most visible.
+//! <img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" style="padding:2% 15%">
 //!
 //! ## Quick Reference
 //!

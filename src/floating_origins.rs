@@ -7,14 +7,15 @@ use bevy_utils::HashMap;
 
 /// Marks the entity to use as the floating origin.
 ///
-/// The [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all entities within this
-/// [`BigSpace`] will be computed relative to this floating origin. There should always be exactly
-/// one entity marked with this component within a [`BigSpace`].
+/// This can also be thought of as the location of the low precision 32 bit rendering origin. More
+/// accurately, the *cell* that this entity is located in defines the position of the rendering
+/// origin. As this entity moves through space, the floating origin used for computing
+/// [`GlobalTransform`](bevy_transform::components::GlobalTransform)s will only change when the
+/// entity moves into a new cell.
 ///
-/// This can also be thought of as the low precision 32 bit rendering origin. More accurately, the
-/// *cell* that this entity is located in defines the position of the rendering origin. As this
-/// entity moves through space, the floating origin used for computing `GlobalTransform`s will only
-/// change when the entity moves into a new cell.
+/// The [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all entities within this
+/// [`BigSpace`] will be computed relative to this floating origin's cell. There should always be
+/// exactly one entity marked with this component within a [`BigSpace`].
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub struct FloatingOrigin;
@@ -24,13 +25,14 @@ pub struct FloatingOrigin;
 /// [`FloatingOrigin`] inside this hierarchy.
 ///
 /// This component must also be paired with a [`Grid`](crate::Grid), which defines the properties of
-/// this root grid. A hierarchy can have many nested `Grid`s, but only one `BigSpace`, at the root.
+/// this root grid. A hierarchy can have many nested [`Grid`](crate::Grid)s, but only one
+/// [`BigSpace`], at the root.
 ///
 /// Your world can have multiple [`BigSpace`]s, and they will remain completely independent. Each
 /// big space uses the floating origin contained within it to compute the
 /// [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all spatial entities within
-/// that `BigSpace`. This is needed for features like split screen, where you may need to render the
-/// world from viewpoints that are very far from each other.
+/// that [`BigSpace`]. This is needed for features like split screen, where you may need to render
+/// the world from viewpoints that are very far from each other.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 // We do not require Grid, because we want more control over when the grid is inserted, especially
