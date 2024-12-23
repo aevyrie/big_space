@@ -1,11 +1,10 @@
 <div align="center">
-  
+
 # Big Space
 
 <img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="80%">
 
-Huge worlds, high performance, no dependencies, ecosystem compatibility.
- [Read the docs](https://docs.rs/big_space)
+Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read the docs](https://docs.rs/big_space)
  
 [![crates.io](https://img.shields.io/crates/v/big_space)](https://crates.io/crates/big_space)
 [![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
