@@ -30,7 +30,7 @@ const DISTANCE: i128 = 2_000_000;
 /// this issue.
 fn toggle_plugin(
     input: Res<ButtonInput<KeyCode>>,
-    ref_frames: ReferenceFrames<i128>,
+    grids: Grids<i128>,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
     mut floating_origin: Query<(Entity, &mut GridCell<i128>), With<FloatingOrigin>>,
@@ -39,10 +39,10 @@ fn toggle_plugin(
         *disabled = !*disabled;
     }
 
-    let this_frame = ref_frames.parent_frame(floating_origin.single().0).unwrap();
+    let this_grid = grids.parent_grid(floating_origin.single().0).unwrap();
 
     let mut origin_cell = floating_origin.single_mut().1;
-    let index_max = DISTANCE / this_frame.cell_edge_length() as i128;
+    let index_max = DISTANCE / this_grid.cell_edge_length() as i128;
     let increment = index_max / 100;
 
     let msg = if *disabled {
@@ -64,7 +64,7 @@ fn toggle_plugin(
         "Floating Origin Enabled"
     };
 
-    let dist = index_max.saturating_sub(origin_cell.x) * this_frame.cell_edge_length() as i128;
+    let dist = index_max.saturating_sub(origin_cell.x) * this_grid.cell_edge_length() as i128;
 
     let thousands = |num: i128| {
         num.to_string()
@@ -108,7 +108,7 @@ fn setup_ui(mut commands: Commands) {
 
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_big_space_default::<i128>(|root| {
-        let d = DISTANCE / root.frame().cell_edge_length() as i128;
+        let d = DISTANCE / root.grid().cell_edge_length() as i128;
         let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
         // Normally, we would put the floating origin on the camera. However in this example, we

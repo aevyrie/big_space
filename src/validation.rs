@@ -8,9 +8,7 @@ use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::{HashMap, HashSet};
 
-use crate::{
-    precision::GridPrecision, reference_frame::ReferenceFrame, BigSpace, FloatingOrigin, GridCell,
-};
+use crate::{grid::Grid, precision::GridPrecision, BigSpace, FloatingOrigin, GridCell};
 
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
@@ -113,7 +111,7 @@ However, the entity has the following components, which does not match any of th
 {}
 Common errors include:
   - Using mismatched GridPrecisions, like GridCell<i32> and GridCell<i64>
-  - Spawning an entity with a GridCell as a child of an entity without a ReferenceFrame.
+  - Spawning an entity with a GridCell as a child of an entity without a Grid.
 
 If possible, use commands.spawn_big_space(), which prevents these errors, instead of manually assembling a hierarchy. See {} for details.", entity, stack_entry.parent_node.name(), stack_entry.parent_node.name(), possibilities, inspect, file!());
                     caches.error_entities.insert(*entity);
@@ -200,7 +198,7 @@ impl<P: GridPrecision> ValidHierarchyNode for AnyNonSpatial<P> {
             .without::<Transform>()
             .without::<GlobalTransform>()
             .without::<BigSpace>()
-            .without::<ReferenceFrame<P>>()
+            .without::<Grid<P>>()
             .without::<FloatingOrigin>();
     }
 
@@ -220,7 +218,7 @@ impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<BigSpace>()
-            .with::<ReferenceFrame<P>>()
+            .with::<Grid<P>>()
             .with::<GlobalTransform>()
             .without::<GridCellAny>()
             .without::<Transform>()
@@ -252,7 +250,7 @@ impl<P: GridPrecision> ValidHierarchyNode for RootSpatialLowPrecision<P> {
             .with::<GlobalTransform>()
             .without::<GridCellAny>()
             .without::<BigSpace>()
-            .without::<ReferenceFrame<P>>()
+            .without::<Grid<P>>()
             .without::<Parent>()
             .without::<FloatingOrigin>();
     }
@@ -270,12 +268,12 @@ struct ChildFrame<P: GridPrecision>(PhantomData<P>);
 
 impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
     fn name(&self) -> &'static str {
-        "Non-root ReferenceFrame"
+        "Non-root Grid"
     }
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .with::<ReferenceFrame<P>>()
+            .with::<Grid<P>>()
             .with::<GridCell<P>>()
             .with::<Transform>()
             .with::<GlobalTransform>()
@@ -306,10 +304,10 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildRootSpatialLowPrecision<P> {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
-            .with::<crate::reference_frame::propagation::LowPrecisionRoot>()
+            .with::<crate::grid::propagation::LowPrecisionRoot>()
             .without::<GridCellAny>()
             .without::<BigSpace>()
-            .without::<ReferenceFrame<P>>()
+            .without::<Grid<P>>()
             .without::<FloatingOrigin>();
     }
 
@@ -336,7 +334,7 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
             .with::<Parent>()
             .without::<GridCellAny>()
             .without::<BigSpace>()
-            .without::<ReferenceFrame<P>>()
+            .without::<Grid<P>>()
             .without::<FloatingOrigin>();
     }
 
@@ -363,7 +361,7 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialHighPrecision<P> {
             .with::<GlobalTransform>()
             .with::<Parent>()
             .without::<BigSpace>()
-            .without::<ReferenceFrame<P>>();
+            .without::<Grid<P>>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {

@@ -8,7 +8,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             BigSpacePlugin::<i8>::default(),
-            FloatingOriginDebugPlugin::<i8>::default(), // Draws cell AABBs and reference frames
+            FloatingOriginDebugPlugin::<i8>::default(), // Draws cell AABBs and grids
             big_space::camera::CameraControllerPlugin::<i8>::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
@@ -23,13 +23,13 @@ fn setup_scene(
     let sphere = Mesh3d(meshes.add(Sphere::default()));
     let matl = MeshMaterial3d(materials.add(Color::WHITE));
 
-    commands.spawn_big_space::<i8>(ReferenceFrame::default(), |root_frame| {
+    commands.spawn_big_space::<i8>(Grid::default(), |root_grid| {
         let width = || -8..8;
         for (x, y, z) in width()
             .flat_map(|x| width().map(move |y| (x, y)))
             .flat_map(|(x, y)| width().map(move |z| (x, y, z)))
         {
-            root_frame.spawn_spatial((
+            root_grid.spawn_spatial((
                 sphere.clone(),
                 matl.clone(),
                 GridCell::<i8> {
@@ -39,8 +39,8 @@ fn setup_scene(
                 },
             ));
         }
-        root_frame.spawn_spatial(DirectionalLight::default());
-        root_frame.spawn_spatial((
+        root_grid.spawn_spatial(DirectionalLight::default());
+        root_grid.spawn_spatial((
             Camera3d::default(),
             Transform::from_xyz(0.0, 0.0, 10.0),
             FloatingOrigin,

@@ -54,7 +54,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
 
         let system_set_config = || {
             (
-                ReferenceFrame::<P>::tag_low_precision_roots // loose ordering on this set
+                Grid::<P>::tag_low_precision_roots // loose ordering on this set
                     .after(FloatingOriginSystem::Init)
                     .before(FloatingOriginSystem::PropagateLowPrecision),
                 (
@@ -65,10 +65,10 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
                 LocalFloatingOrigin::<P>::compute_all
                     .in_set(FloatingOriginSystem::LocalFloatingOrigins)
                     .after(FloatingOriginSystem::RecenterLargeTransforms),
-                ReferenceFrame::<P>::propagate_high_precision
+                Grid::<P>::propagate_high_precision
                     .in_set(FloatingOriginSystem::PropagateHighPrecision)
                     .after(FloatingOriginSystem::LocalFloatingOrigins),
-                ReferenceFrame::<P>::propagate_low_precision
+                Grid::<P>::propagate_low_precision
                     .in_set(FloatingOriginSystem::PropagateLowPrecision)
                     .after(FloatingOriginSystem::PropagateHighPrecision),
             )
@@ -81,7 +81,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
             .register_type::<GlobalTransform>()
             .register_type::<GridCell<P>>()
             .register_type::<GridCellAny>()
-            .register_type::<ReferenceFrame<P>>()
+            .register_type::<Grid<P>>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
             // Meat of the plugin, once on startup, as well as every update

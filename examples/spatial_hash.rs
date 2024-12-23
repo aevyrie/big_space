@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, hash::Hasher, time::Duration};
+use std::hash::Hasher;
 
 use bevy::{
     core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
@@ -6,8 +6,6 @@ use bevy::{
 };
 use bevy_ecs::entity::EntityHasher;
 use bevy_math::DVec3;
-use bevy_render::view::VisibilityRange;
-use bevy_utils::Instant;
 use big_space::prelude::*;
 use noise::{NoiseFn, Perlin};
 
@@ -16,8 +14,8 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             BigSpacePlugin::<i32>::default(),
-            SpatialHashPlugin::<i32>::default(),
-            SpatialPartitionPlugin::<i32>::default(),
+            GridHashPlugin::<i32>::default(),
+            GridPartitionPlugin::<i32>::default(),
             big_space::camera::CameraControllerPlugin::<i32>::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
@@ -25,7 +23,7 @@ fn main() {
             PostUpdate,
             (
                 move_player.after(TransformSystem::TransformPropagate),
-                draw_partitions.after(SpatialSystem::UpdatePartition),
+                draw_partitions.after(HashGridSystem::UpdatePartition),
             ),
         )
         .add_systems(Update, cursor_grab)
@@ -33,11 +31,11 @@ fn main() {
         .run();
 }
 
-const N_ENTITIES: usize = 100_000;
-const HALF_WIDTH: f32 = 50.0;
+const N_ENTITIES: usize = 1_000_000;
+const HALF_WIDTH: f32 = 40.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
-const MOVEMENT_SPEED: f32 = 1e5;
+const MOVEMENT_SPEED: f32 = 5e6;
 const PERCENT_STATIC: f32 = 0.9;
 
 #[derive(Component)]
@@ -76,17 +74,36 @@ impl FromWorld for MaterialPresets {
 
 fn draw_partitions(
     mut gizmos: Gizmos,
-    partitions: Res<SpatialPartitionMap<i32>>,
-    frames: Query<(&GlobalTransform, &ReferenceFrame<i32>)>,
+    partitions: Res<GridPartitionMap<i32>>,
+    grids: Query<(&GlobalTransform, &Grid<i32>)>,
+    camera: Query<&GridCellHash<i32>, With<Camera>>,
 ) {
     for (id, p) in partitions.iter() {
-        let Ok((transform, frame)) = frames.get(p.reference_frame()) else {
+        let Ok((transform, grid)) = grids.get(p.grid()) else {
             return;
         };
-        let l = frame.cell_edge_length();
+        let l = grid.cell_edge_length();
+
+        let mut hasher = EntityHasher::default();
+        hasher.write_u64(id.id());
+        let f = hasher.finish();
+        let hue = (f % 360) as f32;
+
+        p.iter()
+            .filter(|hash| *hash != camera.single())
+            .for_each(|h| {
+                let center = [h.cell().x, h.cell().y, h.cell().z];
+                let local_trans = Transform::from_translation(IVec3::from(center).as_vec3() * l)
+                    .with_scale(Vec3::splat(l));
+                gizmos.cuboid(
+                    transform.mul_transform(local_trans),
+                    Hsla::new(hue, 1.0, 0.5, 0.2),
+                );
+            });
 
         let Some(min) = p
             .iter()
+            .filter(|hash| *hash != camera.single())
             .map(|h| [h.cell().x, h.cell().y, h.cell().z])
             .reduce(|[ax, ay, az], [ix, iy, iz]| [ax.min(ix), ay.min(iy), az.min(iz)])
             .map(|v| IVec3::from(v).as_vec3() * l)
@@ -96,6 +113,7 @@ fn draw_partitions(
 
         let Some(max) = p
             .iter()
+            .filter(|hash| *hash != camera.single())
             .map(|h| [h.cell().x, h.cell().y, h.cell().z])
             .reduce(|[ax, ay, az], [ix, iy, iz]| [ax.max(ix), ay.max(iy), az.max(iz)])
             .map(|v| IVec3::from(v).as_vec3() * l)
@@ -105,16 +123,11 @@ fn draw_partitions(
 
         let size = max - min;
         let center = min + (size) * 0.5;
-        let local_trans = Transform::from_translation(center).with_scale(size + l);
-
-        let mut hasher = EntityHasher::default();
-        hasher.write_u64(id.id());
-        let f = hasher.finish();
-        let hue = (f % 360) as f32;
+        let local_trans = Transform::from_translation(center).with_scale(size + l * 2.0);
 
         gizmos.cuboid(
             transform.mul_transform(local_trans),
-            Hsla::hsl(hue, 1.0, 0.5),
+            Hsla::new(hue, 1.0, 0.5, 0.2),
         );
     }
 }
@@ -129,7 +142,7 @@ fn move_player(
             &mut Transform,
             &mut GridCell<i32>,
             &Parent,
-            &SpatialHash<i32>,
+            &GridCellHash<i32>,
         ),
         With<Player>,
     >,
@@ -139,11 +152,11 @@ fn move_player(
     >,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
-    reference_frame: Query<&ReferenceFrame<i32>>,
-    spatial_hash_map: Res<SpatialHashMap<i32>>,
+    grids: Query<&Grid<i32>>,
+    hash_grid: Res<HashGrid<i32>>,
     material_presets: Res<MaterialPresets>,
-    mut text: Query<(&mut Text, &mut StatsText)>,
-    hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::SpatialHashStats>>,
+    mut text: Query<&mut Text>,
+    hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridCellHashStats>>,
     prop_stats: Res<big_space::timing::SmoothedStat<big_space::timing::PropagationStats>>,
 ) {
     for neighbor in neighbors.iter() {
@@ -171,34 +184,31 @@ fn move_player(
         * CELL_WIDTH
         * 0.8
         * Vec3::new((5.0 * t).sin(), (7.0 * t).cos(), (20.0 * t).sin());
-    (*cell, transform.translation) = reference_frame
+    (*cell, transform.translation) = grids
         .get(parent.get())
         .unwrap()
         .imprecise_translation_to_grid(absolute_pos);
 
     neighbors.clear();
 
-    spatial_hash_map
-        .flood(hash, None)
-        .entities()
-        .for_each(|entity| {
-            neighbors.push(entity);
-            if let Ok(mut material) = materials.get_mut(entity) {
-                **material = material_presets.flood.clone_weak();
-            }
+    hash_grid.flood(hash, None).entities().for_each(|entity| {
+        neighbors.push(entity);
+        if let Ok(mut material) = materials.get_mut(entity) {
+            **material = material_presets.flood.clone_weak();
+        }
 
-            // let frame = reference_frame.get(entry.reference_frame).unwrap();
-            // let transform = frame.global_transform(
-            //     &entry.cell,
-            //     &Transform::from_scale(Vec3::splat(frame.cell_edge_length() * 0.99)),
-            // );
-            // gizmos.cuboid(transform, Color::linear_rgba(1.0, 1.0, 1.0, 0.2));
-        });
+        // let grid = grid.get(entry.grid).unwrap();
+        // let transform = grid.global_transform(
+        //     &entry.cell,
+        //     &Transform::from_scale(Vec3::splat(grid.cell_edge_length() * 0.99)),
+        // );
+        // gizmos.cuboid(transform, Color::linear_rgba(1.0, 1.0, 1.0, 0.2));
+    });
 
-    spatial_hash_map
+    hash_grid
         .get(hash)
         .unwrap()
-        .nearby(&spatial_hash_map)
+        .nearby(&hash_grid)
         .entities()
         .for_each(|entity| {
             neighbors.push(entity);
@@ -207,37 +217,10 @@ fn move_player(
             }
         });
 
-    // Time this separately, otherwise we just ending up timing how long allocations and pushing
-    // to a vec take. Here, we just want to measure how long it takes to library to fulfill the
-    // query, so we do as little extra computation as possible.
-    //
-    // The neighbor query is lazy, which means it only does work when we consume the iterator.
-    let lookup_start = Instant::now();
-    let total = spatial_hash_map
-        .flood(hash, None)
-        .map(|neighbor| neighbor.1.entities.len())
-        .sum::<usize>();
-    let elapsed = lookup_start.elapsed();
-
-    let (mut text, mut stats) = text.single_mut();
-    stats.0.truncate(0);
-    stats.0.push_front(elapsed);
-    let avg = stats
-        .0
-        .iter()
-        .sum::<Duration>()
-        .div_f32(stats.0.len() as f32);
+    let mut text = text.single_mut();
     text.0 = format!(
         "\
 Population: {: >8} Entities
-
-Neighbor Flood Fill: {: >8.1?}
-Neighbors: {: >9} Entities
-
-Spatial Hashing
-Moved Cells: {: >7?} Entities
-Compute Hashes: {: >13.1?}
-Update Maps: {: >16.1?}
 
 Transform Propagation
 Cell Recentering: {: >11.1?}
@@ -246,21 +229,25 @@ Frame Origin: {: >15.1?}
 LP Propagation: {: >13.1?}
 HP Propagation: {: >13.1?}
 
+Spatial Hashing
+Moved Cells: {: >7?} Entities
+Compute Hashes: {: >13.1?}
+Update Maps: {: >16.1?}
+Update Partitions: {: >10.1?}
+
 Total: {: >22.1?}",
         N_ENTITIES,
-        //
-        avg,
-        total,
-        //
-        hash_stats.avg().moved_cell_entities(),
-        hash_stats.avg().hash_update_duration(),
-        hash_stats.avg().map_update_duration(),
         //
         prop_stats.avg().grid_recentering(),
         prop_stats.avg().low_precision_root_tagging(),
         prop_stats.avg().local_origin_propagation(),
         prop_stats.avg().low_precision_propagation(),
         prop_stats.avg().high_precision_propagation(),
+        //
+        hash_stats.avg().moved_cell_entities(),
+        hash_stats.avg().hash_update_duration(),
+        hash_stats.avg().map_update_duration(),
+        hash_stats.avg().update_partition(),
         //
         prop_stats.avg().total() + hash_stats.avg().total(),
     );
@@ -278,7 +265,7 @@ fn spawn(
 
     let rng = || loop {
         let noise_scale = 5.0;
-        let threshold = 0.6;
+        let threshold = 0.70;
         let rng_val = || rng.f64_normalized() * noise_scale;
         let coord = [rng_val(), rng_val(), rng_val()];
         if noise.get(coord) > threshold {
@@ -290,13 +277,13 @@ fn spawn(
     let values: Vec<_> = std::iter::repeat_with(rng).take(N_ENTITIES).collect();
 
     let sphere_mesh_lq = meshes.add(
-        Sphere::new(HALF_WIDTH / (N_ENTITIES as f32).powf(0.33) * 1.1)
+        Sphere::new(HALF_WIDTH / (N_ENTITIES as f32).powf(0.33) * 0.2)
             .mesh()
             .ico(0)
             .unwrap(),
     );
 
-    commands.spawn_big_space::<i32>(ReferenceFrame::new(CELL_WIDTH, 0.0), |root| {
+    commands.spawn_big_space::<i32>(Grid::new(CELL_WIDTH, 0.0), |root| {
         root.spawn_spatial((
             FloatingOrigin,
             Camera3d::default(),
@@ -335,9 +322,9 @@ fn spawn(
                     NonPlayer,
                     Mesh3d(sphere_mesh_lq.clone()),
                     MeshMaterial3d(material_presets.default.clone_weak()),
-                    VisibilityRange {
+                    bevy_render::view::VisibilityRange {
                         start_margin: 1.0..5.0,
-                        end_margin: HALF_WIDTH * CELL_WIDTH * 2.0..HALF_WIDTH * CELL_WIDTH * 3.0,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
                         use_aabb: false,
                     },
                 ));
@@ -345,9 +332,6 @@ fn spawn(
         }
     });
 }
-
-#[derive(Component)]
-struct StatsText(VecDeque<Duration>);
 
 fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
@@ -372,7 +356,6 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     font_size: 14.0,
                     ..default()
                 },
-                StatsText(Default::default()),
             ));
         });
 }

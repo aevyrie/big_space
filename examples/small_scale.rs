@@ -18,7 +18,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins,
             BigSpacePlugin::<i128>::default(),
-            FloatingOriginDebugPlugin::<i128>::default(), // Draws cell AABBs and reference frames
+            FloatingOriginDebugPlugin::<i128>::default(), // Draws cell AABBs and grids
             big_space::camera::CameraControllerPlugin::<i128>::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
@@ -36,16 +36,16 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Because we are working on such small scales, we need to make the reference frame's grid very
-    // small. This ensures that the maximum floating point error is also very small, because no
-    // entities can ever get farther than `SMALL_SCALE * 500` units from the origin.
-    let small_reference_frame_grid = ReferenceFrame::<i128>::new(SMALL_SCALE * 1_000.0, 0.0);
+    // Because we are working on such small scales, we need to make the grid very small. This
+    // ensures that the maximum floating point error is also very small, because no entities can
+    // ever get farther than `SMALL_SCALE * 500` units from the origin.
+    let small_grid = Grid::<i128>::new(SMALL_SCALE * 1_000.0, 0.0);
 
-    commands.spawn_big_space(small_reference_frame_grid, |root_frame| {
-        root_frame.spawn_spatial(DirectionalLight::default());
+    commands.spawn_big_space(small_grid, |root_grid| {
+        root_grid.spawn_spatial(DirectionalLight::default());
 
         // A carbon atom at the origin
-        root_frame.spawn_spatial((
+        root_grid.spawn_spatial((
             Atom,
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(Color::WHITE)),
@@ -53,12 +53,12 @@ fn setup_scene(
         ));
 
         // Compute the grid cell for the far away objects
-        let (grid_cell, cell_offset) = root_frame
-            .frame()
+        let (grid_cell, cell_offset) = root_grid
+            .grid()
             .translation_to_grid(DVec3::X * BIG_DISTANCE);
 
         // A carbon atom at the other side of the milky way
-        root_frame.spawn_spatial((
+        root_grid.spawn_spatial((
             Atom,
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(Color::WHITE)),
@@ -66,7 +66,7 @@ fn setup_scene(
             grid_cell,
         ));
 
-        root_frame.spawn_spatial((
+        root_grid.spawn_spatial((
             Camera3d::default(),
             Projection::Perspective(PerspectiveProjection {
                 near: SMALL_SCALE * 0.01, // Without this, the atom would be clipped
@@ -79,7 +79,7 @@ fn setup_scene(
         ));
 
         // A space ship
-        root_frame.spawn_spatial((
+        root_grid.spawn_spatial((
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)
                 .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
@@ -101,17 +101,14 @@ fn bounce_atoms(mut atoms: Query<&mut Transform, With<Atom>>, time: Res<Time>) {
 fn toggle_cam_pos(
     mut cam: Query<&mut GridCell<i128>, With<Camera>>,
     mut toggle: Local<bool>,
-    frame: Query<&ReferenceFrame<i128>>,
+    grid: Query<&Grid<i128>>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if !keyboard.just_pressed(KeyCode::KeyT) {
         return;
     }
     *cam.single_mut() = if *toggle {
-        frame
-            .single()
-            .translation_to_grid(DVec3::X * BIG_DISTANCE)
-            .0
+        grid.single().translation_to_grid(DVec3::X * BIG_DISTANCE).0
     } else {
         GridCell::ZERO
     };

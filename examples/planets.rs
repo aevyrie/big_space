@@ -140,8 +140,8 @@ fn spawn_solar_system(
         .build(),
     ));
 
-    commands.spawn_big_space_default::<i64>(|root_frame| {
-        root_frame.with_frame_default(|sun| {
+    commands.spawn_big_space_default::<i64>(|root_grid| {
+        root_grid.with_grid_default(|sun| {
             sun.insert((Sun, Name::new("Sun")));
             sun.spawn_spatial((
                 Mesh3d(sun_mesh_handle),
@@ -154,8 +154,8 @@ fn spawn_solar_system(
             ));
 
             let earth_pos = DVec3::Z * EARTH_ORBIT_RADIUS_M;
-            let (earth_cell, earth_pos) = sun.frame().translation_to_grid(earth_pos);
-            sun.with_frame_default(|earth| {
+            let (earth_cell, earth_pos) = sun.grid().translation_to_grid(earth_pos);
+            sun.with_grid_default(|earth| {
                 earth.insert((
                     Name::new("Earth"),
                     earth_cell,
@@ -173,7 +173,7 @@ fn spawn_solar_system(
 
                 let moon_orbit_radius_m = 385e6;
                 let moon_pos = DVec3::NEG_Z * moon_orbit_radius_m;
-                let (moon_cell, moon_pos) = earth.frame().translation_to_grid(moon_pos);
+                let (moon_cell, moon_pos) = earth.grid().translation_to_grid(moon_pos);
                 earth.spawn_spatial((
                     Name::new("Moon"),
                     Mesh3d(moon_mesh_handle),
@@ -189,7 +189,7 @@ fn spawn_solar_system(
 
                 let ball_pos =
                     DVec3::X * (EARTH_RADIUS_M + 1.0) + DVec3::NEG_Z * 30.0 + DVec3::Y * 10.0;
-                let (ball_cell, ball_pos) = earth.frame().translation_to_grid(ball_pos);
+                let (ball_cell, ball_pos) = earth.grid().translation_to_grid(ball_pos);
                 earth
                     .spawn_spatial((ball_cell, Transform::from_translation(ball_pos)))
                     .with_children(|children| {
@@ -215,8 +215,8 @@ fn spawn_solar_system(
                     });
 
                 let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
-                let (cam_cell, cam_pos) = earth.frame().translation_to_grid(cam_pos);
-                earth.with_frame_default(|camera| {
+                let (cam_cell, cam_pos) = earth.grid().translation_to_grid(cam_pos);
+                earth.with_grid_default(|camera| {
                     camera.insert((
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
                         big_space::camera::CameraController::default() // Built-in camera controller
@@ -255,7 +255,7 @@ fn spawn_solar_system(
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());
         let rng = Rng::new();
         (0..1000).for_each(|_| {
-            root_frame.spawn_spatial((
+            root_grid.spawn_spatial((
                 Mesh3d(star_mesh_handle.clone()),
                 MeshMaterial3d(star_mat.clone()),
                 Transform::from_xyz(

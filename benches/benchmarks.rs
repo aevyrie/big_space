@@ -21,11 +21,11 @@ criterion_main!(benches);
 fn global_transform(c: &mut Criterion) {
     let mut group = c.benchmark_group("propagation");
     group.bench_function("global_transform", |b| {
-        let frame = ReferenceFrame::default();
+        let grid = Grid::default();
         let local_cell = GridCell { x: 1, y: 1, z: 1 };
         let local_transform = Transform::from_xyz(9.0, 200.0, 500.0);
         b.iter(|| {
-            black_box(frame.global_transform(&local_cell, &local_transform));
+            black_box(grid.global_transform(&local_cell, &local_transform));
         });
     });
 }
@@ -38,13 +38,10 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("deep_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(ReferenceFrame::new(10000.0, 0.0), |root| {
-            let mut parent = root.spawn_frame_default(()).id();
+        commands.spawn_big_space::<i32>(Grid::new(10000.0, 0.0), |root| {
+            let mut parent = root.spawn_grid_default(()).id();
             for _ in 0..N_SPAWN {
-                let child = root
-                    .commands()
-                    .spawn(BigReferenceFrameBundle::<i32>::default())
-                    .id();
+                let child = root.commands().spawn(BigGridBundle::<i32>::default()).id();
                 root.commands().entity(parent).add_child(child);
                 parent = child;
             }
@@ -61,7 +58,7 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        SpatialHashPlugin::<i32>::default(),
+        GridHashPlugin::<i32>::default(),
         BigSpacePlugin::<i32>::default(),
     ))
     .add_systems(Startup, setup)
@@ -83,7 +80,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("wide_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(ReferenceFrame::new(10000.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(Grid::new(10000.0, 0.0), |root| {
             for _ in 0..N_SPAWN {
                 root.spawn_spatial(());
             }
@@ -100,7 +97,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        SpatialHashPlugin::<i32>::default(),
+        GridHashPlugin::<i32>::default(),
         BigSpacePlugin::<i32>::default(),
     ))
     .add_systems(Startup, setup)
@@ -125,7 +122,7 @@ fn spatial_hashing(c: &mut Criterion) {
     const N_MOVE: usize = 1_000;
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(ReferenceFrame::new(1.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(Grid::new(1.0, 0.0), |root| {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 [
@@ -150,7 +147,7 @@ fn spatial_hashing(c: &mut Criterion) {
     }
 
     let mut app = App::new();
-    app.add_plugins(SpatialHashPlugin::<i32>::default())
+    app.add_plugins(GridHashPlugin::<i32>::default())
         .add_systems(Startup, setup)
         .update();
 
@@ -167,12 +164,12 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let map = app.world().resource::<SpatialHashMap<i32>>();
+    let map = app.world().resource::<HashGrid<i32>>();
     let first = map
         .all_entries()
         .find(|(_, entry)| !entry.entities.is_empty())
         .unwrap();
-    group.bench_function("SpatialHashMap::get", |b| {
+    group.bench_function("HashGrid::get", |b| {
         b.iter(|| {
             black_box(map.get(first.0).unwrap());
         });
@@ -188,13 +185,9 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    // let parent = app
-    //     .world_mut()
-    //     .query::<&SpatialHash<i32>>()
-    //     .get(app.world(), ent)
-    //     .unwrap();
-    // let map = app.world().resource::<SpatialHashMap<i32>>();
-    // let entry = map.get(parent).unwrap();
+    // let parent = app .world_mut() .query::<&GridCellHash<i32>>() .get(app.world(), ent)
+    //     .unwrap(); let map = app.world().resource::<HashGrid<i32>>(); let entry =
+    //     map.get(parent).unwrap();
 
     // group.bench_function("Neighbors radius: 4", |b| {
     //     b.iter(|| {
@@ -212,7 +205,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // });
 
     fn setup_uniform<const HALF_EXTENT: i32>(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(ReferenceFrame::new(1.0, 0.0), |root| {
+        commands.spawn_big_space::<i32>(Grid::new(1.0, 0.0), |root| {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
                     for z in HALF_EXTENT.neg()..HALF_EXTENT {
@@ -226,7 +219,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000
 
     let mut app = App::new();
-    app.add_plugins(SpatialHashPlugin::<i32>::default())
+    app.add_plugins(GridHashPlugin::<i32>::default())
         .add_systems(Startup, setup_uniform::<5>)
         .update();
 
@@ -234,8 +227,8 @@ fn spatial_hashing(c: &mut Criterion) {
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world());
-    let spatial_map = app.world().resource::<SpatialHashMap<i32>>();
-    let hash = SpatialHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let spatial_map = app.world().resource::<HashGrid<i32>>();
+    let hash = GridCellHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
     assert_eq!(spatial_map.nearby(entry).count(), 27);
@@ -254,7 +247,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000_000
 
     let mut app = App::new();
-    app.add_plugins(SpatialHashPlugin::<i32>::default())
+    app.add_plugins(GridHashPlugin::<i32>::default())
         .add_systems(Startup, setup_uniform::<50>)
         .update();
 
@@ -262,8 +255,8 @@ fn spatial_hashing(c: &mut Criterion) {
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world());
-    let spatial_map = app.world().resource::<SpatialHashMap<i32>>();
-    let hash = SpatialHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let spatial_map = app.world().resource::<HashGrid<i32>>();
+    let hash = GridCellHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
     assert_eq!(spatial_map.nearby(entry).count(), 27);
@@ -324,7 +317,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((SpatialHashPlugin::<i32>::default(),));
+    app.add_plugins((GridHashPlugin::<i32>::default(),));
     group.bench_function("No Filter Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -336,7 +329,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((SpatialHashPlugin::<i32, With<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<i32, With<Player>>::default(),));
     group.bench_function("With Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -348,7 +341,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((SpatialHashPlugin::<i32, Without<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<i32, Without<Player>>::default(),));
     group.bench_function("Without Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -360,9 +353,9 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((SpatialHashPlugin::<i32>::default(),))
-        .add_plugins((SpatialHashPlugin::<i32, With<Player>>::default(),))
-        .add_plugins((SpatialHashPlugin::<i32, Without<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<i32>::default(),))
+        .add_plugins((GridHashPlugin::<i32, With<Player>>::default(),))
+        .add_plugins((GridHashPlugin::<i32, Without<Player>>::default(),));
     group.bench_function("All Plugins", |b| {
         b.iter(|| {
             black_box(app.update());

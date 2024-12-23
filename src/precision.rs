@@ -26,7 +26,7 @@ use bevy_reflect::{FromReflect, GetTypeRegistration, Reflect, TypePath, Typed};
 /// precision of 0.5mm in any of these cases.
 ///
 /// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,
-/// there is enough precision to render objects the size of quarks anywhere in the observable
+/// there is enough precision to render objects the size of protons anywhere in the observable
 /// universe.
 ///
 /// # Note

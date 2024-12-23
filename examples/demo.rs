@@ -150,7 +150,7 @@ fn ui_text_system(
         (With<BigSpaceDebugText>, Without<FunFactText>),
     >,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
-    ref_frames: ReferenceFrames<i128>,
+    grids: Grids<i128>,
     time: Res<Time>,
     origin: Query<(Entity, GridTransformReadOnly<i128>), With<FloatingOrigin>>,
     camera: Query<&CameraController>,
@@ -169,11 +169,11 @@ fn ui_text_system(
         translation.x, translation.y, translation.z
     );
 
-    let Some(ref_frame) = ref_frames.parent_frame(origin_entity) else {
+    let Some(grid) = grids.parent_grid(origin_entity) else {
         return;
     };
 
-    let real_position = ref_frame.grid_position_double(origin_pos.cell, origin_pos.transform);
+    let real_position = grid.grid_position_double(origin_pos.cell, origin_pos.transform);
     let real_position_f64_text = format!(
         "Combined (f64): {}x, {}y, {}z",
         real_position.x, real_position.y, real_position.z

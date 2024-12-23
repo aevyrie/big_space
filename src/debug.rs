@@ -20,7 +20,7 @@ impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
             .add_systems(Startup, setup_gizmos)
             .add_systems(
                 PostUpdate,
-                (update_debug_bounds::<P>, update_reference_frame_axes::<P>)
+                (update_debug_bounds::<P>, update_grid_axes::<P>)
                     .chain()
                     .after(bevy_transform::TransformSystem::TransformPropagate),
             );
@@ -37,16 +37,16 @@ fn setup_gizmos(mut store: ResMut<GizmoConfigStore>) {
 /// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.
 fn update_debug_bounds<P: GridPrecision>(
     mut gizmos: Gizmos<BigSpaceGizmoConfig>,
-    reference_frames: ReferenceFrames<P>,
+    grids: Grids<P>,
     occupied_cells: Query<(Entity, &GridCell<P>, Option<&FloatingOrigin>)>,
 ) {
     for (cell_entity, cell, origin) in occupied_cells.iter() {
-        let Some(frame) = reference_frames.parent_frame(cell_entity) else {
+        let Some(grid) = grids.parent_grid(cell_entity) else {
             continue;
         };
-        let transform = frame.global_transform(
+        let transform = grid.global_transform(
             cell,
-            &Transform::from_scale(Vec3::splat(frame.cell_edge_length() * 0.999)),
+            &Transform::from_scale(Vec3::splat(grid.cell_edge_length() * 0.999)),
         );
         if origin.is_none() {
             gizmos.cuboid(transform, Color::linear_rgb(0.0, 1.0, 0.0))
@@ -61,15 +61,15 @@ struct BigSpaceGizmoConfig;
 
 impl GizmoConfigGroup for BigSpaceGizmoConfig {}
 
-/// Draw axes for reference frames.
-fn update_reference_frame_axes<P: GridPrecision>(
+/// Draw axes for grids.
+fn update_grid_axes<P: GridPrecision>(
     mut gizmos: Gizmos<BigSpaceGizmoConfig>,
-    frames: Query<(&GlobalTransform, &ReferenceFrame<P>)>,
+    grids: Query<(&GlobalTransform, &Grid<P>)>,
 ) {
-    for (transform, frame) in frames.iter() {
+    for (transform, grid) in grids.iter() {
         let start = transform.translation();
         // Scale with distance
-        let len = (start.length().powf(0.9)).max(frame.cell_edge_length()) * 0.5;
+        let len = (start.length().powf(0.9)).max(grid.cell_edge_length()) * 0.5;
         gizmos.ray(
             start,
             transform.right() * len,

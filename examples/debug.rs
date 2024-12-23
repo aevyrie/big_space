@@ -64,7 +64,7 @@ fn setup(
         ..default()
     });
 
-    commands.spawn_big_space::<i64>(ReferenceFrame::new(1.0, 0.01), |root| {
+    commands.spawn_big_space::<i64>(Grid::new(1.0, 0.01), |root| {
         root.spawn_spatial((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(matl_handle.clone()),
@@ -79,15 +79,15 @@ fn setup(
             Mover::<2>,
         ));
 
-        root.with_frame(ReferenceFrame::new(0.2, 0.01), |new_frame| {
-            new_frame.insert((
+        root.with_grid(Grid::new(0.2, 0.01), |new_grid| {
+            new_grid.insert((
                 Mesh3d(mesh_handle.clone()),
                 MeshMaterial3d(matl_handle.clone()),
                 Transform::from_xyz(0.0, 1.0, 0.0),
                 Rotator,
                 Mover::<3>,
             ));
-            new_frame.spawn_spatial((
+            new_grid.spawn_spatial((
                 Mesh3d(mesh_handle),
                 MeshMaterial3d(matl_handle),
                 Transform::from_xyz(0.0, 0.5, 0.0),

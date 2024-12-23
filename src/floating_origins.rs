@@ -10,34 +10,40 @@ use bevy_utils::HashMap;
 /// The [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all entities within this
 /// [`BigSpace`] will be computed relative to this floating origin. There should always be exactly
 /// one entity marked with this component within a [`BigSpace`].
+///
+/// This can also be thought of as the low precision 32 bit rendering origin. More accurately, the
+/// *cell* that this entity is located in defines the position of the rendering origin. As this
+/// entity moves through space, the floating origin used for computing `GlobalTransform`s will only
+/// change when the entity moves into a new cell.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub struct FloatingOrigin;
 
-/// A "big space" is a hierarchy of high precision reference frames, rendered with a floating
-/// origin. It is the root of this high precision hierarchy, and tracks the [`FloatingOrigin`]
-/// inside this hierarchy.
+/// A "big space" is a hierarchy of high precision [`Grid`](crate::Grid)s, rendered relative to a
+/// [`FloatingOrigin`]. This component marks the root of a high precision hierarchy, and tracks the
+/// [`FloatingOrigin`] inside this hierarchy.
 ///
-/// This component must also be paired with a [`ReferenceFrame`](crate::ReferenceFrame), which
-/// defines the properties of this root reference frame. A hierarchy can have many nested
-/// `ReferenceFrame`s, but only one `BigSpace`, at the root.
+/// This component must also be paired with a [`Grid`](crate::Grid), which defines the properties of
+/// this root grid. A hierarchy can have many nested `Grid`s, but only one `BigSpace`, at the root.
 ///
 /// Your world can have multiple [`BigSpace`]s, and they will remain completely independent. Each
 /// big space uses the floating origin contained within it to compute the
 /// [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all spatial entities within
-/// that `BigSpace`.
+/// that `BigSpace`. This is needed for features like split screen, where you may need to render the
+/// world from viewpoints that are very far from each other.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
-// We do not require ReferenceFrame, because we want more control over when the reference frame is
-// inserted, especially with the command extension.
+// We do not require Grid, because we want more control over when the grid is inserted, especially
+// with the command extension.
 pub struct BigSpace {
     /// Set the entity to use as the floating origin within this high precision hierarchy.
+    ///
+    /// This is automatically set by [`Self::find_floating_origin`].
     pub floating_origin: Option<Entity>,
 }
 
 impl BigSpace {
-    /// Return the this reference frame's floating origin if it exists and is a descendent of this
-    /// root.
+    /// Return the this grid's floating origin if it exists and is a descendent of this root.
     ///
     /// `this_entity`: the entity this component belongs to.
     pub(crate) fn validate_floating_origin(
@@ -64,7 +70,9 @@ impl BigSpace {
             space.floating_origin = None;
             spaces_set.insert(entity, 0);
         }
-        // Navigate to the root of the hierarchy, starting from each floating origin. This is faster than the reverse direction because it is a tree, and an entity can only have a single parent, but many children. The root should have an empty floating_origin field.
+        // Navigate to the root of the hierarchy, starting from each floating origin. This is faster
+        // than the reverse direction because it is a tree, and an entity can only have a single
+        // parent, but many children. The root should have an empty floating_origin field.
         for origin in &floating_origins {
             let maybe_root = parent_query.iter_ancestors(origin).last();
             if let Some((root, mut space)) =

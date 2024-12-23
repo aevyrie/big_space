@@ -20,17 +20,22 @@ use bevy_utils::Instant;
 #[reflect(Component, Default)]
 pub struct GridCellAny;
 
-/// The cell index an entity within a [`crate::ReferenceFrame`]'s grid. The [`Transform`] of an
-/// entity with this component is a transformation from the center of this cell.
+/// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
+/// this component is a transformation from the center of this cell.
+///
+/// All entities with a [`GridCell`] must be children of an entity with a [`Grid`].
 ///
 /// This component adds precision to the translation of an entity's [`Transform`]. In a
-/// high-precision [`BigSpace`] world, the position of an entity is described by a [`Transform`]
-/// *and* a [`GridCell`]. This component is the index of a cell inside a large grid defined by the
-/// [`ReferenceFrame`], and the transform is the position of the entity relative to the center of
-/// that cell.
+/// high-precision [`BigSpace`], the position of an entity is described by a [`Transform`] *and* a
+/// [`GridCell`]. This component is the index of a cell inside a large [`Grid`], and the
+/// [`Transform`] is the floating point position of the entity relative to the center of this cell.
 ///
-/// Entities and an entity hierarchies are only allowed to have a single type of `GridCell`, you
-/// cannot mix [`GridPrecision`]s.
+/// If an entity's [`Transform`] becomes large enough that the entity leaves the bounds of its cell,
+/// the [`GridCell`] and [`Transform`] will be automatically recomputed to keep the [`Transform`]
+/// small.
+///
+/// [`BigSpace`]s are only allowed to have a single type of `GridCell`, you cannot mix
+/// [`GridPrecision`]s.
 #[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 #[require(Transform, GlobalTransform)]
@@ -73,28 +78,27 @@ impl<P: GridPrecision> GridCell<P> {
         z: P::ONE,
     };
 
-    /// Convert this grid cell to a floating point translation within this `reference_frame`.
-    pub fn as_dvec3(&self, reference_frame: &ReferenceFrame<P>) -> DVec3 {
+    /// Convert this grid cell to a floating point translation within this `grid`.
+    pub fn as_dvec3(&self, grid: &Grid<P>) -> DVec3 {
         DVec3 {
-            x: self.x.as_f64() * reference_frame.cell_edge_length() as f64,
-            y: self.y.as_f64() * reference_frame.cell_edge_length() as f64,
-            z: self.z.as_f64() * reference_frame.cell_edge_length() as f64,
+            x: self.x.as_f64() * grid.cell_edge_length() as f64,
+            y: self.y.as_f64() * grid.cell_edge_length() as f64,
+            z: self.z.as_f64() * grid.cell_edge_length() as f64,
         }
     }
 
     /// If an entity's transform translation becomes larger than the limit specified in its
-    /// [`ReferenceFrame`], it will be relocated to the nearest grid cell to reduce the size of the
-    /// transform.
+    /// [`Grid`], it will be relocated to the nearest grid cell to reduce the size of the transform.
     pub fn recenter_large_transforms(
         mut stats: ResMut<crate::timing::PropagationStats>,
-        reference_frames: Query<&ReferenceFrame<P>>,
+        grids: Query<&Grid<P>>,
         mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
     ) {
         let start = Instant::now();
         changed_transform
             .par_iter_mut()
             .for_each(|(mut grid_pos, mut transform, parent)| {
-                let Ok(reference_frame) = reference_frames.get(parent.get()) else {
+                let Ok(grid) = grids.get(parent.get()) else {
                     return;
                 };
                 if transform
@@ -102,12 +106,11 @@ impl<P: GridPrecision> GridCell<P> {
                     .translation
                     .abs()
                     .max_element()
-                    > reference_frame.maximum_distance_from_origin()
+                    > grid.maximum_distance_from_origin()
                 {
-                    let (grid_cell_delta, translation) = reference_frame
-                        .imprecise_translation_to_grid(
-                            transform.bypass_change_detection().translation,
-                        );
+                    let (grid_cell_delta, translation) = grid.imprecise_translation_to_grid(
+                        transform.bypass_change_detection().translation,
+                    );
                     *grid_pos += grid_cell_delta;
                     transform.translation = translation;
                 }

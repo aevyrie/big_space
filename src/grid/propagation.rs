@@ -1,4 +1,4 @@
-//! Logic for propagating transforms through the hierarchy of reference frames.
+//! Logic for propagating transforms through the hierarchy of grids.
 
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
@@ -16,12 +16,12 @@ use bevy_transform::prelude::*;
 #[derive(Component, Default, Reflect)]
 pub struct LowPrecisionRoot;
 
-impl<P: GridPrecision> ReferenceFrame<P> {
-    /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`ReferenceFrame`]
-    /// the entity belongs to.
+impl<P: GridPrecision> Grid<P> {
+    /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`Grid`] the entity
+    /// belongs to.
     pub fn propagate_high_precision(
         mut stats: ResMut<crate::timing::PropagationStats>,
-        reference_frames: Query<&ReferenceFrame<P>>,
+        grids: Query<&Grid<P>>,
         mut entities: ParamSet<(
             Query<(
                 Ref<GridCell<P>>,
@@ -29,63 +29,61 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 Ref<Parent>,
                 &mut GlobalTransform,
             )>,
-            Query<(&ReferenceFrame<P>, &mut GlobalTransform), With<BigSpace>>,
+            Query<(&Grid<P>, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
         let start = bevy_utils::Instant::now();
 
-        // Performance note: I've also tried to iterate over each reference frame's children at
-        // once, to avoid the reference frame and parent lookup, but that made things worse because
-        // it prevented dumb parallelism. The only thing I can see to make this faster is archetype
-        // change detection. Change filters are not archetype filters, so they scale with the total
-        // number of entities that match the query, regardless of change.
+        // Performance note: I've also tried to iterate over each grid's children at once, to avoid
+        // the grid and parent lookup, but that made things worse because it prevented dumb
+        // parallelism. The only thing I can see to make this faster is archetype change detection.
+        // Change filters are not archetype filters, so they scale with the total number of entities
+        // that match the query, regardless of change.
         entities
             .p0()
             .par_iter_mut()
-            .for_each(|(grid, transform, parent, mut global_transform)| {
-                if let Ok(frame) = reference_frames.get(parent.get()) {
+            .for_each(|(cell, transform, parent, mut global_transform)| {
+                if let Ok(grid) = grids.get(parent.get()) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
-                    // moved and the floating origin's local origin in that reference frame hasn't
-                    // changed.
+                    // moved and the floating origin's local origin in that grid hasn't changed.
                     //
                     // This also ensures we don't trigger change detection on GlobalTransforms when
                     // they haven't changed.
                     //
                     // This check can have a big impact on reducing computations for entities in the
-                    // same reference frame as the floating origin, i.e. the main camera. It also
-                    // means that as the floating origin moves between cells, that could suddenly
-                    // cause a spike in the amount of computation needed that frame. In the future,
-                    // we might be able to spread that work across frames, entities far away can
-                    // maybe be delayed for a frame or two without being noticeable.
-                    if !frame.local_floating_origin().is_local_origin_unchanged()
+                    // same grid as the floating origin, i.e. the main camera. It also means that as
+                    // the floating origin moves between cells, that could suddenly cause a spike in
+                    // the amount of computation needed that grid. In the future, we might be able
+                    // to spread that work across grids, entities far away can maybe be delayed for
+                    // a grid or two without being noticeable.
+                    if !grid.local_floating_origin().is_local_origin_unchanged()
                         || transform.is_changed()
-                        || grid.is_changed()
+                        || cell.is_changed()
                         || parent.is_changed()
                     {
-                        *global_transform = frame.global_transform(&grid, &transform);
+                        *global_transform = grid.global_transform(&cell, &transform);
                     }
                 }
             });
 
-        // Root reference frames
+        // Root grids
         //
-        // These are handled separately because the root reference frame doesn't have a
-        // Transform or GridCell - it wouldn't make sense because it is the root, and these
-        // components are relative to their parent. Due to floating origins, it *is* possible
-        // for the root reference frame to have a GlobalTransform - this is what makes it
-        // possible to place a low precision (Transform only) entity in a root transform - it is
-        // relative to the origin of the root frame.
+        // These are handled separately because the root grid doesn't have a Transform or GridCell -
+        // it wouldn't make sense because it is the root, and these components are relative to their
+        // parent. Due to floating origins, it *is* possible for the root grid to have a
+        // GlobalTransform - this is what makes it possible to place a low precision (Transform
+        // only) entity in a root transform - it is relative to the origin of the root grid.
         entities
             .p1()
             .iter_mut()
-            .for_each(|(frame, mut global_transform)| {
-                if frame.local_floating_origin().is_local_origin_unchanged() {
-                    return; // By definition, this means the frame has not moved
+            .for_each(|(grid, mut global_transform)| {
+                if grid.local_floating_origin().is_local_origin_unchanged() {
+                    return; // By definition, this means the grid has not moved
                 }
-                // The global transform of the root frame is the same as the transform of an entity
+                // The global transform of the root grid is the same as the transform of an entity
                 // at the origin - it is determined entirely by the local origin position:
                 *global_transform =
-                    frame.global_transform(&GridCell::default(), &Transform::IDENTITY);
+                    grid.global_transform(&GridCell::default(), &Transform::IDENTITY);
             });
 
         stats.high_precision_propagation += start.elapsed();
@@ -148,8 +146,8 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             Ref<GlobalTransform>,
             (
                 // A root big space does not have a grid cell, and not all high precision entities
-                // have a reference frame
-                Or<(With<ReferenceFrame<P>>, With<GridCell<P>>)>,
+                // have a grid
+                Or<(With<Grid<P>>, With<GridCell<P>>)>,
             ),
         >,
         roots: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
@@ -159,7 +157,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 With<Parent>,
                 Without<GridCellAny>,
                 Without<GridCell<P>>, // Used to prove access to GlobalTransform is disjoint
-                Without<ReferenceFrame<P>>,
+                Without<Grid<P>>,
             ),
         >,
         parent_query: Query<
@@ -168,14 +166,14 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 With<Transform>,
                 With<GlobalTransform>,
                 Without<GridCellAny>,
-                Without<ReferenceFrame<P>>,
+                Without<Grid<P>>,
             ),
         >,
     ) {
         let start = bevy_utils::Instant::now();
         let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
-            // High precision global transforms are change-detected, and are only updated if
-            // that entity has moved relative to the floating origin's grid cell.
+            // High precision global transforms are change-detected, and are only updated if that
+            // entity has moved relative to the floating origin's grid cell.
             let changed = parent_transform.is_changed();
 
             // SAFETY:
@@ -232,7 +230,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 With<Parent>,
                 Without<GridCellAny>, // ***ADDED*** Only recurse low-precision entities
                 Without<GridCell<P>>, // ***ADDED*** Only recurse low-precision entities
-                Without<ReferenceFrame<P>>, // ***ADDED*** Only recurse low-precision entities
+                Without<Grid<P>>,     // ***ADDED*** Only recurse low-precision entities
             ),
         >,
         parent_query: &Query<
@@ -241,7 +239,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
                 With<Transform>,
                 With<GlobalTransform>,
                 Without<GridCellAny>,
-                Without<ReferenceFrame<P>>,
+                Without<Grid<P>>,
             ),
         >,
         entity: Entity,
@@ -251,30 +249,25 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             let Ok((transform, mut global_transform, children)) =
             // SAFETY: This call cannot create aliased mutable references.
             //   - The top level iteration parallelizes on the roots of the hierarchy.
-            //   - The caller ensures that each child has one and only one unique parent throughout the entire
-            //     hierarchy.
+            //   - The caller ensures that each child has one and only one unique parent throughout
+            //     the entire hierarchy.
             //
             // For example, consider the following malformed hierarchy:
             //
             //     A
             //   /   \
-            //  B     C
-            //   \   /
-            //     D
+            //  B     C \   / D
             //
-            // D has two parents, B and C. If the propagation passes through C, but the Parent component on D points to B,
-            // the above check will panic as the origin parent does match the recorded parent.
+            // D has two parents, B and C. If the propagation passes through C, but the Parent
+            // component on D points to B, the above check will panic as the origin parent does
+            // match the recorded parent.
             //
             // Also consider the following case, where A and B are roots:
             //
-            //  A       B
-            //   \     /
-            //    C   D
-            //     \ /
-            //      E
+            //  A       B \     / C   D \ / E
             //
-            // Even if these A and B start two separate tasks running in parallel, one of them will panic before attempting
-            // to mutably access E.
+            // Even if these A and B start two separate tasks running in parallel, one of them will
+            // panic before attempting to mutably access E.
             (unsafe { transform_query.get_unchecked(entity) }) else {
                 return;
             };
@@ -292,11 +285,11 @@ impl<P: GridPrecision> ReferenceFrame<P> {
             actual_parent.get(), entity,
             "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
         );
-            // SAFETY: The caller guarantees that `transform_query` will not be fetched
-            // for any descendants of `entity`, so it is safe to call `propagate_recursive` for each child.
+            // SAFETY: The caller guarantees that `transform_query` will not be fetched for any
+            // descendants of `entity`, so it is safe to call `propagate_recursive` for each child.
             //
-            // The above assertion ensures that each child has one and only one unique parent throughout the
-            // entire hierarchy.
+            // The above assertion ensures that each child has one and only one unique parent
+            // throughout the entire hierarchy.
             unsafe {
                 Self::propagate_recursive(
                     global_matrix.as_ref(),

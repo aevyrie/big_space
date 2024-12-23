@@ -28,7 +28,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
                 default_camera_inputs
                     .before(camera_controller::<P>)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects_in_frame::<P>.before(camera_controller::<P>),
+                nearest_objects_in_grid::<P>.before(camera_controller::<P>),
                 camera_controller::<P>.before(TransformSystem::TransformPropagate),
             ),
         );
@@ -133,8 +133,9 @@ impl Default for CameraController {
     }
 }
 
-/// ButtonInput state used to command camera motion. Reset every time the values are read to update the
-/// camera. Allows you to map any input to camera motions. Uses aircraft principle axes conventions.
+/// ButtonInput state used to command camera motion. Reset every time the values are read to update
+/// the camera. Allows you to map any input to camera motions. Uses aircraft principle axes
+/// conventions.
 #[derive(Clone, Debug, Default, Reflect, Resource)]
 pub struct CameraInput {
     /// When disabled, the camera input system is not run.
@@ -156,7 +157,7 @@ pub struct CameraInput {
 }
 
 impl CameraInput {
-    /// Reset the controller back to zero to ready fro the next frame.
+    /// Reset the controller back to zero to ready fro the next grid.
     pub fn reset(&mut self) {
         *self = CameraInput {
             defaults_disabled: self.defaults_disabled,
@@ -209,8 +210,8 @@ pub fn default_camera_inputs(
     }
 }
 
-/// Find the object nearest the camera, within the same reference frame as the camera.
-pub fn nearest_objects_in_frame<P: GridPrecision>(
+/// Find the object nearest the camera, within the same grid as the camera.
+pub fn nearest_objects_in_grid<P: GridPrecision>(
     objects: Query<(
         Entity,
         &Transform,
@@ -261,7 +262,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
-    frames: crate::reference_frame::local_origin::ReferenceFrames<P>,
+    grids: crate::grid::local_origin::Grids<P>,
     mut input: ResMut<CameraInput>,
     mut camera: Query<(
         Entity,
@@ -271,7 +272,7 @@ pub fn camera_controller<P: GridPrecision>(
     )>,
 ) {
     for (camera, mut cell, mut transform, mut controller) in camera.iter_mut() {
-        let Some(frame) = frames.parent_frame(camera) else {
+        let Some(grid) = grids.parent_grid(camera) else {
             continue;
         };
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
@@ -293,7 +294,7 @@ pub fn camera_controller<P: GridPrecision>(
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
-        let (cell_offset, new_translation) = frame.translation_to_grid(vel_t_next);
+        let (cell_offset, new_translation) = grid.translation_to_grid(vel_t_next);
         let new = *cell.bypass_change_detection() + cell_offset;
         cell.set_if_neq(new);
         transform.translation += new_translation;
@@ -301,7 +302,7 @@ pub fn camera_controller<P: GridPrecision>(
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
         transform.rotation *= new_rotation.as_quat();
 
-        // Store the new velocity to be used in the next frame
+        // Store the new velocity to be used in the next grid
         controller.vel_translation = vel_t_next;
         controller.vel_rotation = new_rotation;
 

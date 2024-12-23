@@ -1,4 +1,4 @@
-//! Spatial hashing acceleration structure. See [`SpatialHashPlugin`].
+//! Spatial hashing acceleration structure. See [`GridHashPlugin`].
 
 use std::marker::PhantomData;
 
@@ -10,51 +10,58 @@ pub mod component;
 pub mod map;
 pub mod partition;
 
-/// Add spatial hashing acceleration to `big_space`, accessible through the [`SpatialHashMap`]
-/// resource, and [`SpatialHash`] components.
+/// Add spatial hashing acceleration to `big_space`, accessible through the [`HashGrid`] resource,
+/// and [`GridCellHash`] components.
 ///
-/// You can optionally add a [`SpatialHashFilter`] to this plugin, to only run the spatial hashing
-/// on entities that match the query filter. This is useful if you only want to, say, compute hashes
-/// and insert in the [`SpatialHashMap`] for `Player` entities.
+/// You can optionally add a [`HashGridFilter`] to this plugin, to only run the spatial hashing on
+/// entities that match the query filter. This is useful if you only want to, say, compute hashes
+/// and insert in the [`HashGrid`] for `Player` entities.
 ///
 /// If you are adding multiple copies of this plugin with different filters, there are optimizations
 /// in place to avoid duplicating work. However, you should still take care to avoid excessively
 /// overlapping filters.
-pub struct SpatialHashPlugin<P: GridPrecision, F: SpatialHashFilter = ()>(PhantomData<(P, F)>);
+pub struct GridHashPlugin<P, F = ()>(PhantomData<(P, F)>)
+where
+    P: GridPrecision,
+    F: HashGridFilter;
 
-impl<P: GridPrecision, F: SpatialHashFilter> Plugin for SpatialHashPlugin<P, F> {
+impl<P, F> Plugin for GridHashPlugin<P, F>
+where
+    P: GridPrecision,
+    F: HashGridFilter,
+{
     fn build(&self, app: &mut App) {
-        app.init_resource::<SpatialHashMap<P, F>>()
-            .init_resource::<ChangedSpatialHashes<P, F>>()
-            .register_type::<SpatialHash<P>>()
+        app.init_resource::<HashGrid<P, F>>()
+            .init_resource::<ChangedGridCells<P, F>>()
+            .register_type::<GridCellHash<P>>()
             .add_systems(
                 PostUpdate,
                 (
-                    SpatialHash::<P>::update::<F>
-                        .in_set(SpatialSystem::UpdateHash)
+                    GridCellHash::<P>::update::<F>
+                        .in_set(HashGridSystem::UpdateHash)
                         .after(FloatingOriginSystem::RecenterLargeTransforms),
-                    SpatialHashMap::<P, F>::update
-                        .in_set(SpatialSystem::UpdateMap)
-                        .after(SpatialSystem::UpdateHash),
+                    HashGrid::<P, F>::update
+                        .in_set(HashGridSystem::UpdateMap)
+                        .after(HashGridSystem::UpdateHash),
                 ),
             );
     }
 }
 
-impl<P: GridPrecision, F: SpatialHashFilter> Default for SpatialHashPlugin<P, F> {
+impl<P: GridPrecision, F: HashGridFilter> Default for GridHashPlugin<P, F> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-/// System sets for [`SpatialHashPlugin`].
+/// System sets for [`GridHashPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
-pub enum SpatialSystem {
-    /// [`SpatialHash`] updated.
+pub enum HashGridSystem {
+    /// [`GridCellHash`] updated.
     UpdateHash,
-    /// [`SpatialHashMap`] updated.
+    /// [`HashGrid`] updated.
     UpdateMap,
-    /// [`SpatialPartitionMap`] updated.
+    /// [`GridPartitionMap`] updated.
     UpdatePartition,
 }
 
@@ -62,13 +69,13 @@ pub enum SpatialSystem {
 /// hashing.The trait is automatically implemented for all compatible types, like [`With`] or
 /// [`Without`].
 ///
-/// By default, this is `()`, but it can be overidden when adding the [`SpatialHashPlugin`] and
-/// [`SpatialHashMap`]. For example, if you use `With<Players>` as your filter, only `Player`s would
-/// be considered when building spatial hash maps. This is useful when you only care about querying
+/// By default, this is `()`, but it can be overidden when adding the [`GridHashPlugin`] and
+/// [`HashGrid`]. For example, if you use `With<Players>` as your filter, only `Player`s would be
+/// considered when building spatial hash maps. This is useful when you only care about querying
 /// certain entities, and want to avoid the plugin doing bookkeeping work for entities you don't
 /// care about.
-pub trait SpatialHashFilter: QueryFilter + Send + Sync + 'static {}
-impl<T: QueryFilter + Send + Sync + 'static> SpatialHashFilter for T {}
+pub trait HashGridFilter: QueryFilter + Send + Sync + 'static {}
+impl<T: QueryFilter + Send + Sync + 'static> HashGridFilter for T {}
 
 /// Used to manually track spatial hashes that have changed, for optimization purposes.
 ///
@@ -84,12 +91,12 @@ impl<T: QueryFilter + Send + Sync + 'static> SpatialHashFilter for T {}
 /// It may be possible to remove this if bevy gets archetype change detection, or observers that can
 /// react to a component being mutated. For now, this performs well enough.
 #[derive(Resource)]
-struct ChangedSpatialHashes<P: GridPrecision, F: SpatialHashFilter> {
+struct ChangedGridCells<P: GridPrecision, F: HashGridFilter> {
     list: Vec<Entity>,
     spooky: PhantomData<(P, F)>,
 }
 
-impl<P: GridPrecision, F: SpatialHashFilter> Default for ChangedSpatialHashes<P, F> {
+impl<P: GridPrecision, F: HashGridFilter> Default for ChangedGridCells<P, F> {
     fn default() -> Self {
         Self {
             list: Vec::new(),
@@ -107,7 +114,7 @@ impl<P: GridPrecision, F: SpatialHashFilter> Default for ChangedSpatialHashes<P,
 mod tests {
     use std::sync::OnceLock;
 
-    use crate::{prelude::*, spatial_hash::map::SpatialEntryToEntities};
+    use crate::{hash::map::SpatialEntryToEntities, prelude::*};
     use bevy_utils::hashbrown::HashSet;
 
     #[test]
@@ -124,31 +131,23 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(SpatialHashPlugin::<i32>::default())
+        app.add_plugins(GridHashPlugin::<i32>::default())
             .add_systems(Update, setup)
             .update();
 
         let hash = *app
             .world()
             .entity(*ENTITY.get().unwrap())
-            .get::<SpatialHash<i32>>()
+            .get::<GridCellHash<i32>>()
             .unwrap();
 
-        assert!(app
-            .world()
-            .resource::<SpatialHashMap<i32>>()
-            .get(&hash)
-            .is_some());
+        assert!(app.world().resource::<HashGrid<i32>>().get(&hash).is_some());
 
         app.world_mut().despawn(*ENTITY.get().unwrap());
 
         app.update();
 
-        assert!(app
-            .world()
-            .resource::<SpatialHashMap<i32>>()
-            .get(&hash)
-            .is_none());
+        assert!(app.world().resource::<HashGrid<i32>>().get(&hash).is_none());
     }
 
     #[test]
@@ -177,22 +176,22 @@ mod tests {
 
                 root.commands().insert_resource(ParentSet { a, b, c });
 
-                root.with_frame_default(|frame| {
-                    let x = frame.spawn_spatial(GridCell::new(0, 1, 2)).id();
-                    let y = frame.spawn_spatial(GridCell::new(0, 1, 2)).id();
-                    let z = frame.spawn_spatial(GridCell::new(5, 5, 5)).id();
-                    frame.commands().insert_resource(ChildSet { x, y, z });
+                root.with_grid_default(|grid| {
+                    let x = grid.spawn_spatial(GridCell::new(0, 1, 2)).id();
+                    let y = grid.spawn_spatial(GridCell::new(0, 1, 2)).id();
+                    let z = grid.spawn_spatial(GridCell::new(5, 5, 5)).id();
+                    grid.commands().insert_resource(ChildSet { x, y, z });
                 });
             });
         };
 
         let mut app = App::new();
-        app.add_plugins(SpatialHashPlugin::<i32>::default())
+        app.add_plugins(GridHashPlugin::<i32>::default())
             .add_systems(Update, setup);
 
         app.update();
 
-        let mut spatial_hashes = app.world_mut().query::<&SpatialHash<i32>>();
+        let mut spatial_hashes = app.world_mut().query::<&GridCellHash<i32>>();
 
         let parent = app.world().resource::<ParentSet>().clone();
         let child = app.world().resource::<ChildSet>().clone();
@@ -229,7 +228,7 @@ mod tests {
 
         let entities = &app
             .world()
-            .resource::<SpatialHashMap<i32>>()
+            .resource::<HashGrid<i32>>()
             .get(spatial_hashes.get(app.world(), parent.a).unwrap())
             .unwrap()
             .entities;
@@ -264,7 +263,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(SpatialHashPlugin::<i32>::default())
+        app.add_plugins(GridHashPlugin::<i32>::default())
             .add_systems(Startup, setup);
 
         app.update();
@@ -276,8 +275,10 @@ mod tests {
             .get(app.world(), entities.a)
             .unwrap();
 
-        let map = app.world().resource::<SpatialHashMap<i32>>();
-        let entry = map.get(&SpatialHash::new(parent, &GridCell::ZERO)).unwrap();
+        let map = app.world().resource::<HashGrid<i32>>();
+        let entry = map
+            .get(&GridCellHash::new(parent, &GridCell::ZERO))
+            .unwrap();
         let neighbors: HashSet<Entity> = map.nearby(entry).entities().collect();
 
         assert!(neighbors.contains(&entities.a));
@@ -285,7 +286,7 @@ mod tests {
         assert!(!neighbors.contains(&entities.c));
 
         let flooded: HashSet<Entity> = map
-            .flood(&SpatialHash::new(parent, &GridCell::ZERO), None)
+            .flood(&GridCellHash::new(parent, &GridCell::ZERO), None)
             .entities()
             .collect();
 
@@ -314,32 +315,30 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins((
-            SpatialHashPlugin::<i32>::default(),
-            SpatialHashPlugin::<i32, With<Player>>::default(),
-            SpatialHashPlugin::<i32, Without<Player>>::default(),
+            GridHashPlugin::<i32>::default(),
+            GridHashPlugin::<i32, With<Player>>::default(),
+            GridHashPlugin::<i32, Without<Player>>::default(),
         ))
         .add_systems(Startup, setup)
         .update();
 
-        let zero_hash = SpatialHash::from_parent(*ROOT.get().unwrap(), &GridCell::ZERO);
+        let zero_hash = GridCellHash::from_parent(*ROOT.get().unwrap(), &GridCell::ZERO);
 
-        let map = app.world().resource::<SpatialHashMap<i32>>();
+        let map = app.world().resource::<HashGrid<i32>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             3,
             "There are a total of 3 spatial entities"
         );
 
-        let map = app.world().resource::<SpatialHashMap<i32, With<Player>>>();
+        let map = app.world().resource::<HashGrid<i32, With<Player>>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             1,
             "There is only one entity with the Player component"
         );
 
-        let map = app
-            .world()
-            .resource::<SpatialHashMap<i32, Without<Player>>>();
+        let map = app.world().resource::<HashGrid<i32, Without<Player>>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             2,
@@ -347,8 +346,8 @@ mod tests {
         );
     }
 
-    /// Verify that [`SpatialHashMap::just_removed`] and [`SpatialHashMap::just_inserted`] work
-    /// correctly when entities are spawned and move between cells.
+    /// Verify that [`HashGrid::just_removed`] and [`HashGrid::just_inserted`] work correctly when
+    /// entities are spawned and move between cells.
     #[test]
     fn spatial_map_changed_cell_tracking() {
         use bevy::prelude::*;
@@ -373,7 +372,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins((
             BigSpacePlugin::<i32>::default(),
-            SpatialHashPlugin::<i32>::default(),
+            GridHashPlugin::<i32>::default(),
         ))
         .add_systems(Startup, setup);
 
@@ -382,7 +381,7 @@ mod tests {
         let entities = app.world().resource::<Entities>().clone();
         let get_hash = |app: &mut App, entity| {
             *app.world_mut()
-                .query::<&SpatialHash<i32>>()
+                .query::<&GridCellHash<i32>>()
                 .get(app.world(), entity)
                 .unwrap()
         };
@@ -390,7 +389,7 @@ mod tests {
         let a_hash_t0 = get_hash(&mut app, entities.a);
         let b_hash_t0 = get_hash(&mut app, entities.b);
         let c_hash_t0 = get_hash(&mut app, entities.c);
-        let map = app.world().resource::<SpatialHashMap<i32>>();
+        let map = app.world().resource::<HashGrid<i32>>();
         assert!(map.just_inserted().contains(&a_hash_t0));
         assert!(map.just_inserted().contains(&b_hash_t0));
         assert!(map.just_inserted().contains(&c_hash_t0));
@@ -412,14 +411,14 @@ mod tests {
         let a_hash_t1 = get_hash(&mut app, entities.a);
         let b_hash_t1 = get_hash(&mut app, entities.b);
         let c_hash_t1 = get_hash(&mut app, entities.c);
-        let map = app.world().resource::<SpatialHashMap<i32>>();
+        let map = app.world().resource::<HashGrid<i32>>();
 
-        // Last frame
+        // Last grid
         assert!(map.just_removed().contains(&a_hash_t0)); // Moved cell
         assert!(map.just_removed().contains(&b_hash_t0)); // Moved cell via transform
         assert!(!map.just_removed().contains(&c_hash_t0)); // Did not move
 
-        // Current frame
+        // Current grid
         assert!(map.just_inserted().contains(&a_hash_t1)); // Moved cell
         assert!(map.just_inserted().contains(&b_hash_t1)); // Moved cell via transform
         assert!(!map.just_inserted().contains(&c_hash_t1)); // Did not move

@@ -1,6 +1,5 @@
-//! Adds the concept of hierarchical, nesting [`ReferenceFrame`]s, to group entities that move
-//! through space together, like entities on a planet, rotating about the planet's axis, and,
-//! orbiting a star.
+//! Adds the concept of hierarchical, nesting [`Grid`]s, to group entities that move through space
+//! together, like entities on a planet, rotating about the planet's axis, and, orbiting a star.
 
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
@@ -10,35 +9,29 @@ use bevy_transform::prelude::*;
 
 use local_origin::LocalFloatingOrigin;
 
+pub mod cell;
 pub mod local_origin;
 pub mod propagation;
 
-/// A component that defines a reference frame for children of this entity with [`GridCell`]s. All
-/// entities with a [`GridCell`] must be children of an entity with a [`ReferenceFrame`]. The
-/// reference frame *defines* the grid that the `GridCell` indexes into.
+/// A component that defines a spatial grid that child entities are located on. Child entities are
+/// located on this grid with the [`GridCell`] component.
 ///
-/// ## Motivation
+/// All entities with a [`GridCell`] must be children of an entity with a [`Grid`].
 ///
-/// Reference frames are hierarchical, allowing more precision for objects with similar relative
-/// velocities. All entities in the same reference frame will move together, like standard transform
-/// propagation, but with much more precision. Entities in the same reference frame as the
-/// [`FloatingOrigin`] will be rendered with the most precision. Transforms are propagated starting
-/// from the floating origin, ensuring that references frames in a similar point in the hierarchy
-/// have accumulated the least error. Reference frames are transformed relative to each other using
-/// 64 bit float transforms.
+/// Grids are hierarchical, allowing more precision for objects with similar relative velocities.
+/// All entities in the same grid will move together, like standard transform propagation, but with
+/// much more precision.
 ///
-/// ## Example
-///
-/// You can use reference frames to ensure all entities on a planet, and the planet itself, are in
-/// the same rotating reference frame, instead of moving rapidly through space around a star, or
-/// worse, around the center of the galaxy.
+/// Entities in the same grid as the [`FloatingOrigin`] will be rendered with the most precision.
+/// Transforms are propagated starting from the floating origin, ensuring that grids in a similar
+/// point in the hierarchy have accumulated the least error. Grids are transformed relative to each
+/// other using 64 bit float transforms.
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Component)]
 // We do not require the Transform, GlobalTransform, or GridCell, because these are not required in
 // all cases: e.g. BigSpace should not have a Transform or GridCell.
-pub struct ReferenceFrame<P: GridPrecision + Reflect> {
-    /// The high-precision position of the floating origin's current grid cell local to this
-    /// reference frame.
+pub struct Grid<P: GridPrecision> {
+    /// The high-precision position of the floating origin's current grid cell local to this grid.
     local_floating_origin: LocalFloatingOrigin<P>,
     /// Defines the uniform scale of the grid by the length of the edge of a grid cell.
     cell_edge_length: f32,
@@ -46,15 +39,14 @@ pub struct ReferenceFrame<P: GridPrecision + Reflect> {
     maximum_distance_from_origin: f32,
 }
 
-impl<P: GridPrecision> Default for ReferenceFrame<P> {
+impl<P: GridPrecision> Default for Grid<P> {
     fn default() -> Self {
         Self::new(2_000f32, 100f32)
     }
 }
 
-impl<P: GridPrecision> ReferenceFrame<P> {
-    /// Construct a new [`ReferenceFrame`]. The properties of a reference frame cannot be changed
-    /// after construction.
+impl<P: GridPrecision> Grid<P> {
+    /// Construct a new [`Grid`]. The properties of a grid cannot be changed after construction.
     pub fn new(cell_edge_length: f32, switching_threshold: f32) -> Self {
         Self {
             local_floating_origin: LocalFloatingOrigin::default(),
@@ -63,26 +55,26 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         }
     }
 
-    /// Get the position of the floating origin relative to the current reference frame.
+    /// Get the position of the floating origin relative to the current grid.
     #[inline]
     pub fn local_floating_origin(&self) -> &LocalFloatingOrigin<P> {
         &self.local_floating_origin
     }
 
-    /// Get the size of each cell this reference frame's grid.
+    /// Get the size of each cell this grid's grid.
     #[inline]
     pub fn cell_edge_length(&self) -> f32 {
         self.cell_edge_length
     }
 
-    /// Get the reference frame's [`Self::maximum_distance_from_origin`].
+    /// Get the grid's [`Self::maximum_distance_from_origin`].
     #[inline]
     pub fn maximum_distance_from_origin(&self) -> f32 {
         self.maximum_distance_from_origin
     }
 
     /// Compute the double precision position of an entity's [`Transform`] with respect to the given
-    /// [`GridCell`] within this reference frame.
+    /// [`GridCell`] within this grid.
     #[inline]
     pub fn grid_position_double(&self, pos: &GridCell<P>, transform: &Transform) -> DVec3 {
         DVec3 {
@@ -104,7 +96,7 @@ impl<P: GridPrecision> ReferenceFrame<P> {
     }
 
     /// Returns the floating point position of a [`GridCell`].
-    pub fn grid_to_float(&self, pos: &GridCell<P>) -> DVec3 {
+    pub fn cell_to_float(&self, pos: &GridCell<P>) -> DVec3 {
         DVec3 {
             x: pos.x.as_f64(),
             y: pos.y.as_f64(),
@@ -146,20 +138,19 @@ impl<P: GridPrecision> ReferenceFrame<P> {
         self.translation_to_grid(input.as_dvec3())
     }
 
-    /// Compute the [`GlobalTransform`] of an entity in this reference frame.
+    /// Compute the [`GlobalTransform`] of an entity in this grid.
     #[inline]
     pub fn global_transform(
         &self,
         local_cell: &GridCell<P>,
         local_transform: &Transform,
     ) -> GlobalTransform {
-        // The reference frame transform from the floating origin's reference frame, to the local
-        // reference frame.
-        let transform_origin = self.local_floating_origin().reference_frame_transform();
+        // The grid transform from the floating origin's grid, to the local grid.
+        let transform_origin = self.local_floating_origin().grid_transform();
         // The grid cell offset of this entity relative to the floating origin's cell in this local
-        // reference frame.
+        // grid.
         let cell_origin_relative = *local_cell - self.local_floating_origin().cell();
-        let grid_offset = self.grid_to_float(&cell_origin_relative);
+        let grid_offset = self.cell_to_float(&cell_origin_relative);
         let local_transform = DAffine3::from_scale_rotation_translation(
             local_transform.scale.as_dvec3(),
             local_transform.rotation.as_dquat(),

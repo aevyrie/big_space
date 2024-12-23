@@ -11,17 +11,17 @@ fn main() {
             BigSpacePlugin::<i64>::default(),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
-            // bevy_hanabi::HanabiPlugin, // TODO fix once hanabi updates to bevy 0.15
+            bevy_hanabi::HanabiPlugin, // TODO fix once hanabi updates to bevy 0.15
         ))
-        // .add_systems(Startup, setup_scene)
-        // .add_systems(
-        //     PostUpdate,
-        //     update_trail.after(TransformSystem::TransformPropagate),
-        // )
+        .add_systems(Startup, setup_scene)
+        .add_systems(
+            PostUpdate,
+            update_trail.after(TransformSystem::TransformPropagate),
+        )
         .run();
 }
 
-/* fn setup_scene(
+fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -29,24 +29,21 @@ fn main() {
 ) {
     let effect = effects.add(particle_effect());
     commands.spawn_big_space_default::<i64>(|root| {
-        root.spawn_spatial(DirectionalLightBundle::default());
-        root.spawn_spatial(PbrBundle {
-            mesh: meshes.add(Sphere::default()),
-            material: materials.add(Color::BLACK),
-            ..default()
-        });
+        root.spawn_spatial(DirectionalLight::default());
+        root.spawn_spatial((
+            Mesh3d(meshes.add(Sphere::default())),
+            MeshMaterial3d(materials.add(Color::BLACK)),
+        ));
 
         root.spawn_spatial((
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 0.0, 50.0),
-                camera: Camera {
-                    hdr: true,
-                    clear_color: ClearColorConfig::Custom(Color::BLACK),
-                    ..default()
-                },
-                ..Default::default()
+            Transform::from_xyz(0.0, 0.0, 50.0),
+            Camera {
+                hdr: true,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                ..default()
             },
-            bevy::core_pipeline::bloom::BloomSettings {
+            Camera3d::default(),
+            bevy::core_pipeline::bloom::Bloom {
                 intensity: 0.2,
                 ..default()
             },
@@ -54,7 +51,7 @@ fn main() {
             big_space::camera::CameraController::default().with_smoothness(0.98, 0.9),
         ));
 
-        // Because we want the trail to be fixed in the root reference frame, we spawn it here,
+        // Because we want the trail to be fixed in the root grid, we spawn it here,
         // instead of on the camera itself.
         root.spawn_spatial((
             Name::new("effect"),
@@ -165,4 +162,3 @@ fn particle_effect() -> bevy_hanabi::EffectAsset {
         })
         .render_groups(render_color, ParticleGroupSet::single(1))
 }
- */
