@@ -6,7 +6,7 @@
 [![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
 [![test suite](https://github.com/aevyrie/big_space/actions/workflows/rust.yml/badge.svg)](https://github.com/aevyrie/big_space/actions/workflows/rust.yml)
 
-<img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="70%">
+<img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="80%">
 
 Huge worlds, high performance, no dependencies, ecosystem compatibility.
  [Read the docs](https://docs.rs/big_space)
