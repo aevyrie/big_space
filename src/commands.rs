@@ -160,8 +160,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
         }
     }
 
-    /// Spawn a grid as a child of the current grid. The first argument in the closure is the
-    /// paren't grid.
+    /// Spawn a grid as a child of the current grid.
     pub fn spawn_grid_default(&mut self, bundle: impl Bundle) -> GridCommands<P> {
         self.spawn_grid(Grid::default(), bundle)
     }

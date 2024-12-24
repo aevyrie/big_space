@@ -31,11 +31,12 @@ fn main() {
         .run();
 }
 
-const N_ENTITIES: usize = 1_000_000;
+// Try bumping this up to really stress test. I'm able to push a million entities with an M3 Max.
+const N_ENTITIES: usize = 100_000;
 const HALF_WIDTH: f32 = 40.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
-const MOVEMENT_SPEED: f32 = 5e6;
+const MOVEMENT_SPEED: f32 = 5.0;
 const PERCENT_STATIC: f32 = 0.9;
 
 #[derive(Component)]
@@ -137,15 +138,7 @@ fn draw_partitions(
 fn move_player(
     time: Res<Time>,
     mut _gizmos: Gizmos,
-    mut player: Query<
-        (
-            &mut Transform,
-            &mut GridCell<i32>,
-            &Parent,
-            &GridHash<i32>,
-        ),
-        With<Player>,
-    >,
+    mut player: Query<(&mut Transform, &mut GridCell<i32>, &Parent, &GridHash<i32>), With<Player>>,
     mut non_player: Query<
         (&mut Transform, &mut GridCell<i32>, &Parent),
         (Without<Player>, With<NonPlayer>),
@@ -166,7 +159,7 @@ fn move_player(
     }
 
     let t = time.elapsed_secs() * 1.0;
-    let scale = MOVEMENT_SPEED / (N_ENTITIES as f32 * HALF_WIDTH);
+    let scale = MOVEMENT_SPEED / HALF_WIDTH;
     if scale.abs() > 0.0 {
         // Avoid change detection
         for (i, (mut transform, _, _)) in non_player.iter_mut().enumerate() {
