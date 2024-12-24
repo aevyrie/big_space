@@ -64,44 +64,44 @@ harness = false
 [[example]]
 name = "debug"
 path = "examples/debug.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "error_child"
 path = "examples/error_child.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "error"
 path = "examples/error.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "infinite"
 path = "examples/infinite.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "minimal"
 path = "examples/minimal.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "particles"
 path = "examples/particles.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
 
 [[example]]
 name = "split_screen"
 path = "examples/split_screen.rs"
-doc-scrape-examples = true
+doc-scrape-examples = false
