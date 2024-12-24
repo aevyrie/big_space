@@ -1,17 +1,15 @@
 #![allow(clippy::type_complexity)]
 
-use bevy::prelude::*;
-use bevy_color::palettes;
-use big_space::{commands::BigSpaceCommands, reference_frame::ReferenceFrame, FloatingOrigin};
+use bevy::{color::palettes, prelude::*};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i64>::default(),
+            DefaultPlugins,
+            BigSpacePlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
-        .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement, rotation))
         .run();
@@ -62,11 +60,11 @@ fn setup(
 ) {
     let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
     let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::Srgba(palettes::basic::YELLOW),
+        base_color: Color::Srgba(palettes::basic::WHITE),
         ..default()
     });
 
-    commands.spawn_big_space(ReferenceFrame::<i64>::new(1.0, 0.01), |root| {
+    commands.spawn_big_space::<i64>(Grid::new(1.0, 0.01), |root| {
         root.spawn_spatial((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(matl_handle.clone()),
@@ -81,15 +79,15 @@ fn setup(
             Mover::<2>,
         ));
 
-        root.with_frame(ReferenceFrame::new(0.2, 0.01), |new_frame| {
-            new_frame.insert((
+        root.with_grid(Grid::new(0.2, 0.01), |new_grid| {
+            new_grid.insert((
                 Mesh3d(mesh_handle.clone()),
                 MeshMaterial3d(matl_handle.clone()),
                 Transform::from_xyz(0.0, 1.0, 0.0),
                 Rotator,
                 Mover::<3>,
             ));
-            new_frame.spawn_spatial((
+            new_grid.spawn_spatial((
                 Mesh3d(mesh_handle),
                 MeshMaterial3d(matl_handle),
                 Transform::from_xyz(0.0, 0.5, 0.0),

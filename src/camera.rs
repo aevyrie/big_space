@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
@@ -16,11 +17,6 @@ use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
 use bevy_utils::HashSet;
 
-use crate::{
-    precision::GridPrecision, reference_frame::local_origin::ReferenceFrames,
-    world_query::GridTransform,
-};
-
 /// Adds the `big_space` camera controller
 #[derive(Default)]
 pub struct CameraControllerPlugin<P: GridPrecision>(PhantomData<P>);
@@ -32,7 +28,7 @@ impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
                 default_camera_inputs
                     .before(camera_controller::<P>)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects_in_frame::<P>.before(camera_controller::<P>),
+                nearest_objects_in_grid::<P>.before(camera_controller::<P>),
                 camera_controller::<P>.before(TransformSystem::TransformPropagate),
             ),
         );
@@ -122,11 +118,11 @@ impl CameraController {
 impl Default for CameraController {
     fn default() -> Self {
         Self {
-            smoothness: 0.8,
-            rotational_smoothness: 0.5,
+            smoothness: 0.85,
+            rotational_smoothness: 0.8,
             speed: 1.0,
-            speed_pitch: 1.0,
-            speed_yaw: 1.0,
+            speed_pitch: 2.0,
+            speed_yaw: 2.0,
             speed_roll: 1.0,
             speed_bounds: [1e-17, 1e30],
             slow_near_objects: true,
@@ -137,8 +133,9 @@ impl Default for CameraController {
     }
 }
 
-/// ButtonInput state used to command camera motion. Reset every time the values are read to update the
-/// camera. Allows you to map any input to camera motions. Uses aircraft principle axes conventions.
+/// ButtonInput state used to command camera motion. Reset every time the values are read to update
+/// the camera. Allows you to map any input to camera motions. Uses aircraft principle axes
+/// conventions.
 #[derive(Clone, Debug, Default, Reflect, Resource)]
 pub struct CameraInput {
     /// When disabled, the camera input system is not run.
@@ -160,7 +157,7 @@ pub struct CameraInput {
 }
 
 impl CameraInput {
-    /// Reset the controller back to zero to ready fro the next frame.
+    /// Reset the controller back to zero to ready fro the next grid.
     pub fn reset(&mut self) {
         *self = CameraInput {
             defaults_disabled: self.defaults_disabled,
@@ -213,15 +210,15 @@ pub fn default_camera_inputs(
     }
 }
 
-/// Find the object nearest the camera, within the same reference frame as the camera.
-pub fn nearest_objects_in_frame<P: GridPrecision>(
+/// Find the object nearest the camera, within the same grid as the camera.
+pub fn nearest_objects_in_grid<P: GridPrecision>(
     objects: Query<(
         Entity,
         &Transform,
         &GlobalTransform,
         &Aabb,
         Option<&RenderLayers>,
-        Option<&InheritedVisibility>,
+        &InheritedVisibility,
     )>,
     mut camera: Query<(
         Entity,
@@ -234,6 +231,9 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
     let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.get_single_mut() else {
         return;
     };
+    if !camera.slow_near_objects {
+        return;
+    }
     let cam_layer = cam_layer.to_owned().unwrap_or_default();
     let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
 
@@ -244,10 +244,7 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
             let obj_layer = obj_layer.unwrap_or_default();
             cam_layer.intersects(obj_layer)
         })
-        .filter(|(.., visibility)| {
-            let visibility = visibility.copied().unwrap_or(InheritedVisibility::VISIBLE);
-            visibility.get()
-        })
+        .filter(|(.., visibility)| visibility.get())
         .map(|(entity, object_local, obj_pos, aabb, ..)| {
             let center_distance =
                 obj_pos.translation().as_dvec3() - cam_pos.translation().as_dvec3();
@@ -265,12 +262,17 @@ pub fn nearest_objects_in_frame<P: GridPrecision>(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller<P: GridPrecision>(
     time: Res<Time>,
-    frames: ReferenceFrames<P>,
+    grids: crate::grid::local_origin::Grids<P>,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(Entity, GridTransform<P>, &mut CameraController)>,
+    mut camera: Query<(
+        Entity,
+        &mut GridCell<P>,
+        &mut Transform,
+        &mut CameraController,
+    )>,
 ) {
-    for (camera, mut position, mut controller) in camera.iter_mut() {
-        let Some(frame) = frames.parent_frame(camera) else {
+    for (camera, mut cell, mut transform, mut controller) in camera.iter_mut() {
+        let Some(grid) = grids.parent_grid(camera) else {
             continue;
         };
         let speed = match (controller.nearest_object, controller.slow_near_objects) {
@@ -288,18 +290,19 @@ pub fn camera_controller<P: GridPrecision>(
         let (vel_t_target, vel_r_target) =
             input.target_velocity(&controller, speed, time.delta_secs_f64());
 
-        let cam_rot = position.transform.rotation.as_dquat();
+        let cam_rot = transform.rotation.as_dquat();
         let vel_t_next = cam_rot * vel_t_target; // Orients the translation to match the camera
         let vel_t_next = vel_t_current.lerp(vel_t_next, lerp_translation);
         // Convert the high precision translation to a grid cell and low precision translation
-        let (cell_offset, new_translation) = frame.translation_to_grid(vel_t_next);
-        *position.cell += cell_offset;
-        position.transform.translation += new_translation;
+        let (cell_offset, new_translation) = grid.translation_to_grid(vel_t_next);
+        let new = *cell.bypass_change_detection() + cell_offset;
+        cell.set_if_neq(new);
+        transform.translation += new_translation;
 
         let new_rotation = vel_r_current.slerp(vel_r_target, lerp_rotation);
-        position.transform.rotation *= new_rotation.as_quat();
+        transform.rotation *= new_rotation.as_quat();
 
-        // Store the new velocity to be used in the next frame
+        // Store the new velocity to be used in the next grid
         controller.vel_translation = vel_t_next;
         controller.vel_rotation = new_rotation;
 

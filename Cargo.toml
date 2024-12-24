@@ -8,13 +8,20 @@ keywords = ["bevy", "floating-origin", "large-scale", "space"]
 repository = "https://github.com/aevyrie/big_space"
 documentation = "https://docs.rs/crate/big_space/latest"
 
+[features]
+default = []
+debug = ["bevy_gizmos", "bevy_color"]
+camera = ["bevy_render", "bevy_time", "bevy_input"]
+
 [dependencies]
-tracing = { version = "0.1", default-features = false }
+tracing = "0.1" # Less deps than pulling in bevy_log
+smallvec = "1.13.2" # Already used by bevy in commands
 bevy_app = { version = "0.15.0", default-features = false }
-bevy_ecs = { version = "0.15.0", default-features = false }
+bevy_ecs = { version = "0.15.0", default-features = true }
 bevy_hierarchy = { version = "0.15.0", default-features = false }
 bevy_math = { version = "0.15.0", default-features = false }
 bevy_reflect = { version = "0.15.0", default-features = false }
+bevy_tasks = { version = "0.15.0", default-features = false }
 bevy_transform = { version = "0.15.0", default-features = false, features = [
     "bevy-support",
 ] }
@@ -26,9 +33,12 @@ bevy_render = { version = "0.15.0", default-features = false, optional = true }
 bevy_input = { version = "0.15.0", default-features = false, optional = true }
 bevy_time = { version = "0.15.0", default-features = false, optional = true }
 
+
 [dev-dependencies]
+big_space = { path = "", features = ["debug", "camera"] }
 bevy = { version = "0.15.0", default-features = false, features = [
     "bevy_scene",
+    "bevy_asset",
     "bevy_gltf",
     "bevy_winit",
     "default_font",
@@ -41,45 +51,57 @@ bevy = { version = "0.15.0", default-features = false, features = [
     "tonemapping_luts",
     "multi_threaded",
 ] }
-rand = "0.8.5"
+noise = "0.9"
+turborand = "0.10"
+criterion = "0.5"
+bytemuck = "1.20"
+bevy_hanabi = "0.14"
 
-[features]
-default = ["debug", "camera", "bevy_render"]
-debug = ["bevy_gizmos", "bevy_color"]
-camera = ["bevy_render", "bevy_time", "bevy_input"]
-
-[[example]]
-name = "demo"
-path = "examples/demo.rs"
-required-features = ["default"]
-doc-scrape-examples = true
+[[bench]]
+name = "benchmarks"
+harness = false
 
 [[example]]
 name = "debug"
 path = "examples/debug.rs"
-required-features = ["default"]
 doc-scrape-examples = true
 
 [[example]]
-name = "error"
-path = "examples/error.rs"
-required-features = ["default"]
+name = "demo"
+path = "examples/demo.rs"
 doc-scrape-examples = true
 
 [[example]]
 name = "error_child"
 path = "examples/error_child.rs"
-required-features = ["default"]
+doc-scrape-examples = true
+
+[[example]]
+name = "error"
+path = "examples/error.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "infinite"
+path = "examples/infinite.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "minimal"
+path = "examples/minimal.rs"
+doc-scrape-examples = true
+
+[[example]]
+name = "particles"
+path = "examples/particles.rs"
 doc-scrape-examples = true
 
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
-required-features = ["default"]
 doc-scrape-examples = true
 
 [[example]]
 name = "split_screen"
 path = "examples/split_screen.rs"
-required-features = ["default"]
 doc-scrape-examples = true

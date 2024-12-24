@@ -1,6 +1,5 @@
+use crate::prelude::*;
 use bevy::prelude::*;
-
-use crate::{BigSpacePlugin, BigSpaceRootBundle, FloatingOrigin, GridCell};
 
 #[test]
 fn changing_floating_origin_updates_global_transform() {

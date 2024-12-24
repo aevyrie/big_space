@@ -1,9 +1,7 @@
 use std::collections::VecDeque;
 
-/// Example with spheres at the scale and distance of the earth and moon around the sun, at 1:1
-/// scale. The earth is rotating on its axis, and the camera is in this reference frame, to
-/// demonstrate how high precision nested reference frames work at large scales.
 use bevy::{
+    color::palettes,
     core_pipeline::bloom::Bloom,
     math::DVec3,
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
@@ -11,22 +9,14 @@ use bevy::{
     render::camera::Exposure,
     transform::TransformSystem,
 };
-use bevy_color::palettes;
-use big_space::{
-    camera::{CameraController, CameraInput},
-    commands::BigSpaceCommands,
-    reference_frame::ReferenceFrame,
-    FloatingOrigin,
-};
-use rand::Rng;
+use big_space::prelude::*;
+use turborand::{rng::Rng, TurboRand};
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::new(),
-            big_space::BigSpacePlugin::<i64>::new(true),
-            // big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
+            DefaultPlugins,
+            BigSpacePlugin::<i64>::new(true),
             big_space::camera::CameraControllerPlugin::<i64>::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
@@ -43,7 +33,7 @@ fn main() {
                     .in_set(TransformSystem::TransformPropagate)
                     .after(bevy::transform::systems::sync_simple_transforms)
                     .after(bevy::transform::systems::propagate_transforms)
-                    .after(big_space::FloatingOriginSet::PropagateLowPrecision),
+                    .after(FloatingOriginSystem::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
                     .after(big_space::camera::default_camera_inputs)
@@ -89,7 +79,7 @@ fn lighting(
 }
 
 fn springy_ship(
-    cam_input: Res<CameraInput>,
+    cam_input: Res<big_space::camera::CameraInput>,
     mut ship: Query<&mut Transform, With<Spaceship>>,
     mut desired_dir: Local<(Vec3, Quat)>,
     mut smoothed_rot: Local<VecDeque<Vec3>>,
@@ -150,8 +140,8 @@ fn spawn_solar_system(
         .build(),
     ));
 
-    commands.spawn_big_space(ReferenceFrame::<i64>::default(), |root_frame| {
-        root_frame.with_frame_default(|sun| {
+    commands.spawn_big_space_default::<i64>(|root_grid| {
+        root_grid.with_grid_default(|sun| {
             sun.insert((Sun, Name::new("Sun")));
             sun.spawn_spatial((
                 Mesh3d(sun_mesh_handle),
@@ -164,8 +154,8 @@ fn spawn_solar_system(
             ));
 
             let earth_pos = DVec3::Z * EARTH_ORBIT_RADIUS_M;
-            let (earth_cell, earth_pos) = sun.frame().translation_to_grid(earth_pos);
-            sun.with_frame_default(|earth| {
+            let (earth_cell, earth_pos) = sun.grid().translation_to_grid(earth_pos);
+            sun.with_grid_default(|earth| {
                 earth.insert((
                     Name::new("Earth"),
                     earth_cell,
@@ -183,7 +173,7 @@ fn spawn_solar_system(
 
                 let moon_orbit_radius_m = 385e6;
                 let moon_pos = DVec3::NEG_Z * moon_orbit_radius_m;
-                let (moon_cell, moon_pos) = earth.frame().translation_to_grid(moon_pos);
+                let (moon_cell, moon_pos) = earth.grid().translation_to_grid(moon_pos);
                 earth.spawn_spatial((
                     Name::new("Moon"),
                     Mesh3d(moon_mesh_handle),
@@ -199,7 +189,7 @@ fn spawn_solar_system(
 
                 let ball_pos =
                     DVec3::X * (EARTH_RADIUS_M + 1.0) + DVec3::NEG_Z * 30.0 + DVec3::Y * 10.0;
-                let (ball_cell, ball_pos) = earth.frame().translation_to_grid(ball_pos);
+                let (ball_cell, ball_pos) = earth.grid().translation_to_grid(ball_pos);
                 earth
                     .spawn_spatial((ball_cell, Transform::from_translation(ball_pos)))
                     .with_children(|children| {
@@ -225,11 +215,11 @@ fn spawn_solar_system(
                     });
 
                 let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
-                let (cam_cell, cam_pos) = earth.frame().translation_to_grid(cam_pos);
-                earth.with_frame_default(|camera| {
+                let (cam_cell, cam_pos) = earth.grid().translation_to_grid(cam_pos);
+                earth.with_grid_default(|camera| {
                     camera.insert((
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
-                        CameraController::default() // Built-in camera controller
+                        big_space::camera::CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
                             .with_smoothness(0.98, 0.98)
                             .with_speed(1.0),
@@ -263,15 +253,15 @@ fn spawn_solar_system(
             ..default()
         });
         let star_mesh_handle = meshes.add(Sphere::new(1e10).mesh().ico(5).unwrap());
-        let mut rng = rand::thread_rng();
+        let rng = Rng::new();
         (0..1000).for_each(|_| {
-            root_frame.spawn_spatial((
+            root_grid.spawn_spatial((
                 Mesh3d(star_mesh_handle.clone()),
                 MeshMaterial3d(star_mat.clone()),
                 Transform::from_xyz(
-                    (rng.gen::<f32>() - 0.5) * 1e14,
-                    (rng.gen::<f32>() - 0.5) * 1e14,
-                    (rng.gen::<f32>() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
+                    (rng.f32() - 0.5) * 1e14,
                 ),
             ));
         });

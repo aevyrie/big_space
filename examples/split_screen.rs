@@ -10,21 +10,15 @@ use bevy::{
     transform::TransformSystem,
 };
 use bevy_color::palettes;
-use big_space::{
-    camera::{CameraController, CameraControllerPlugin},
-    commands::BigSpaceCommands,
-    reference_frame::ReferenceFrame,
-    world_query::{GridTransform, GridTransformReadOnly},
-    BigSpacePlugin, FloatingOrigin,
-};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
+            DefaultPlugins,
             BigSpacePlugin::<i32>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i32>::default(),
-            CameraControllerPlugin::<i32>::default(),
+            FloatingOriginDebugPlugin::<i32>::default(),
+            big_space::camera::CameraControllerPlugin::<i32>::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, set_camera_viewports)
@@ -61,27 +55,26 @@ fn setup(
     ));
 
     // Big Space 1
-    commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
-        root_frame
-            .spawn_spatial((
-                Camera3d::default(),
-                Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
-                    .looking_to(Vec3::NEG_X, Vec3::Y),
-                CameraController::default().with_smoothness(0.8, 0.8),
-                RenderLayers::layer(2),
-                LeftCamera,
-                FloatingOrigin,
-            ))
-            .with_child((
-                Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::YELLOW),
-                    ..default()
-                })),
-                RenderLayers::layer(2),
-            ));
+    commands.spawn_big_space_default::<i32>(|root| {
+        root.spawn_spatial((
+            Camera3d::default(),
+            Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
+                .looking_to(Vec3::NEG_X, Vec3::Y),
+            big_space::camera::CameraController::default().with_smoothness(0.8, 0.8),
+            RenderLayers::layer(2),
+            LeftCamera,
+            FloatingOrigin,
+        ))
+        .with_child((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::YELLOW),
+                ..default()
+            })),
+            RenderLayers::layer(2),
+        ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             RightCameraReplicated,
             Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -91,7 +84,7 @@ fn setup(
             RenderLayers::layer(2),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::Srgba(palettes::css::BLUE),
@@ -101,7 +94,7 @@ fn setup(
             RenderLayers::layer(2),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::Srgba(palettes::css::GREEN),
@@ -113,30 +106,29 @@ fn setup(
     });
 
     // Big Space 2
-    commands.spawn_big_space(ReferenceFrame::<i32>::default(), |root_frame| {
-        root_frame
-            .spawn_spatial((
-                Camera3d::default(),
-                Transform::from_xyz(1_000_000.0, 100_005.0, 0.0).looking_to(Vec3::NEG_X, Vec3::Y),
-                Camera {
-                    order: 1,
-                    clear_color: ClearColorConfig::None,
-                    ..default()
-                },
-                RenderLayers::layer(1),
-                RightCamera,
-                FloatingOrigin,
-            ))
-            .with_child((
-                Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::Srgba(palettes::css::PINK),
-                    ..default()
-                })),
-                RenderLayers::layer(1),
-            ));
+    commands.spawn_big_space_default::<i32>(|root| {
+        root.spawn_spatial((
+            Camera3d::default(),
+            Camera {
+                order: 1,
+                clear_color: ClearColorConfig::None,
+                ..default()
+            },
+            Transform::from_xyz(1_000_000.0, 100_005.0, 0.0).looking_to(Vec3::NEG_X, Vec3::Y),
+            RenderLayers::layer(1),
+            RightCamera,
+            FloatingOrigin,
+        ))
+        .with_child((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::Srgba(palettes::css::FUCHSIA),
+                ..default()
+            })),
+            RenderLayers::layer(1),
+        ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             LeftCameraReplicated,
             Mesh3d(meshes.add(Cuboid::new(1.0, 2.0, 1.0))),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -146,7 +138,7 @@ fn setup(
             RenderLayers::layer(1),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::Srgba(palettes::css::BLUE),
@@ -156,7 +148,7 @@ fn setup(
             RenderLayers::layer(1),
         ));
 
-        root_frame.spawn_spatial((
+        root.spawn_spatial((
             Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(35).unwrap())),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: Color::Srgba(palettes::css::GREEN),

@@ -6,18 +6,11 @@
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
-use big_space::{
-    commands::BigSpaceCommands,
-    reference_frame::{local_origin::ReferenceFrames, ReferenceFrame},
-    FloatingOrigin, GridCell,
-};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::BigSpacePlugin::<i128>::default(),
-        ))
+        .add_plugins((DefaultPlugins, BigSpacePlugin::<i128>::default()))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
         .run();
@@ -37,7 +30,7 @@ const DISTANCE: i128 = 2_000_000;
 /// this issue.
 fn toggle_plugin(
     input: Res<ButtonInput<KeyCode>>,
-    ref_frames: ReferenceFrames<i128>,
+    grids: Grids<i128>,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
     mut floating_origin: Query<(Entity, &mut GridCell<i128>), With<FloatingOrigin>>,
@@ -46,10 +39,10 @@ fn toggle_plugin(
         *disabled = !*disabled;
     }
 
-    let this_frame = ref_frames.parent_frame(floating_origin.single().0).unwrap();
+    let this_grid = grids.parent_grid(floating_origin.single().0).unwrap();
 
     let mut origin_cell = floating_origin.single_mut().1;
-    let index_max = DISTANCE / this_frame.cell_edge_length() as i128;
+    let index_max = DISTANCE / this_grid.cell_edge_length() as i128;
     let increment = index_max / 100;
 
     let msg = if *disabled {
@@ -71,7 +64,7 @@ fn toggle_plugin(
         "Floating Origin Enabled"
     };
 
-    let dist = index_max.saturating_sub(origin_cell.x) * this_frame.cell_edge_length() as i128;
+    let dist = index_max.saturating_sub(origin_cell.x) * this_grid.cell_edge_length() as i128;
 
     let thousands = |num: i128| {
         num.to_string()
@@ -114,8 +107,8 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_big_space(ReferenceFrame::<i128>::default(), |root| {
-        let d = DISTANCE / root.frame().cell_edge_length() as i128;
+    commands.spawn_big_space_default::<i128>(|root| {
+        let d = DISTANCE / root.grid().cell_edge_length() as i128;
         let distant_grid_cell = GridCell::<i128>::new(d, d, d);
 
         // Normally, we would put the floating origin on the camera. However in this example, we
