@@ -3,15 +3,15 @@
 //! being mixed in games that use double precision (f64) worlds, but you can use this floating
 //! origin plugin to work on almost any set of scales.
 //!
-//! In this example, we will be spawning spheres the size of carbon atoms, across the width of the
+//! In this example, we will be spawning spheres the size of protons, across the width of the
 //! milky way galaxy.
 
 use bevy::prelude::*;
 use bevy_math::DVec3;
 use big_space::prelude::*;
 
-const BIG_DISTANCE: f64 = 100_000_000_000_000_000_000.0; // Diameter of the milky way galaxy
-const SMALL_SCALE: f32 = 0.000_000_000_154; // Diameter of a carbon atom
+const UNIVERSE_DIA: f64 = 8.8e26; // Diameter of the observable universe
+const PROTON_DIA: f32 = 1.68e-15; // Diameter of a proton
 
 fn main() {
     App::new()
@@ -28,7 +28,7 @@ fn main() {
 }
 
 #[derive(Component)]
-struct Atom;
+struct Proton;
 
 fn setup_scene(
     mut commands: Commands,
@@ -39,40 +39,40 @@ fn setup_scene(
     // Because we are working on such small scales, we need to make the grid very small. This
     // ensures that the maximum floating point error is also very small, because no entities can
     // ever get farther than `SMALL_SCALE * 500` units from the origin.
-    let small_grid = Grid::<i128>::new(SMALL_SCALE * 1_000.0, 0.0);
+    let small_grid = Grid::<i128>::new(PROTON_DIA * 5_000.0, 0.0);
 
     commands.spawn_big_space(small_grid, |root_grid| {
         root_grid.spawn_spatial(DirectionalLight::default());
 
-        // A carbon atom at the origin
+        // A proton at the origin
         root_grid.spawn_spatial((
-            Atom,
+            Proton,
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(Color::WHITE)),
-            Transform::from_scale(Vec3::splat(SMALL_SCALE)),
+            Transform::from_scale(Vec3::splat(PROTON_DIA)),
         ));
 
         // Compute the grid cell for the far away objects
         let (grid_cell, cell_offset) = root_grid
             .grid()
-            .translation_to_grid(DVec3::X * BIG_DISTANCE);
+            .translation_to_grid(DVec3::X * UNIVERSE_DIA);
 
-        // A carbon atom at the other side of the milky way
+        // A proton at the other side of the milky way
         root_grid.spawn_spatial((
-            Atom,
+            Proton,
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(Color::WHITE)),
-            Transform::from_translation(cell_offset).with_scale(Vec3::splat(SMALL_SCALE)),
+            Transform::from_translation(cell_offset).with_scale(Vec3::splat(PROTON_DIA)),
             grid_cell,
         ));
 
         root_grid.spawn_spatial((
             Camera3d::default(),
             Projection::Perspective(PerspectiveProjection {
-                near: SMALL_SCALE * 0.01, // Without this, the atom would be clipped
+                near: PROTON_DIA * 0.01, // Without this, the atom would be clipped
                 ..Default::default()
             }),
-            Transform::from_xyz(0.0, 0.0, SMALL_SCALE * 2.0),
+            Transform::from_xyz(0.0, 0.0, PROTON_DIA * 2.0),
             grid_cell,
             FloatingOrigin,
             big_space::camera::CameraController::default(),
@@ -88,13 +88,13 @@ fn setup_scene(
     });
 
     commands.spawn(Text::new(format!(
-        "Press `T` to teleport between the origin and ship {BIG_DISTANCE}m away."
+        "Press `T` to teleport between the origin and ship {UNIVERSE_DIA}m away."
     )));
 }
 
-fn bounce_atoms(mut atoms: Query<&mut Transform, With<Atom>>, time: Res<Time>) {
+fn bounce_atoms(mut atoms: Query<&mut Transform, With<Proton>>, time: Res<Time>) {
     for mut atom in atoms.iter_mut() {
-        atom.translation.y = time.elapsed_secs().sin() * SMALL_SCALE;
+        atom.translation.y = time.elapsed_secs().sin() * PROTON_DIA;
     }
 }
 
@@ -103,14 +103,21 @@ fn toggle_cam_pos(
     mut toggle: Local<bool>,
     grid: Query<&Grid<i128>>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    protons: Query<&GlobalTransform, With<Proton>>,
 ) {
     if !keyboard.just_pressed(KeyCode::KeyT) {
         return;
     }
     *cam.single_mut() = if *toggle {
-        grid.single().translation_to_grid(DVec3::X * BIG_DISTANCE).0
+        grid.single().translation_to_grid(DVec3::X * UNIVERSE_DIA).0
     } else {
         GridCell::ZERO
     };
     *toggle = !*toggle;
+    // To prove there is no funny business going on, let's print out the `GlobalTransform` of each
+    // of the protons, to show that they truly are as far apart as we say they are.
+    info!("Width of observable universe: {UNIVERSE_DIA}");
+    for proton in &protons {
+        info!("Proton x coord: {}", proton.translation().x);
+    }
 }
