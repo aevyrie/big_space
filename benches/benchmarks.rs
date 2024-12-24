@@ -164,12 +164,12 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let map = app.world().resource::<HashGrid<i32>>();
+    let map = app.world().resource::<GridHashMap<i32>>();
     let first = map
         .all_entries()
         .find(|(_, entry)| !entry.entities.is_empty())
         .unwrap();
-    group.bench_function("HashGrid::get", |b| {
+    group.bench_function("GridHashMap::get", |b| {
         b.iter(|| {
             black_box(map.get(first.0).unwrap());
         });
@@ -185,8 +185,8 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    // let parent = app .world_mut() .query::<&GridCellHash<i32>>() .get(app.world(), ent)
-    //     .unwrap(); let map = app.world().resource::<HashGrid<i32>>(); let entry =
+    // let parent = app .world_mut() .query::<&GridHash<i32>>() .get(app.world(), ent)
+    //     .unwrap(); let map = app.world().resource::<GridHashMap<i32>>(); let entry =
     //     map.get(parent).unwrap();
 
     // group.bench_function("Neighbors radius: 4", |b| {
@@ -227,8 +227,8 @@ fn spatial_hashing(c: &mut Criterion) {
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world());
-    let spatial_map = app.world().resource::<HashGrid<i32>>();
-    let hash = GridCellHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let spatial_map = app.world().resource::<GridHashMap<i32>>();
+    let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
     assert_eq!(spatial_map.nearby(entry).count(), 27);
@@ -255,8 +255,8 @@ fn spatial_hashing(c: &mut Criterion) {
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world());
-    let spatial_map = app.world().resource::<HashGrid<i32>>();
-    let hash = GridCellHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let spatial_map = app.world().resource::<GridHashMap<i32>>();
+    let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
     assert_eq!(spatial_map.nearby(entry).count(), 27);

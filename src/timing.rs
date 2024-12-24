@@ -15,16 +15,15 @@ impl Plugin for TimingStatsPlugin {
     fn build(&self, app: &mut bevy_app::App) {
         app.init_resource::<PropagationStats>()
             .register_type::<PropagationStats>()
-            .init_resource::<GridCellHashStats>()
-            .register_type::<GridCellHashStats>()
+            .init_resource::<GridHashStats>()
+            .register_type::<GridHashStats>()
             .init_resource::<SmoothedStat<PropagationStats>>()
             .register_type::<SmoothedStat<PropagationStats>>()
-            .init_resource::<SmoothedStat<GridCellHashStats>>()
-            .register_type::<SmoothedStat<GridCellHashStats>>()
+            .init_resource::<SmoothedStat<GridHashStats>>()
+            .register_type::<SmoothedStat<GridHashStats>>()
             .add_systems(
                 PostUpdate,
-                (GridCellHashStats::reset, PropagationStats::reset)
-                    .in_set(FloatingOriginSystem::Init),
+                (GridHashStats::reset, PropagationStats::reset).in_set(FloatingOriginSystem::Init),
             )
             .add_systems(
                 PostUpdate,
@@ -35,10 +34,7 @@ impl Plugin for TimingStatsPlugin {
     }
 }
 
-fn update_totals(
-    mut prop_stats: ResMut<PropagationStats>,
-    mut hash_stats: ResMut<GridCellHashStats>,
-) {
+fn update_totals(mut prop_stats: ResMut<PropagationStats>, mut hash_stats: ResMut<GridHashStats>) {
     prop_stats.total = prop_stats.grid_recentering
         + prop_stats.high_precision_propagation
         + prop_stats.local_origin_propagation
@@ -51,8 +47,8 @@ fn update_totals(
 }
 
 fn update_averages(
-    hash_stats: Res<GridCellHashStats>,
-    mut avg_hash_stats: ResMut<SmoothedStat<GridCellHashStats>>,
+    hash_stats: Res<GridHashStats>,
+    mut avg_hash_stats: ResMut<SmoothedStat<GridHashStats>>,
     prop_stats: Res<PropagationStats>,
     mut avg_prop_stats: ResMut<SmoothedStat<PropagationStats>>,
 ) {
@@ -143,7 +139,7 @@ impl std::ops::Div<u32> for PropagationStats {
 
 /// Aggregate runtime statistics across all [`crate::hash::GridHashPlugin`]s.
 #[derive(Resource, Debug, Clone, Default, Reflect)]
-pub struct GridCellHashStats {
+pub struct GridHashStats {
     pub(crate) moved_entities: usize,
     pub(crate) hash_update_duration: Duration,
     pub(crate) map_update_duration: Duration,
@@ -151,8 +147,8 @@ pub struct GridCellHashStats {
     pub(crate) total: Duration,
 }
 
-impl GridCellHashStats {
-    fn reset(mut stats: ResMut<GridCellHashStats>) {
+impl GridHashStats {
+    fn reset(mut stats: ResMut<GridHashStats>) {
         *stats = Self::default();
     }
 
@@ -182,9 +178,9 @@ impl GridCellHashStats {
     }
 }
 
-impl<'a> std::iter::Sum<&'a GridCellHashStats> for GridCellHashStats {
-    fn sum<I: Iterator<Item = &'a GridCellHashStats>>(iter: I) -> Self {
-        iter.fold(GridCellHashStats::default(), |mut acc, e| {
+impl<'a> std::iter::Sum<&'a GridHashStats> for GridHashStats {
+    fn sum<I: Iterator<Item = &'a GridHashStats>>(iter: I) -> Self {
+        iter.fold(GridHashStats::default(), |mut acc, e| {
             acc.hash_update_duration += e.hash_update_duration;
             acc.map_update_duration += e.map_update_duration;
             acc.update_partition += e.update_partition;
@@ -195,7 +191,7 @@ impl<'a> std::iter::Sum<&'a GridCellHashStats> for GridCellHashStats {
     }
 }
 
-impl Div<u32> for GridCellHashStats {
+impl Div<u32> for GridHashStats {
     type Output = Self;
 
     fn div(self, rhs: u32) -> Self::Output {

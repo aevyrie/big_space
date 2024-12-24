@@ -14,8 +14,15 @@
 //! - [`BigSpace`] : The root of a high precision entity hierarchy.
 //! - [`FloatingOrigin`] : Position of the 32 bit rendering origin.
 //! - [`Grid`] : Defines the size of a grid for its child cells.
-//! - [`GridCell`] : Position of an entity within its parent grid.
-//! - [`GridPrecision`] : Number of bits (precision) of a grid
+//! - [`GridCell`] : Cell index of an entity within its parent's grid.
+//! - [`GridPrecision`] : Integer precision of a grid.
+//!
+//! #### Spatial Hashing
+//!
+//! - [`GridHash`] : The spatial hash of an entity's grid cell.
+//! - [`GridHashMap`] : A map for entity, grid cell, and neighbor lookups.
+//! - [`GridPartition`] : Group of adjacent grid cells.
+//! - [`GridPartitionMap`] : A map for finding independent partitions of entities.
 //!
 //! Jump to [Usage](crate#usage) to get started.
 //!
@@ -228,10 +235,10 @@ pub mod prelude {
         Grid,
     };
     pub use hash::{
-        component::{FastGridCellHash, GridCellHash},
-        map::{HashGrid, SpatialEntryToEntities},
+        component::{FastGridHash, GridHash},
+        map::{GridHashMap, SpatialEntryToEntities},
         partition::{GridPartition, GridPartitionId, GridPartitionMap, GridPartitionPlugin},
-        GridHashPlugin, HashGridSystem,
+        GridHashMapSystem, GridHashPlugin,
     };
     pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
     pub use precision::GridPrecision;

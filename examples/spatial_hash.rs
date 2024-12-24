@@ -23,7 +23,7 @@ fn main() {
             PostUpdate,
             (
                 move_player.after(TransformSystem::TransformPropagate),
-                draw_partitions.after(HashGridSystem::UpdatePartition),
+                draw_partitions.after(GridHashMapSystem::UpdatePartition),
             ),
         )
         .add_systems(Update, cursor_grab)
@@ -76,7 +76,7 @@ fn draw_partitions(
     mut gizmos: Gizmos,
     partitions: Res<GridPartitionMap<i32>>,
     grids: Query<(&GlobalTransform, &Grid<i32>)>,
-    camera: Query<&GridCellHash<i32>, With<Camera>>,
+    camera: Query<&GridHash<i32>, With<Camera>>,
 ) {
     for (id, p) in partitions.iter() {
         let Ok((transform, grid)) = grids.get(p.grid()) else {
@@ -142,7 +142,7 @@ fn move_player(
             &mut Transform,
             &mut GridCell<i32>,
             &Parent,
-            &GridCellHash<i32>,
+            &GridHash<i32>,
         ),
         With<Player>,
     >,
@@ -153,10 +153,10 @@ fn move_player(
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
     grids: Query<&Grid<i32>>,
-    hash_grid: Res<HashGrid<i32>>,
+    hash_grid: Res<GridHashMap<i32>>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<&mut Text>,
-    hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridCellHashStats>>,
+    hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
     prop_stats: Res<big_space::timing::SmoothedStat<big_space::timing::PropagationStats>>,
 ) {
     for neighbor in neighbors.iter() {

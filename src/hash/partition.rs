@@ -10,18 +10,18 @@ use bevy_utils::{
     PassHash,
 };
 
-use super::{GridCellHash, GridPrecision, HashGrid, HashGridFilter, HashGridSystem};
+use super::{GridHash, GridHashMap, GridHashMapFilter, GridPrecision, GridHashMapSystem};
 
 /// Adds support for spatial partitioning. Requires [`GridHashPlugin`](super::GridHashPlugin).
 pub struct GridPartitionPlugin<P, F = ()>(PhantomData<(P, F)>)
 where
     P: GridPrecision,
-    F: HashGridFilter;
+    F: GridHashMapFilter;
 
 impl<P, F> Default for GridPartitionPlugin<P, F>
 where
     P: GridPrecision,
-    F: HashGridFilter,
+    F: GridHashMapFilter,
 {
     fn default() -> Self {
         Self(PhantomData)
@@ -31,14 +31,14 @@ where
 impl<P, F> Plugin for GridPartitionPlugin<P, F>
 where
     P: GridPrecision,
-    F: HashGridFilter,
+    F: GridHashMapFilter,
 {
     fn build(&self, app: &mut App) {
         app.init_resource::<GridPartitionMap<P, F>>().add_systems(
             PostUpdate,
             GridPartitionMap::<P, F>::update
-                .in_set(HashGridSystem::UpdatePartition)
-                .after(HashGridSystem::UpdateMap),
+                .in_set(GridHashMapSystem::UpdatePartition)
+                .after(GridHashMapSystem::UpdateMap),
         );
     }
 }
@@ -65,16 +65,16 @@ impl Hash for GridPartitionId {
 ///
 /// Partitions divide space into independent groups of cells.
 ///
-/// The map depends on and is built from a corresponding [`HashGrid`] with the same
-/// `P:`[`GridPrecision`] and `F:`[`HashGridFilter`].
+/// The map depends on and is built from a corresponding [`GridHashMap`] with the same
+/// `P:`[`GridPrecision`] and `F:`[`GridHashMapFilter`].
 #[derive(Resource)]
 pub struct GridPartitionMap<P, F = ()>
 where
     P: GridPrecision,
-    F: HashGridFilter,
+    F: GridHashMapFilter,
 {
     partitions: HashMap<GridPartitionId, GridPartition<P>>,
-    reverse_map: HashMap<GridCellHash<P>, GridPartitionId, PassHash>,
+    reverse_map: HashMap<GridHash<P>, GridPartitionId, PassHash>,
     next_partition: u64,
     spooky: PhantomData<F>,
 }
@@ -82,7 +82,7 @@ where
 impl<P, F> Default for GridPartitionMap<P, F>
 where
     P: GridPrecision,
-    F: HashGridFilter,
+    F: GridHashMapFilter,
 {
     fn default() -> Self {
         Self {
@@ -97,7 +97,7 @@ where
 impl<P, F> Deref for GridPartitionMap<P, F>
 where
     P: GridPrecision,
-    F: HashGridFilter,
+    F: GridHashMapFilter,
 {
     type Target = HashMap<GridPartitionId, GridPartition<P>>;
 
@@ -109,7 +109,7 @@ where
 impl<P, F> GridPartitionMap<P, F>
 where
     P: GridPrecision,
-    F: HashGridFilter,
+    F: GridHashMapFilter,
 {
     /// Returns a reference to the [`GridPartition`], if it exists.
     #[inline]
@@ -120,7 +120,7 @@ where
     /// Searches for the [`GridPartition`] that contains this `hash`, returning the partition's
     /// [`GridPartitionId`] if the hash is found in any partition.
     #[inline]
-    pub fn get(&self, hash: &GridCellHash<P>) -> Option<&GridPartitionId> {
+    pub fn get(&self, hash: &GridHash<P>) -> Option<&GridPartitionId> {
         self.reverse_map.get(hash)
     }
 
@@ -131,7 +131,7 @@ where
     }
 
     #[inline]
-    fn insert(&mut self, partition: GridPartitionId, set: HashSet<GridCellHash<P>, PassHash>) {
+    fn insert(&mut self, partition: GridPartitionId, set: HashSet<GridHash<P>, PassHash>) {
         let Some(hash) = set.iter().next() else {
             return;
         };
@@ -148,7 +148,7 @@ where
     }
 
     #[inline]
-    fn push(&mut self, partition: &GridPartitionId, hash: &GridCellHash<P>) {
+    fn push(&mut self, partition: &GridPartitionId, hash: &GridHash<P>) {
         if let Some(partition) = self.partitions.get_mut(partition) {
             partition.insert(*hash)
         } else {
@@ -158,7 +158,7 @@ where
     }
 
     #[inline]
-    fn remove(&mut self, hash: &GridCellHash<P>) {
+    fn remove(&mut self, hash: &GridHash<P>) {
         let Some(old_id) = self.reverse_map.remove(hash) else {
             return;
         };
@@ -207,14 +207,12 @@ where
 
     fn update(
         mut partition_map: ResMut<Self>,
-        mut timing: ResMut<crate::timing::GridCellHashStats>,
-        hash_grid: Res<HashGrid<P, F>>,
+        mut timing: ResMut<crate::timing::GridHashStats>,
+        hash_grid: Res<GridHashMap<P, F>>,
         // Scratch space allocations
         mut added_neighbors: Local<Vec<GridPartitionId>>,
-        mut adjacent_to_removals: Local<
-            HashMap<GridPartitionId, HashSet<GridCellHash<P>, PassHash>>,
-        >,
-        mut split_candidates: Local<Vec<(GridPartitionId, HashSet<GridCellHash<P>, PassHash>)>>,
+        mut adjacent_to_removals: Local<HashMap<GridPartitionId, HashSet<GridHash<P>, PassHash>>>,
+        mut split_candidates: Local<Vec<(GridPartitionId, HashSet<GridHash<P>, PassHash>)>>,
         mut split_results: Local<Vec<Vec<SplitResult<P>>>>,
     ) {
         let start = Instant::now();
@@ -366,7 +364,7 @@ where
 
 struct SplitResult<P: GridPrecision> {
     original_partition: GridPartitionId,
-    new_partitions: Vec<HashSet<GridCellHash<P>, PassHash>>,
+    new_partitions: Vec<HashSet<GridHash<P>, PassHash>>,
 }
 
 /// A group of nearby [`GridCell`](crate::GridCell)s in an island disconnected from all other
@@ -374,7 +372,7 @@ struct SplitResult<P: GridPrecision> {
 #[derive(Debug)]
 pub struct GridPartition<P: GridPrecision> {
     grid: Entity,
-    tables: Vec<HashSet<GridCellHash<P>, PassHash>>,
+    tables: Vec<HashSet<GridHash<P>, PassHash>>,
 }
 impl<P: GridPrecision> GridPartition<P> {
     /// Tables smaller than this will be drained into other tables when merging. Tables larger than
@@ -388,13 +386,13 @@ impl<P: GridPrecision> GridPartition<P> {
 
     /// Returns `true` if the `hash` is in this partition.
     #[inline]
-    pub fn contains(&self, hash: &GridCellHash<P>) -> bool {
+    pub fn contains(&self, hash: &GridHash<P>) -> bool {
         self.tables.iter().any(|table| table.contains(hash))
     }
 
-    /// Iterates over all [`GridCellHash`]s in this partition.
+    /// Iterates over all [`GridHash`]s in this partition.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &GridCellHash<P>> {
+    pub fn iter(&self) -> impl Iterator<Item = &GridHash<P>> {
         self.tables.iter().flat_map(|table| table.iter())
     }
 
@@ -405,7 +403,7 @@ impl<P: GridPrecision> GridPartition<P> {
     }
 
     #[inline]
-    fn insert(&mut self, cell: GridCellHash<P>) {
+    fn insert(&mut self, cell: GridHash<P>) {
         if self.contains(&cell) {
             return;
         }
