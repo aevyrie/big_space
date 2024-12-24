@@ -29,7 +29,7 @@ Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read t
 
 | bevy | big_space |
 | ---- | --------- |
-| 0.15 | 0.8       |
+| 0.15 | 0.8, 0.9  |
 | 0.14 | 0.7       |
 | 0.13 | 0.5, 0.6  |
 | 0.12 | 0.4       |
