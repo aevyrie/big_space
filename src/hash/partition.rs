@@ -10,7 +10,7 @@ use bevy_utils::{
     PassHash,
 };
 
-use super::{GridHash, GridHashMap, GridHashMapFilter, GridPrecision, GridHashMapSystem};
+use super::{GridHash, GridHashMap, GridHashMapFilter, GridHashMapSystem, GridPrecision};
 
 /// Adds support for spatial partitioning. Requires [`GridHashPlugin`](super::GridHashPlugin).
 pub struct GridPartitionPlugin<P, F = ()>(PhantomData<(P, F)>)
