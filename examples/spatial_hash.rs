@@ -32,7 +32,7 @@ fn main() {
 }
 
 // Try bumping this up to really stress test. I'm able to push a million entities with an M3 Max.
-const N_ENTITIES: usize = 100_000;
+const N_ENTITIES: usize = 1_000_000;
 const HALF_WIDTH: f32 = 40.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.

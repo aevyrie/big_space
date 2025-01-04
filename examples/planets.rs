@@ -2,7 +2,10 @@ use std::collections::VecDeque;
 
 use bevy::{
     color::palettes,
-    core_pipeline::bloom::Bloom,
+    core_pipeline::{
+        auto_exposure::AutoExposure, bloom::Bloom, motion_blur::MotionBlur,
+        post_process::ChromaticAberration, Skybox,
+    },
     math::DVec3,
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
     prelude::*,
@@ -31,8 +34,8 @@ fn main() {
                 rotate,
                 lighting
                     .in_set(TransformSystem::TransformPropagate)
-                    .after(bevy::transform::systems::sync_simple_transforms)
-                    .after(bevy::transform::systems::propagate_transforms)
+                    // .after(bevy::transform::systems::sync_simple_transforms)
+                    // .after(bevy::transform::systems::propagate_transforms)
                     .after(FloatingOriginSystem::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
@@ -126,14 +129,14 @@ fn spawn_solar_system(
         PrimaryLight,
         DirectionalLight {
             color: Color::WHITE,
-            illuminance: 120_000.,
+            illuminance: 50_000.,
             shadows_enabled: true,
             ..default()
         },
         CascadeShadowConfigBuilder {
             num_cascades: 4,
             minimum_distance: 0.1,
-            maximum_distance: 10_000.0,
+            maximum_distance: 1e15,
             first_cascade_far_bound: 100.0,
             overlap_proportion: 0.2,
         }
@@ -218,16 +221,16 @@ fn spawn_solar_system(
                 let (cam_cell, cam_pos) = earth.grid().translation_to_grid(cam_pos);
                 earth.with_grid_default(|camera| {
                     camera.insert((
+                        FloatingOrigin,
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
                         big_space::camera::CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
-                            .with_smoothness(0.98, 0.98)
+                            .with_smoothness(0.95, 0.95)
                             .with_speed(1.0),
                         cam_cell,
                     ));
 
                     camera.spawn_spatial((
-                        FloatingOrigin,
                         Camera3d::default(),
                         Transform::from_xyz(0.0, 4.0, 22.0),
                         Camera {
@@ -235,7 +238,31 @@ fn spawn_solar_system(
                             ..default()
                         },
                         Exposure::SUNLIGHT,
-                        Bloom::default(),
+                        AutoExposure {
+                            // filter: 0.0..=1.0,
+                            
+                            ..Default::default()
+                        },
+                        Bloom {
+                            // intensity: 0.1,
+                            // low_frequency_boost: 0.1,
+                            // low_frequency_boost_curvature: 0.0,
+                            max_mip_dimension: 1024,
+                            ..Bloom::NATURAL
+                        },
+                        ChromaticAberration {
+                            intensity: 0.01,
+                            ..Default::default()
+                        },
+                        MotionBlur {
+                            shutter_angle: 1.0,
+                            samples: 8,
+                        },
+                        Skybox {
+                            brightness: 0.0,
+                            image: asset_server.load("environment_maps/specular_rgb9e5_zstd.ktx2"),
+                            ..Default::default()
+                        },
                     ));
 
                     camera.with_child((
