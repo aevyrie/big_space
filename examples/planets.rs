@@ -31,8 +31,6 @@ fn main() {
                 rotate,
                 lighting
                     .in_set(TransformSystem::TransformPropagate)
-                    .after(bevy::transform::systems::sync_simple_transforms)
-                    .after(bevy::transform::systems::propagate_transforms)
                     .after(FloatingOriginSystem::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
@@ -147,7 +145,7 @@ fn spawn_solar_system(
                 Mesh3d(sun_mesh_handle),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: Color::WHITE,
-                    emissive: LinearRgba::rgb(100000., 100000., 100000.),
+                    emissive: LinearRgba::rgb(1000., 1000., 1000.),
                     ..default()
                 })),
                 NotShadowCaster,
@@ -218,6 +216,7 @@ fn spawn_solar_system(
                 let (cam_cell, cam_pos) = earth.grid().translation_to_grid(cam_pos);
                 earth.with_grid_default(|camera| {
                     camera.insert((
+                        FloatingOrigin,
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
                         big_space::camera::CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
@@ -227,7 +226,6 @@ fn spawn_solar_system(
                     ));
 
                     camera.spawn_spatial((
-                        FloatingOrigin,
                         Camera3d::default(),
                         Transform::from_xyz(0.0, 4.0, 22.0),
                         Camera {
@@ -235,7 +233,12 @@ fn spawn_solar_system(
                             ..default()
                         },
                         Exposure::SUNLIGHT,
-                        Bloom::default(),
+                        Bloom::NATURAL,
+                        bevy::core_pipeline::post_process::ChromaticAberration {
+                            intensity: 0.01,
+                            ..Default::default()
+                        },
+                        bevy::core_pipeline::motion_blur::MotionBlur::default(),
                     ));
 
                     camera.with_child((
