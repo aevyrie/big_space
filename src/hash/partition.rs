@@ -1,16 +1,18 @@
 //! Detect and update groups of nearby occupied cells.
 
-use std::{hash::Hash, marker::PhantomData, ops::Deref, time::Instant};
+use std::{hash::Hash, marker::PhantomData, ops::Deref};
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},
-    PassHash,
+    Instant, PassHash,
 };
 
-use super::{GridHash, GridHashMap, GridHashMapFilter, GridHashMapSystem, GridPrecision};
+use super::{GridCell, GridHash, GridHashMap, GridHashMapFilter, GridHashMapSystem, GridPrecision};
+
+pub use private::GridPartition;
 
 /// Adds support for spatial partitioning. Requires [`GridHashPlugin`](super::GridHashPlugin).
 pub struct GridPartitionPlugin<P, F = ()>(PhantomData<(P, F)>)
@@ -135,15 +137,16 @@ where
         let Some(hash) = set.iter().next() else {
             return;
         };
+        let mut min = hash.cell();
+        let mut max = hash.cell();
         for hash in set.iter() {
             self.reverse_map.insert(*hash, partition);
+            min = min.min(hash.cell());
+            max = max.max(hash.cell());
         }
         self.partitions.insert(
             partition,
-            GridPartition {
-                grid: hash.grid(),
-                tables: vec![set],
-            },
+            GridPartition::new(hash.grid(), vec![set], min, max),
         );
     }
 
@@ -162,8 +165,14 @@ where
         let Some(old_id) = self.reverse_map.remove(hash) else {
             return;
         };
+        let mut empty = false;
         if let Some(partition) = self.partitions.get_mut(&old_id) {
-            partition.tables.iter_mut().any(|table| table.remove(hash));
+            if partition.remove(hash) && partition.is_empty() {
+                empty = true;
+            }
+        }
+        if empty {
+            self.partitions.remove(&old_id);
         }
     }
 
@@ -252,12 +261,6 @@ where
             partition_map.remove(removed_cell);
         }
 
-        // Clean up empty tables and partitions
-        partition_map.partitions.retain(|_id, partition| {
-            partition.tables.retain(|table| !table.is_empty());
-            !partition.tables.is_empty()
-        });
-
         for removed_cell in hash_grid.just_removed().iter() {
             // Group occupied neighbor cells by partition, so we can check if they are still
             // connected to each other after this removal.
@@ -293,7 +296,7 @@ where
                 let _task_span = tracing::info_span!("parallel partition split").entered();
                 affected_cells
                     .iter_mut()
-                    .filter_map(|(original_partition, adjacent_hashes)| {
+                    .filter_map(|(id, adjacent_hashes)| {
                         let mut new_partitions = Vec::with_capacity(0);
                         let mut counter = 0;
                         while let Some(this_cell) = adjacent_hashes.iter().next().copied() {
@@ -309,7 +312,7 @@ where
                             if adjacent_hashes.is_empty() && counter == 0 {
                                 // If it only took a single iteration to connect all affected cells,
                                 // it means the partition has not been split, and we can continue to
-                                // the next // partition.
+                                // the next partition.
                                 return None;
                             } else {
                                 new_partitions
@@ -319,7 +322,7 @@ where
                         }
 
                         Some(SplitResult {
-                            original_partition: *original_partition,
+                            original_partition_id: *id,
                             new_partitions,
                         })
                     })
@@ -328,27 +331,15 @@ where
         );
 
         for SplitResult {
-            original_partition,
+            original_partition_id,
             ref mut new_partitions,
         } in split_results.iter_mut().flatten()
         {
             // We want the original partition to retain the most cells to ensure that the smaller
             // sets are the ones that are assigned a new partition ID.
-            new_partitions.sort_unstable_by_key(|v| v.len());
-            if let Some(partition) = new_partitions.pop() {
-                if let Some(tables) = partition_map
-                    .partitions
-                    .get_mut(original_partition)
-                    .map(|p| &mut p.tables)
-                {
-                    // TODO: keep these in an object pool to reuse allocs
-                    tables.drain(1..);
-                    if let Some(table) = tables.get_mut(0) {
-                        *table = partition;
-                    } else {
-                        tables.push(partition);
-                    }
-                }
+            new_partitions.sort_unstable_by_key(|set| set.len());
+            if let Some(largest_partition) = new_partitions.pop() {
+                partition_map.insert(*original_partition_id, largest_partition);
             }
 
             // At this point the reverse map will be out of date. However, `partitions.insert()`
@@ -363,86 +354,193 @@ where
 }
 
 struct SplitResult<P: GridPrecision> {
-    original_partition: GridPartitionId,
+    original_partition_id: GridPartitionId,
     new_partitions: Vec<HashSet<GridHash<P>, PassHash>>,
 }
 
-/// A group of nearby [`GridCell`](crate::GridCell)s in an island disconnected from all other
-/// [`GridCell`](crate::GridCell)s.
-#[derive(Debug)]
-pub struct GridPartition<P: GridPrecision> {
-    grid: Entity,
-    tables: Vec<HashSet<GridHash<P>, PassHash>>,
-}
-impl<P: GridPrecision> GridPartition<P> {
-    /// Tables smaller than this will be drained into other tables when merging. Tables larger than
-    /// this limit will instead be added to a list of tables. This prevents partitions ending up
-    /// with many tables containing a few entries.
-    ///
-    /// Draining and extending a hash set is much slower than moving the entire hash set into a
-    /// list. The tradeoff is that the more tables added, the more there are that need to be
-    /// iterated over when searching for a cell.
-    const MIN_TABLE_SIZE: usize = 128;
-
-    /// Returns `true` if the `hash` is in this partition.
-    #[inline]
-    pub fn contains(&self, hash: &GridHash<P>) -> bool {
-        self.tables.iter().any(|table| table.contains(hash))
+/// A private module to ensure the internal fields of the partition are not accessed directly.
+/// Needed to ensure invariants are upheld.
+mod private {
+    use super::{GridCell, GridHash, GridPrecision};
+    use bevy_ecs::prelude::*;
+    use bevy_utils::{hashbrown::HashSet, PassHash};
+    /// A group of nearby [`GridCell`](crate::GridCell)s in an island disconnected from all other
+    /// [`GridCell`](crate::GridCell)s.
+    #[derive(Debug)]
+    pub struct GridPartition<P: GridPrecision> {
+        grid: Entity,
+        tables: Vec<HashSet<GridHash<P>, PassHash>>,
+        min: GridCell<P>,
+        max: GridCell<P>,
     }
 
-    /// Iterates over all [`GridHash`]s in this partition.
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &GridHash<P>> {
-        self.tables.iter().flat_map(|table| table.iter())
-    }
-
-    /// Returns the total number of cells in this partition.
-    #[inline]
-    pub fn num_cells(&self) -> usize {
-        self.tables.iter().map(|t| t.len()).sum()
-    }
-
-    #[inline]
-    fn insert(&mut self, cell: GridHash<P>) {
-        if self.contains(&cell) {
-            return;
+    impl<P: GridPrecision> GridPartition<P> {
+        /// Returns `true` if the `hash` is in this partition.
+        #[inline]
+        pub fn contains(&self, hash: &GridHash<P>) -> bool {
+            self.tables.iter().any(|table| table.contains(hash))
         }
-        if let Some(i) = self.smallest_table() {
-            self.tables[i].insert(cell);
-        } else {
-            let mut table = HashSet::default();
-            table.insert(cell);
-            self.tables.push(table);
+
+        /// Iterates over all [`GridHash`]s in this partition.
+        #[inline]
+        pub fn iter(&self) -> impl Iterator<Item = &GridHash<P>> {
+            self.tables.iter().flat_map(|table| table.iter())
+        }
+
+        /// Returns the total number of cells in this partition.
+        #[inline]
+        pub fn num_cells(&self) -> usize {
+            self.tables.iter().map(|t| t.len()).sum()
+        }
+
+        /// The grid this partition resides in.
+        #[inline]
+        pub fn grid(&self) -> Entity {
+            self.grid
+        }
+
+        /// The maximum grid cell extent of the partition.
+        pub fn max(&self) -> GridCell<P> {
+            self.max
+        }
+
+        /// The minimum grid cell extent of the partition.
+        pub fn min(&self) -> GridCell<P> {
+            self.min
+        }
+
+        /// Frees up any unused memory. Returns `false` if the partition is completely empty.
+        pub fn is_empty(&self) -> bool {
+            self.tables.is_empty()
         }
     }
 
-    #[inline]
-    fn smallest_table(&self) -> Option<usize> {
-        self.tables
-            .iter()
-            .enumerate()
-            .map(|(i, t)| (i, t.len()))
-            .min_by_key(|(_, len)| *len)
-            .map(|(i, _len)| i)
-    }
+    /// Private internal methods
+    impl<P: GridPrecision> GridPartition<P> {
+        pub(crate) fn new(
+            grid: Entity,
+            tables: Vec<HashSet<GridHash<P>, PassHash>>,
+            min: GridCell<P>,
+            max: GridCell<P>,
+        ) -> Self {
+            Self {
+                grid,
+                tables,
+                min,
+                max,
+            }
+        }
 
-    #[inline]
-    fn extend(&mut self, mut partition: GridPartition<P>) {
-        for mut table in partition.tables.drain(..) {
-            if table.len() < Self::MIN_TABLE_SIZE {
-                if let Some(i) = self.smallest_table() {
-                    self.tables[i].extend(table.drain());
+        /// Tables smaller than this will be drained into other tables when merging. Tables larger than
+        /// this limit will instead be added to a list of tables. This prevents partitions ending up
+        /// with many tables containing a few entries.
+        ///
+        /// Draining and extending a hash set is much slower than moving the entire hash set into a
+        /// list. The tradeoff is that the more tables added, the more there are that need to be
+        /// iterated over when searching for a cell.
+        const MIN_TABLE_SIZE: usize = 20_000;
+
+        #[inline]
+        pub(crate) fn insert(&mut self, cell: GridHash<P>) {
+            if self.contains(&cell) {
+                return;
+            }
+            if let Some(i) = self.smallest_table() {
+                self.tables[i].insert(cell);
+            } else {
+                let mut table = HashSet::default();
+                table.insert(cell);
+                self.tables.push(table);
+            }
+            self.min = self.min.min(cell.cell());
+            self.max = self.max.max(cell.cell());
+        }
+
+        #[inline]
+        fn smallest_table(&self) -> Option<usize> {
+            self.tables
+                .iter()
+                .enumerate()
+                .map(|(i, t)| (i, t.len()))
+                .min_by_key(|(_, len)| *len)
+                .map(|(i, _len)| i)
+        }
+
+        #[inline]
+        pub(crate) fn extend(&mut self, mut partition: GridPartition<P>) {
+            for mut table in partition.tables.drain(..) {
+                if table.len() < Self::MIN_TABLE_SIZE {
+                    if let Some(i) = self.smallest_table() {
+                        for hash in table.drain() {
+                            self.tables[i].insert_unique_unchecked(hash);
+                        }
+                    } else {
+                        self.tables.push(table);
+                    }
                 } else {
                     self.tables.push(table);
                 }
+            }
+            self.min = self.min.min(partition.min);
+            self.max = self.max.max(partition.max);
+        }
+
+        /// Removes a grid hash from the partition. Returns whether the value was present.
+        #[inline]
+        pub(crate) fn remove(&mut self, hash: &GridHash<P>) -> bool {
+            let Some(i_table) = self
+                .tables
+                .iter_mut()
+                .enumerate()
+                .find_map(|(i, table)| table.remove(hash).then_some(i))
+            else {
+                return false;
+            };
+            if self.tables[i_table].is_empty() {
+                self.tables.swap_remove(i_table);
+            }
+
+            let (cell, min, max) = (hash.cell(), self.min, self.max);
+            // Only need to recompute the bounds if the removed cell was touching the boundary.
+            if min.x == cell.x || min.y == cell.y || min.z == cell.z {
+                self.compute_min();
+            }
+            // Note this is not an `else if`. The cell might be on the max bound in one axis, and the
+            // min bound in another.
+            if max.x == cell.x || max.y == cell.y || max.z == cell.z {
+                self.compute_max();
+            }
+            true
+        }
+
+        /// Computes the minimum bounding coordinate. Requires linearly scanning over entries in the
+        /// partition.
+        #[inline]
+        fn compute_min(&mut self) {
+            if let Some(min) = self
+                .iter()
+                .map(|hash| hash.cell())
+                .reduce(|acc, e| acc.min(e))
+            {
+                self.min = min
             } else {
-                self.tables.push(table);
+                self.min = GridCell::ONE * P::from_f64(1e10);
             }
         }
-    }
 
-    /// The grid this partition resides in.
-    pub fn grid(&self) -> Entity {
-        self.grid
+        /// Computes the maximum bounding coordinate. Requires linearly scanning over entries in the
+        /// partition.
+        #[inline]
+        fn compute_max(&mut self) {
+            if let Some(max) = self
+                .iter()
+                .map(|hash| hash.cell())
+                .reduce(|acc, e| acc.max(e))
+            {
+                self.max = max
+            } else {
+                self.min = GridCell::ONE * P::from_f64(-1e10);
+            }
+        }
     }
 }

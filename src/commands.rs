@@ -21,6 +21,10 @@ pub trait BigSpaceCommands {
         &mut self,
         child_builder: impl FnOnce(&mut GridCommands<P>),
     );
+
+    /// Access the [`GridCommands`] of an entity by passing in the [`Entity`] and [`Grid`]. Note
+    /// that the value of `grid` will be inserted in this entity when the command is applied.
+    fn grid<P: GridPrecision>(&mut self, entity: Entity, grid: Grid<P>) -> GridCommands<P>;
 }
 
 impl BigSpaceCommands for Commands<'_, '_> {
@@ -45,6 +49,15 @@ impl BigSpaceCommands for Commands<'_, '_> {
     ) {
         self.spawn_big_space(Grid::default(), child_builder);
     }
+
+    fn grid<P: GridPrecision>(&mut self, entity: Entity, grid: Grid<P>) -> GridCommands<P> {
+        GridCommands {
+            entity,
+            commands: self.reborrow(),
+            grid,
+            children: Default::default(),
+        }
+    }
 }
 
 /// Build [`big_space`](crate) hierarchies more easily, with access to grids.
@@ -68,6 +81,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     }
 
     /// Spawn an entity in this grid.
+    #[inline]
     pub fn spawn(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
         let entity = self.commands.spawn(bundle).id();
         self.children.push(entity);
@@ -80,9 +94,9 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
 
     /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and insert the provided
     /// bundle.
+    #[inline]
     pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
         let entity = self
-            .commands
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
@@ -92,8 +106,6 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
             .insert(bundle)
             .id();
 
-        self.children.push(entity);
-
         SpatialEntityCommands {
             entity,
             commands: self.commands.reborrow(),
@@ -101,7 +113,8 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
         }
     }
 
-    /// Returns the [`Entity``] id of the entity.
+    /// Returns the [`Entity`] id of the entity.
+    #[inline]
     pub fn id(&self) -> Entity {
         self.entity
     }
@@ -109,6 +122,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and apply entity commands
     /// to it via the closure. This allows you to insert bundles on this new spatial entities, and
     /// add more children to it.
+    #[inline]
     pub fn with_spatial(
         &mut self,
         spatial: impl FnOnce(&mut SpatialEntityCommands<P>),
@@ -120,6 +134,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and apply entity commands
     /// to it via the closure. This allows you to insert bundles on this new spatial entities, and
     /// add more children to it.
+    #[inline]
     pub fn with_grid(
         &mut self,
         new_grid: Grid<P>,
@@ -130,16 +145,15 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     }
 
     /// Same as [`Self::with_grid`], but using the default [`Grid`] value.
+    #[inline]
     pub fn with_grid_default(&mut self, builder: impl FnOnce(&mut GridCommands<P>)) -> &mut Self {
         self.with_grid(Grid::default(), builder)
     }
 
     /// Spawn a grid as a child of the current grid.
+    #[inline]
     pub fn spawn_grid(&mut self, new_grid: Grid<P>, bundle: impl Bundle) -> GridCommands<P> {
-        let mut entity_commands = self.commands.entity(self.entity);
-        let mut commands = entity_commands.commands();
-
-        let entity = commands
+        let entity = self
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
@@ -149,8 +163,6 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
             ))
             .insert(bundle)
             .id();
-
-        self.children.push(entity);
 
         GridCommands {
             entity,
@@ -166,11 +178,13 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     }
 
     /// Access the underlying commands.
+    #[inline]
     pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
         &mut self.commands
     }
 
     /// Spawns the passed bundle which provides this grid, and adds it to this entity as a child.
+    #[inline]
     pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
         self.commands.entity(self.entity).with_child(bundle);
         self

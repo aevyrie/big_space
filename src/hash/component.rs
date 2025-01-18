@@ -34,6 +34,12 @@ impl<P: GridPrecision> PartialEq<GridHash<P>> for FastGridHash {
     }
 }
 
+impl<P: GridPrecision> From<GridHash<P>> for FastGridHash {
+    fn from(value: GridHash<P>) -> Self {
+        Self(value.pre_hash)
+    }
+}
+
 /// A unique spatial hash shared by all entities in the same [`GridCell`] within the same [`Grid`].
 ///
 /// Once computed, a spatial hash can be used to rapidly check if any two entities are in the same
@@ -153,52 +159,48 @@ impl<P: GridPrecision> GridHash<P> {
     pub(super) fn update<F: GridHashMapFilter>(
         mut commands: Commands,
         mut changed_hashes: ResMut<ChangedGridHashes<P, F>>,
-        mut spatial_entities: ParamSet<(
-            Query<
-                (
-                    Entity,
-                    &Parent,
-                    &GridCell<P>,
-                    &mut GridHash<P>,
-                    &mut FastGridHash,
-                ),
-                (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
-            >,
-            Query<(Entity, &Parent, &GridCell<P>), (F, Without<GridHash<P>>)>,
-        )>,
+        mut spatial_entities: Query<
+            (
+                Entity,
+                &Parent,
+                &GridCell<P>,
+                &mut GridHash<P>,
+                &mut FastGridHash,
+            ),
+            (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
+        >,
+        added_entities: Query<(Entity, &Parent, &GridCell<P>), (F, Without<GridHash<P>>)>,
         mut stats: Option<ResMut<crate::timing::GridHashStats>>,
-        mut thread_changed_hashes: Local<Parallel<Vec<Entity>>>,
+        mut thread_updated_hashes: Local<Parallel<Vec<Entity>>>,
         mut thread_commands: Local<Parallel<Vec<(Entity, GridHash<P>, FastGridHash)>>>,
     ) {
         let start = Instant::now();
 
         // Create new
-        spatial_entities
-            .p1()
+        added_entities
             .par_iter()
             .for_each(|(entity, parent, cell)| {
                 let spatial_hash = GridHash::new(parent, cell);
-                let fast_hash = FastGridHash(spatial_hash.pre_hash);
+                let fast_hash = spatial_hash.into();
                 thread_commands.scope(|tl| tl.push((entity, spatial_hash, fast_hash)));
-                thread_changed_hashes.scope(|tl| tl.push(entity));
+                thread_updated_hashes.scope(|tl| tl.push(entity));
             });
         for (entity, spatial_hash, fast_hash) in thread_commands.drain() {
             commands.entity(entity).insert((spatial_hash, fast_hash));
         }
 
         // Update existing
-        spatial_entities.p0().par_iter_mut().for_each(
+        spatial_entities.par_iter_mut().for_each(
             |(entity, parent, cell, mut hash, mut fast_hash)| {
                 let new_hash = GridHash::new(parent, cell);
                 let new_fast_hash = new_hash.pre_hash;
                 if hash.replace_if_neq(new_hash).is_some() {
-                    thread_changed_hashes.scope(|tl| tl.push(entity));
+                    thread_updated_hashes.scope(|tl| tl.push(entity));
                 }
                 fast_hash.0 = new_fast_hash;
             },
         );
-
-        changed_hashes.list.extend(thread_changed_hashes.drain());
+        thread_updated_hashes.drain_into(&mut changed_hashes.updated);
 
         if let Some(ref mut stats) = stats {
             stats.hash_update_duration += start.elapsed();

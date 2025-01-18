@@ -92,14 +92,14 @@ impl<T: QueryFilter + Send + Sync + 'static> GridHashMapFilter for T {}
 /// react to a component being mutated. For now, this performs well enough.
 #[derive(Resource)]
 struct ChangedGridHashes<P: GridPrecision, F: GridHashMapFilter> {
-    list: Vec<Entity>,
+    updated: Vec<Entity>,
     spooky: PhantomData<(P, F)>,
 }
 
 impl<P: GridPrecision, F: GridHashMapFilter> Default for ChangedGridHashes<P, F> {
     fn default() -> Self {
         Self {
-            list: Vec::new(),
+            updated: Vec::new(),
             spooky: PhantomData,
         }
     }
