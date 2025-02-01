@@ -36,13 +36,7 @@ fn main() {
                 draw_partitions.after(GridHashMapSystem::UpdatePartition),
             ),
         )
-        .add_systems(
-            Update,
-            (
-                cursor_grab,
-                spawn_spheres.run_if(input_pressed(KeyCode::KeyR)),
-            ),
-        )
+        .add_systems(Update, (cursor_grab, spawn_spheres))
         .init_resource::<MaterialPresets>()
         .run();
 }
@@ -288,12 +282,19 @@ fn spawn(mut commands: Commands) {
 
 fn spawn_spheres(
     mut commands: Commands,
+    input: Res<ButtonInput<KeyCode>>,
     material_presets: Res<MaterialPresets>,
     mut grid: Query<(Entity, &Grid<i32>, &mut Children)>,
     non_players: Query<(), With<NonPlayer>>,
 ) {
     let n_entities = non_players.iter().len() as f32;
-    let n_spawn = 10 * (1.0 + n_entities / 1e3) as usize;
+    let n_spawn = if input.pressed(KeyCode::KeyR) {
+        10 * (1.0 + n_entities / 1e1) as usize
+    } else if input.pressed(KeyCode::KeyU) {
+        1_000
+    } else {
+        return;
+    };
 
     let (entity, _grid, mut children) = grid.single_mut();
     let mut dyn_parent = bevy_reflect::DynamicTupleStruct::default();
