@@ -191,6 +191,14 @@
 //! position of the planet with high precision, then directly compute the [`GridCell`] and
 //! [`Transform`] of that entity using [`Grid::translation_to_grid`].
 //!
+//! # System Ordering
+//!
+//! The `GlobalTransform` computation happens in the [`TransformSystem::TransformPropagate`] system
+//! set, both in the [`PostUpdate`] and the [`PostStartup`] schedules.
+//!
+//! To run your own systems before/after this (for example, for reacting to [`GlobalTransform`]
+//! changes), order them around [`TransformSystem::TransformPropagate`].
+//!
 //! # Next Steps
 //!
 //! Take a look at the examples to see usage, as well as explanation of these use cases and topics.
