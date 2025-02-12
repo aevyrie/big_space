@@ -1,19 +1,18 @@
 #![allow(clippy::type_complexity)]
 
-use bevy::prelude::*;
-use big_space::{reference_frame::ReferenceFrame, FloatingOrigin, GridCell};
+use bevy::{color::palettes, prelude::*};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            big_space::FloatingOriginPlugin::<i64>::new(0.5, 0.01),
+            DefaultPlugins,
+            BigSpacePlugin::<i64>::default(),
             big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
         ))
-        .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement, rotation))
-        .run()
+        .run();
 }
 
 #[derive(Component)]
@@ -29,8 +28,8 @@ fn movement(
     )>,
 ) {
     let delta_translation = |offset: f32, scale: f32| -> Vec3 {
-        let t_1 = time.elapsed_seconds() * 0.1 + offset;
-        let dt = time.delta_seconds() * 0.1;
+        let t_1 = time.elapsed_secs() * 0.1 + offset;
+        let dt = time.delta_secs() * 0.1;
         let t_0 = t_1 - dt;
         let pos =
             |t: f32| -> Vec3 { Vec3::new(t.cos() * 2.0, t.sin() * 2.0, (t * 1.3).sin() * 2.0) };
@@ -50,7 +49,7 @@ struct Rotator;
 
 fn rotation(time: Res<Time>, mut query: Query<&mut Transform, With<Rotator>>) {
     for mut transform in &mut query {
-        transform.rotate_z(3.0 * time.delta_seconds() * 0.2);
+        transform.rotate_z(3.0 * time.delta_secs() * 0.2);
     }
 }
 
@@ -61,73 +60,49 @@ fn setup(
 ) {
     let mesh_handle = meshes.add(Sphere::new(0.1).mesh().ico(16).unwrap());
     let matl_handle = materials.add(StandardMaterial {
-        base_color: Color::YELLOW,
+        base_color: Color::Srgba(palettes::basic::WHITE),
         ..default()
     });
 
-    commands.spawn((
-        PbrBundle {
-            mesh: mesh_handle.clone(),
-            material: matl_handle.clone(),
-            transform: Transform::from_xyz(0.0, 0.0, 1.0),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-        Mover::<1>,
-    ));
-    commands.spawn((
-        PbrBundle {
-            mesh: mesh_handle.clone(),
-            material: matl_handle.clone(),
-            transform: Transform::from_xyz(1.0, 0.0, 0.0),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-        Mover::<2>,
-    ));
-    commands
-        .spawn((
-            PbrBundle {
-                mesh: mesh_handle.clone(),
-                material: matl_handle.clone(),
-                transform: Transform::from_xyz(0.0, 1.0, 0.0),
-                ..default()
-            },
-            GridCell::<i64>::default(),
-            ReferenceFrame::<i64>::new(0.2, 0.01),
-            Rotator,
-            Mover::<3>,
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                PbrBundle {
-                    mesh: mesh_handle,
-                    material: matl_handle,
-                    transform: Transform::from_xyz(0.0, 0.5, 0.0),
-                    ..default()
-                },
-                GridCell::<i64>::default(),
+    commands.spawn_big_space::<i64>(Grid::new(1.0, 0.01), |root| {
+        root.spawn_spatial((
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(matl_handle.clone()),
+            Transform::from_xyz(0.0, 0.0, 1.0),
+            Mover::<1>,
+        ));
+
+        root.spawn_spatial((
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(matl_handle.clone()),
+            Transform::from_xyz(1.0, 0.0, 0.0),
+            Mover::<2>,
+        ));
+
+        root.with_grid(Grid::new(0.2, 0.01), |new_grid| {
+            new_grid.insert((
+                Mesh3d(mesh_handle.clone()),
+                MeshMaterial3d(matl_handle.clone()),
+                Transform::from_xyz(0.0, 1.0, 0.0),
+                Rotator,
+                Mover::<3>,
+            ));
+            new_grid.spawn_spatial((
+                Mesh3d(mesh_handle),
+                MeshMaterial3d(matl_handle),
+                Transform::from_xyz(0.0, 0.5, 0.0),
                 Mover::<4>,
             ));
         });
 
-    // light
-    commands.spawn((
-        PointLightBundle {
-            transform: Transform::from_xyz(4.0, 8.0, 4.0),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-    ));
+        // light
+        root.spawn_spatial((PointLight::default(), Transform::from_xyz(4.0, 8.0, 4.0)));
 
-    // camera
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 0.0, 8.0)
-                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-            ..default()
-        },
-        GridCell::<i64>::default(),
-        FloatingOrigin,
-    ));
+        // camera
+        root.spawn_spatial((
+            Camera3d::default(),
+            Transform::from_xyz(0.0, 0.0, 8.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
+            FloatingOrigin,
+        ));
+    });
 }

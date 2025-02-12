@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low Poly Spaceship
+* source:	https://sketchfab.com/3d-models/low-poly-spaceship-f854128cf78d4dafb28d16b3c15001ba
+* author:	FriendlyCreep (https://sketchfab.com/FriendlyCreep)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low Poly Spaceship" (https://sketchfab.com/3d-models/low-poly-spaceship-f854128cf78d4dafb28d16b3c15001ba) by FriendlyCreep (https://sketchfab.com/FriendlyCreep) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
