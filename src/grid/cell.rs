@@ -36,7 +36,7 @@ pub struct GridCellAny;
 ///
 /// [`BigSpace`]s are only allowed to have a single type of `GridCell`, you cannot mix
 /// [`GridPrecision`]s.
-#[derive(Component, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Reflect)]
+#[derive(Component, Default, Debug, PartialEq, Eq, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 #[require(Transform, GlobalTransform)]
 #[component(storage = "Table", on_add = Self::on_add, on_remove = Self::on_remove)]
@@ -84,6 +84,28 @@ impl<P: GridPrecision> GridCell<P> {
             x: self.x.as_f64() * grid.cell_edge_length() as f64,
             y: self.y.as_f64() * grid.cell_edge_length() as f64,
             z: self.z.as_f64() * grid.cell_edge_length() as f64,
+        }
+    }
+
+    /// Returns a cell containing the minimum values for each element of self and rhs.
+    ///
+    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ..].
+    pub fn min(&self, rhs: Self) -> Self {
+        Self {
+            x: self.x.min(rhs.x),
+            y: self.y.min(rhs.y),
+            z: self.z.min(rhs.z),
+        }
+    }
+
+    /// Returns a cell containing the maximum values for each element of self and rhs.
+    ///
+    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ..].
+    pub fn max(&self, rhs: Self) -> Self {
+        Self {
+            x: self.x.max(rhs.x),
+            y: self.y.max(rhs.y),
+            z: self.z.max(rhs.z),
         }
     }
 
