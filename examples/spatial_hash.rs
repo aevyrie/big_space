@@ -5,7 +5,6 @@ use bevy::{
     prelude::*,
 };
 use bevy_ecs::entity::EntityHasher;
-use bevy_input::common_conditions::input_pressed;
 use bevy_math::DVec3;
 use big_space::prelude::*;
 use noise::{NoiseFn, Simplex};
@@ -13,11 +12,11 @@ use smallvec::SmallVec;
 use turborand::prelude::*;
 
 // Try bumping this up to really stress test. I'm able to push a million entities with an M3 Max.
-const HALF_WIDTH: f32 = 500.0;
+const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
 const MOVEMENT_SPEED: f32 = 5.0;
-const PERCENT_STATIC: f32 = 1.0;
+const PERCENT_STATIC: f32 = 0.99;
 
 fn main() {
     App::new()
@@ -111,7 +110,7 @@ fn draw_partitions(
                     .with_scale(Vec3::splat(l));
                 gizmos.cuboid(
                     transform.mul_transform(local_trans),
-                    Hsla::new(hue, 1.0, 0.5, 0.8),
+                    Hsla::new(hue, 1.0, 0.5, 0.05),
                 );
             });
 
@@ -124,7 +123,7 @@ fn draw_partitions(
 
         gizmos.cuboid(
             transform.mul_transform(local_trans),
-            Hsla::new(hue, 1.0, 0.5, 0.8),
+            Hsla::new(hue, 1.0, 0.5, 0.2),
         );
     }
 }
@@ -212,6 +211,10 @@ fn move_player(
     let mut text = text.single_mut();
     text.0 = format!(
         "\
+Controls:
+WASD to move, QE to roll
+F to spawn 1,000, G to double
+
 Population: {: >8} Entities
 
 Transform Propagation
@@ -287,10 +290,10 @@ fn spawn_spheres(
     mut grid: Query<(Entity, &Grid<i32>, &mut Children)>,
     non_players: Query<(), With<NonPlayer>>,
 ) {
-    let n_entities = non_players.iter().len() as f32;
-    let n_spawn = if input.pressed(KeyCode::KeyR) {
-        10 * (1.0 + n_entities / 1e1) as usize
-    } else if input.pressed(KeyCode::KeyU) {
+    let n_entities = non_players.iter().len().max(1);
+    let n_spawn = if input.pressed(KeyCode::KeyG) {
+        n_entities
+    } else if input.pressed(KeyCode::KeyF) {
         1_000
     } else {
         return;
@@ -313,14 +316,14 @@ fn spawn_spheres(
                     hash,
                     NonPlayer,
                     Parent::from_reflect(dyn_parent).unwrap(),
-                    // Mesh3d(material_presets.sphere.clone_weak()),
-                    // MeshMaterial3d(material_presets.default.clone_weak()),
-                    // bevy_render::view::VisibilityRange {
-                    //     start_margin: 1.0..5.0,
-                    //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                    //     use_aabb: false,
-                    // },
-                    // bevy_render::view::NoFrustumCulling,
+                    Mesh3d(material_presets.sphere.clone_weak()),
+                    MeshMaterial3d(material_presets.default.clone_weak()),
+                    bevy_render::view::VisibilityRange {
+                        start_margin: 1.0..5.0,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                        use_aabb: false,
+                    },
+                    bevy_render::view::NoFrustumCulling,
                 ))
                 .id()
         })
@@ -342,7 +345,7 @@ fn sample_noise<'a, T: NoiseFn<f64, 3>>(
 ) -> impl Iterator<Item = Vec3> + use<'a, T> {
     std::iter::repeat_with(
         || loop {
-            let noise_scale = 2.0;
+            let noise_scale = 0.05 * HALF_WIDTH as f64;
             let threshold = 0.50;
             let rng_val = || rng.f64_normalized() * noise_scale;
             let coord = [rng_val(), rng_val(), rng_val()];
