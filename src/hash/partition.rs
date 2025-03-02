@@ -63,7 +63,7 @@ impl Hash for GridPartitionId {
     }
 }
 
-/// Groups connected [`GridCell`](crate::GridCell)s into [`GridPartition`]s.
+/// Groups connected [`GridCell`]s into [`GridPartition`]s.
 ///
 /// Partitions divide space into independent groups of cells.
 ///
