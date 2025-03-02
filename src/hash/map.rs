@@ -116,7 +116,11 @@ where
     }
 }
 
-impl<P: GridPrecision, F: GridHashMapFilter> GridHashMap<P, F> {
+impl<P, F> GridHashMap<P, F>
+where
+    P: GridPrecision,
+    F: GridHashMapFilter,
+{
     /// Get information about all entities located at this [`GridHash`], as well as its
     /// neighbors.
     #[inline]
@@ -243,7 +247,11 @@ impl<P: GridPrecision, F: GridHashMapFilter> GridHashMap<P, F> {
 }
 
 /// Private Systems
-impl<P: GridPrecision, F: GridHashMapFilter> GridHashMap<P, F> {
+impl<P, F> GridHashMap<P, F>
+where
+    P: GridPrecision,
+    F: GridHashMapFilter,
+{
     /// Update the [`GridHashMap`] with entities that have changed [`GridHash`]es, and meet the
     /// optional [`GridHashMapFilter`].
     pub(super) fn update(
@@ -263,12 +271,12 @@ impl<P: GridPrecision, F: GridHashMapFilter> GridHashMap<P, F> {
         }
 
         if let Some(ref mut stats) = stats {
-            stats.moved_entities = changed_hashes.list.len();
+            stats.moved_entities = changed_hashes.updated.len();
         }
 
         // See the docs on ChangedGridHash understand why we don't use query change detection.
         for (entity, spatial_hash) in changed_hashes
-            .list
+            .updated
             .drain(..)
             .filter_map(|entity| all_hashes.get(entity).ok())
         {
@@ -282,7 +290,11 @@ impl<P: GridPrecision, F: GridHashMapFilter> GridHashMap<P, F> {
 }
 
 /// Private Methods
-impl<P: GridPrecision, F: GridHashMapFilter> GridHashMap<P, F> {
+impl<P, F> GridHashMap<P, F>
+where
+    P: GridPrecision,
+    F: GridHashMapFilter,
+{
     /// Insert an entity into the [`GridHashMap`], updating any existing entries.
     #[inline]
     fn insert(&mut self, entity: Entity, hash: GridHash<P>) {
@@ -361,31 +373,35 @@ impl<P: GridPrecision> InnerGridHashMap<P> {
         } else {
             let mut entities = self.hash_set_pool.pop().unwrap_or_default();
             entities.insert(entity);
+            self.insert_entry(hash, entities);
+        }
+    }
 
-            let mut occupied_neighbors = self.neighbor_pool.pop().unwrap_or_default();
-            occupied_neighbors.extend(hash.adjacent(1).filter(|neighbor| {
-                self.inner
-                    .get_mut(neighbor)
-                    .map(|entry| {
-                        entry.occupied_neighbors.push(hash);
-                        true
-                    })
-                    .unwrap_or_default()
-            }));
+    #[inline]
+    fn insert_entry(&mut self, hash: GridHash<P>, entities: HashSet<Entity, EntityHash>) {
+        let mut occupied_neighbors = self.neighbor_pool.pop().unwrap_or_default();
+        occupied_neighbors.extend(hash.adjacent(1).filter(|neighbor| {
+            self.inner
+                .get_mut(neighbor)
+                .map(|entry| {
+                    entry.occupied_neighbors.push(hash);
+                    true
+                })
+                .unwrap_or_default()
+        }));
 
-            self.inner.insert(
-                hash,
-                GridHashEntry {
-                    entities,
-                    occupied_neighbors,
-                },
-            );
+        self.inner.insert(
+            hash,
+            GridHashEntry {
+                entities,
+                occupied_neighbors,
+            },
+        );
 
-            if !self.just_removed.remove(&hash) {
-                // If a cell is removed then added within the same update, it can't be considered
-                // "just added" because it *already existed* at the start of the update.
-                self.just_inserted.insert(hash);
-            }
+        if !self.just_removed.remove(&hash) {
+            // If a cell is removed then added within the same update, it can't be considered
+            // "just added" because it *already existed* at the start of the update.
+            self.just_inserted.insert(hash);
         }
     }
 
