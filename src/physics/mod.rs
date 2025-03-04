@@ -1,7 +1,7 @@
+use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::prelude::*;
 use bevy_math::{DVec3, Vec3};
 use rapier3d::prelude::*;
-use crate::prelude::{GridCell, GridPrecision};
 
 #[derive(Component)]
 pub struct BigPhysics {
@@ -9,33 +9,44 @@ pub struct BigPhysics {
 }
 
 /// Implement this trait to
-pub trait BigPhysicsContext {
+pub trait BigPhysicsContext: Send + Sync {
     /// Move the origin of the physics simulation by a translational offset.
     ///
     /// This occurs when a physics origin is recentered to be closer to the centroid of the entities
     /// in the simulation, to maximize precision. This should be implemented by updating the
     /// translation of all entities by `-offset`.
-    fn move_origin(&mut self, offset: DVec3);
+    fn move_origin(&mut self, offset: Vec3);
 
     /// Advance the simulation by one time step.
     fn step(&mut self);
 
     /// Update an entity's properties in the simulation, inserting it if it does not exist.
-    fn update(&mut self, entity: Entity, properties: &BigPhysicsProps);
+    fn update(&mut self, entity: Entity, properties: &RigidBody);
 
     /// Remove an entity from the simulation.
     fn remove(&mut self, entity: Entity);
 
-    /// Merge a simulation into this simulation.
-    fn merge(&mut self, other: &Self);
+    /// Merge another simulation into this simulation.
+    ///
+    /// It is likely that `other` is the same type as `self`, however this is a trait method, so we
+    /// no longer have any information about what type `self` is. You probably need to downcast
+    /// `other` to `Self` fallibly inside this method.
+    fn merge(&mut self, other: &dyn BigPhysicsContext);
 
     /// Return the physics position of the entity, relative to the physics origin.
     fn position(&self, entity: Entity) -> Option<DVec3>;
 }
 
-pub struct BigPhysicsProps {
+#[derive(Component)]
+pub struct RigidBody {
+    behavior: Behavior,
+    shape: Shape,
+    mass: Mass,
+}
+
+pub struct Mass {
     /// kg
-    mass_kg: f32,
+    mass: f32,
     /// m
     center_of_mass_local: Vec3,
     /// radians
@@ -44,8 +55,19 @@ pub struct BigPhysicsProps {
     principal_moment_of_inertia: f32,
 }
 
-use std::sync::mpsc::channel;
+pub enum Shape {
+    Cuboid { half_extents: Vec3 },
+    Sphere { radius: f32 },
+}
+
+pub enum Behavior {
+    Static,
+    Dynamic,
+    Kinematic,
+}
+
 pub struct RapierContext {
+    entity_map: EntityHashMap<(RigidBodyHandle, ColliderHandle)>,
     gravity: Vector<f32>,
     integration_parameters: IntegrationParameters,
     islands: IslandManager,
@@ -54,7 +76,7 @@ pub struct RapierContext {
     bodies: RigidBodySet,
     colliders: ColliderSet,
     impulse_joints: ImpulseJointSet,
-    multibody_joints:  MultibodyJointSet,
+    multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
     query_pipeline: Option<QueryPipeline>,
     hooks: Box<dyn PhysicsHooks>,
@@ -65,21 +87,66 @@ pub struct RapierContext {
 impl Default for RapierContext {
     fn default() -> Self {
         Self {
-            gravity: Default::default(),
-            integration_parameters: Default::default(),
-            islands: Default::default(),
             broad_phase: Box::new(DefaultBroadPhase::new()),
-            narrow_phase: Default::default(),
-            bodies: Default::default(),
-            colliders: Default::default(),
-            impulse_joints: Default::default(),
-            multibody_joints: Default::default(),
-            ccd_solver: Default::default(),
-            query_pipeline: None,
             hooks: Box::new(()),
             events: Box::new(()),
-            pipeline: PhysicsPipeline::new(),
+            ..Default::default()
         }
+    }
+}
+
+impl BigPhysicsContext for RapierContext {
+    fn move_origin(&mut self, offset: Vec3) {
+        for (_, body) in self.bodies.iter_mut() {
+            let mut iso = *body.position();
+            iso.translation.vector -= Vector::new(offset.x, offset.y, offset.z);
+            body.set_position(iso, false);
+            body.set_next_kinematic_position(iso);
+        }
+    }
+
+    fn step(&mut self) {
+        self.pipeline.step(
+            &self.gravity,
+            &self.integration_parameters,
+            &mut self.islands,
+            self.broad_phase.as_mut(),
+            &mut self.narrow_phase,
+            &mut self.bodies,
+            &mut self.colliders,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
+            &mut self.ccd_solver,
+            self.query_pipeline.as_mut(),
+            self.hooks.as_ref(),
+            self.events.as_ref(),
+        )
+    }
+
+    fn update(&mut self, entity: Entity, properties: &RigidBody) {
+        let Some((body, collider)) = self.entity_map.get(&entity) else {
+            return;
+        };
+        let body = &mut self.bodies[*body];
+        let collider = &mut self.colliders[*collider];
+        collider.set_mass(properties.mass.mass);
+        collider.set_shape(match properties.shape {
+            Shape::Cuboid { half_extents: l } => SharedShape::cuboid(l.x, l.y, l.z),
+            Shape::Sphere { radius } => SharedShape::ball(radius),
+        })
+        collider.set_mass_properties()
+    }
+
+    fn remove(&mut self, entity: Entity) {
+        todo!()
+    }
+
+    fn merge(&mut self, other: &dyn BigPhysicsContext) {
+        todo!()
+    }
+
+    fn position(&self, entity: Entity) -> Option<DVec3> {
+        todo!()
     }
 }
 
@@ -98,7 +165,6 @@ fn tst() {
     let collider = ColliderBuilder::ball(0.5).restitution(0.7).build();
     let ball_body_handle = rigid_body_set.insert(rigid_body);
     collider_set.insert_with_parent(collider, ball_body_handle, &mut rigid_body_set);
-
 
     /* Create other structures necessary for the simulation. */
     let gravity = vector![0.0, -9.81, 0.0];
