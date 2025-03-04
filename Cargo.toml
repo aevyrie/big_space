@@ -16,6 +16,7 @@ all-features = true
 default = ["std"]
 debug = ["std", "bevy_gizmos", "bevy_color"]
 camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
+physics = ["rapier3d"]
 i8 = []
 i16 = []
 i32 = []
