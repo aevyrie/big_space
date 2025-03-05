@@ -1,8 +1,8 @@
 //! This example demonstrates what floating point error in rendering looks like. You can press
-//! spacebar to smoothly switch between enabling and disabling the floating origin.
+//! space bar to smoothly switch between enabling and disabling the floating origin.
 //!
 //! Instead of disabling the plugin outright, this example simply moves the floating origin
-//! independently from the camera, which is equivalent to what would happen when moving far from the
+//! independently of the camera, which is equivalent to what would happen when moving far from the
 //! origin when not using this plugin.
 
 use bevy::prelude::*;
@@ -10,7 +10,7 @@ use big_space::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, BigSpacePlugin::<i128>::default()))
+        .add_plugins((DefaultPlugins, BigSpacePlugin::default()))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
         .run();
@@ -22,18 +22,19 @@ fn main() {
 /// floating point error when we disable this plugin.
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
-/// 10_000_000_000_000_000_000_000_000_000_000_000_000
-const DISTANCE: i128 = 2_000_000;
+/// 10_000_000_000_000_000 with the default i64 feature, or
+/// 10_000_000_000_000_000_000_000_000_000_000_000_000 with the i128 feature.
+const DISTANCE: GridPrecision = 2_000_000;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
 /// disabling the plugin. Normally you would make your active camera the floating origin to avoid
 /// this issue.
 fn toggle_plugin(
     input: Res<ButtonInput<KeyCode>>,
-    grids: Grids<i128>,
+    grids: Grids,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
-    mut floating_origin: Query<(Entity, &mut GridCell<i128>), With<FloatingOrigin>>,
+    mut floating_origin: Query<(Entity, &mut GridCell), With<FloatingOrigin>>,
 ) {
     if input.just_pressed(KeyCode::Space) {
         *disabled = !*disabled;
@@ -42,7 +43,7 @@ fn toggle_plugin(
     let this_grid = grids.parent_grid(floating_origin.single().0).unwrap();
 
     let mut origin_cell = floating_origin.single_mut().1;
-    let index_max = DISTANCE / this_grid.cell_edge_length() as i128;
+    let index_max = DISTANCE / this_grid.cell_edge_length() as GridPrecision;
     let increment = index_max / 100;
 
     let msg = if *disabled {
@@ -64,9 +65,10 @@ fn toggle_plugin(
         "Floating Origin Enabled"
     };
 
-    let dist = index_max.saturating_sub(origin_cell.x) * this_grid.cell_edge_length() as i128;
+    let dist =
+        index_max.saturating_sub(origin_cell.x) * this_grid.cell_edge_length() as GridPrecision;
 
-    let thousands = |num: i128| {
+    let thousands = |num: GridPrecision| {
         num.to_string()
             .as_bytes()
             .rchunks(3)
@@ -107,9 +109,9 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn_big_space_default::<i128>(|root| {
-        let d = DISTANCE / root.grid().cell_edge_length() as i128;
-        let distant_grid_cell = GridCell::<i128>::new(d, d, d);
+    commands.spawn_big_space_default(|root| {
+        let d = DISTANCE / root.grid().cell_edge_length() as GridPrecision;
+        let distant_grid_cell = GridCell::new(d, d, d);
 
         // Normally, we would put the floating origin on the camera. However in this example, we
         // want to show what happens as the camera is far from the origin, to emulate what

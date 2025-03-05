@@ -7,9 +7,9 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i8>::default(),
-            FloatingOriginDebugPlugin::<i8>::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::<i8>::default(), // Compatible controller
+            BigSpacePlugin::default(),
+            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
+            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -23,7 +23,7 @@ fn setup_scene(
     let sphere = Mesh3d(meshes.add(Sphere::default()));
     let matl = MeshMaterial3d(materials.add(Color::WHITE));
 
-    commands.spawn_big_space::<i8>(Grid::default(), |root_grid| {
+    commands.spawn_big_space(Grid::default(), |root_grid| {
         let width = || -8..8;
         for (x, y, z) in width()
             .flat_map(|x| width().map(move |y| (x, y)))
@@ -32,7 +32,7 @@ fn setup_scene(
             root_grid.spawn_spatial((
                 sphere.clone(),
                 matl.clone(),
-                GridCell::<i8> {
+                GridCell {
                     x: x * 16,
                     y: y * 16,
                     z: z * 16,

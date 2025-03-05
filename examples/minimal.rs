@@ -11,9 +11,9 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i64>::default(),
-            FloatingOriginDebugPlugin::<i64>::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::<i64>::default(), // Compatible controller
+            BigSpacePlugin::default(),
+            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
+            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -32,7 +32,7 @@ fn setup_scene(
     // A world can have multiple independent BigSpaces, with their own floating origins. This can
     // come in handy if you want to have two cameras very far from each other, rendering at the same
     // time like split screen, or portals.
-    commands.spawn_big_space_default::<i64>(|root_grid| {
+    commands.spawn_big_space_default(|root_grid| {
         // Because BIG_DISTANCE is so large, we want to avoid using bevy's f32 transforms alone and
         // experience rounding errors. Instead, we use this helper to convert an f64 position into a
         // grid cell and f32 offset.

@@ -22,10 +22,10 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i32>::default(),
-            GridHashPlugin::<i32>::default(),
-            GridPartitionPlugin::<i32>::default(),
-            big_space::camera::CameraControllerPlugin::<i32>::default(),
+            BigSpacePlugin::default(),
+            GridHashPlugin::<()>::default(),
+            GridPartitionPlugin::<()>::default(),
+            big_space::camera::CameraControllerPlugin::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(
@@ -86,9 +86,9 @@ impl FromWorld for MaterialPresets {
 
 fn draw_partitions(
     mut gizmos: Gizmos,
-    partitions: Res<GridPartitionMap<i32>>,
-    grids: Query<(&GlobalTransform, &Grid<i32>)>,
-    camera: Query<&GridHash<i32>, With<Camera>>,
+    partitions: Res<GridPartitionMap>,
+    grids: Query<(&GlobalTransform, &Grid)>,
+    camera: Query<&GridHash, With<Camera>>,
 ) {
     for (id, p) in partitions.iter().take(10_000) {
         let Ok((transform, grid)) = grids.get(p.grid()) else {
@@ -105,7 +105,7 @@ fn draw_partitions(
             .filter(|hash| *hash != camera.single())
             .take(1_000)
             .for_each(|h| {
-                let center = [h.cell().x, h.cell().y, h.cell().z];
+                let center = [h.cell().x as i32, h.cell().y as i32, h.cell().z as i32];
                 let local_trans = Transform::from_translation(IVec3::from(center).as_vec3() * l)
                     .with_scale(Vec3::splat(l));
                 gizmos.cuboid(
@@ -114,8 +114,8 @@ fn draw_partitions(
                 );
             });
 
-        let min = IVec3::from([p.min().x, p.min().y, p.min().z]).as_vec3() * l;
-        let max = IVec3::from([p.max().x, p.max().y, p.max().z]).as_vec3() * l;
+        let min = IVec3::from([p.min().x as i32, p.min().y as i32, p.min().z as i32]).as_vec3() * l;
+        let max = IVec3::from([p.max().x as i32, p.max().y as i32, p.max().z as i32]).as_vec3() * l;
 
         let size = max - min;
         let center = min + (size) * 0.5;
@@ -133,15 +133,15 @@ fn draw_partitions(
 fn move_player(
     time: Res<Time>,
     mut _gizmos: Gizmos,
-    mut player: Query<(&mut Transform, &mut GridCell<i32>, &Parent, &GridHash<i32>), With<Player>>,
+    mut player: Query<(&mut Transform, &mut GridCell, &Parent, &GridHash), With<Player>>,
     mut non_player: Query<
-        (&mut Transform, &mut GridCell<i32>, &Parent),
+        (&mut Transform, &mut GridCell, &Parent),
         (Without<Player>, With<NonPlayer>),
     >,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
-    grids: Query<&Grid<i32>>,
-    hash_grid: Res<GridHashMap<i32>>,
+    grids: Query<&Grid>,
+    hash_grid: Res<GridHashMap>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<&mut Text>,
     hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
@@ -257,7 +257,7 @@ Total: {: >22.1?}",
 }
 
 fn spawn(mut commands: Commands) {
-    commands.spawn_big_space::<i32>(Grid::new(CELL_WIDTH, 0.0), |root| {
+    commands.spawn_big_space(Grid::new(CELL_WIDTH, 0.0), |root| {
         root.spawn_spatial((
             FloatingOrigin,
             Camera3d::default(),
@@ -273,7 +273,7 @@ fn spawn(mut commands: Commands) {
                 .with_speed(15.0),
             Fxaa::default(),
             Bloom::default(),
-            GridCell::new(0, 0, HALF_WIDTH as i32 / 2),
+            GridCell::new(0, 0, HALF_WIDTH as GridPrecision / 2),
         ))
         .with_children(|b| {
             b.spawn(DirectionalLight::default());
@@ -287,7 +287,7 @@ fn spawn_spheres(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     material_presets: Res<MaterialPresets>,
-    mut grid: Query<(Entity, &Grid<i32>, &mut Children)>,
+    mut grid: Query<(Entity, &Grid, &mut Children)>,
     non_players: Query<(), With<NonPlayer>>,
 ) {
     let n_entities = non_players.iter().len().max(1);
@@ -306,12 +306,12 @@ fn spawn_spheres(
 
     let new_children = sample_noise(n_spawn, &Simplex::new(345612), &Rng::new())
         .map(|value| {
-            let hash = GridHash::<i32>::__new_manual(entity, &GridCell::default());
+            let hash = GridHash::__new_manual(entity, &GridCell::default());
             commands
                 .spawn((
                     Transform::from_xyz(value.x, value.y, value.z),
                     GlobalTransform::default(),
-                    GridCell::<i32>::default(),
+                    GridCell::default(),
                     FastGridHash::from(hash),
                     hash,
                     NonPlayer,

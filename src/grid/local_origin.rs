@@ -38,9 +38,9 @@ mod inner {
     /// other - consider the grid of a planet, spinning about its axis and orbiting about a star, it
     /// will not align with the grid of the star system!
     #[derive(Default, Debug, Clone, PartialEq, Reflect)]
-    pub struct LocalFloatingOrigin<P: GridPrecision> {
+    pub struct LocalFloatingOrigin {
         /// The local cell that the floating origin's grid cell origin falls into.
-        cell: GridCell<P>,
+        cell: GridCell,
         /// The translation of the floating origin's grid cell relative to the origin of
         /// [`LocalFloatingOrigin::cell`].
         translation: Vec3,
@@ -73,7 +73,7 @@ mod inner {
         is_local_origin_unchanged: bool,
     }
 
-    impl<P: GridPrecision> LocalFloatingOrigin<P> {
+    impl LocalFloatingOrigin {
         /// The grid transform from the local grid, to the floating origin's grid. See
         /// [Self::grid_transform].
         #[inline]
@@ -83,7 +83,7 @@ mod inner {
 
         /// Gets [`Self::cell`].
         #[inline]
-        pub fn cell(&self) -> GridCell<P> {
+        pub fn cell(&self) -> GridCell {
             self.cell
         }
 
@@ -102,7 +102,7 @@ mod inner {
         /// Update this local floating origin, and compute the new inverse transform.
         pub fn set(
             &mut self,
-            translation_grid: GridCell<P>,
+            translation_grid: GridCell,
             translation_float: Vec3,
             rotation_float: DQuat,
         ) {
@@ -120,7 +120,7 @@ mod inner {
         }
 
         /// Create a new [`LocalFloatingOrigin`].
-        pub fn new(cell: GridCell<P>, translation: Vec3, rotation: DQuat) -> Self {
+        pub fn new(cell: GridCell, translation: Vec3, rotation: DQuat) -> Self {
             let grid_transform = DAffine3 {
                 matrix3: DMat3::from_quat(rotation),
                 translation: translation.as_dvec3(),
@@ -144,9 +144,9 @@ mod inner {
     }
 }
 
-fn propagate_origin_to_parent<P: GridPrecision>(
+fn propagate_origin_to_parent(
     this_grid_entity: Entity,
-    grids: &mut GridsMut<P>,
+    grids: &mut GridsMut,
     parent_grid_entity: Entity,
 ) {
     let (this_grid, this_cell, this_transform) = grids.get(this_grid_entity);
@@ -190,9 +190,9 @@ fn propagate_origin_to_parent<P: GridPrecision>(
     });
 }
 
-fn propagate_origin_to_child<P: GridPrecision>(
+fn propagate_origin_to_child(
     this_grid_entity: Entity,
-    grids: &mut GridsMut<P>,
+    grids: &mut GridsMut,
     child_grid_entity: Entity,
 ) {
     let (this_grid, _this_cell, _this_transform) = grids.get(this_grid_entity);
@@ -241,14 +241,14 @@ fn propagate_origin_to_child<P: GridPrecision>(
 
 /// A system param for more easily navigating a hierarchy of [`Grid`]s.
 #[derive(SystemParam)]
-pub struct Grids<'w, 's, P: GridPrecision> {
+pub struct Grids<'w, 's> {
     parent: Query<'w, 's, Read<Parent>>,
-    grid_query: Query<'w, 's, (Entity, Read<Grid<P>>, Option<Read<Parent>>)>,
+    grid_query: Query<'w, 's, (Entity, Read<Grid>, Option<Read<Parent>>)>,
 }
 
-impl<P: GridPrecision> Grids<'_, '_, P> {
+impl Grids<'_, '_> {
     /// Get a [`Grid`] from its `Entity`.
-    pub fn get(&self, grid_entity: Entity) -> &Grid<P> {
+    pub fn get(&self, grid_entity: Entity) -> &Grid {
         self.grid_query
             .get(grid_entity)
             .map(|(_entity, grid, _parent)| grid)
@@ -258,7 +258,7 @@ impl<P: GridPrecision> Grids<'_, '_, P> {
     }
 
     /// Get the [`Grid`] that `this` `Entity` is a child of, if it exists.
-    pub fn parent_grid(&self, this: Entity) -> Option<&Grid<P>> {
+    pub fn parent_grid(&self, this: Entity) -> Option<&Grid> {
         self.parent_grid_entity(this)
             .map(|grid_entity| self.get(grid_entity))
     }
@@ -316,13 +316,13 @@ impl<P: GridPrecision> Grids<'_, '_, P> {
 
 /// A system param for more easily navigating a hierarchy of grids mutably.
 #[derive(SystemParam)]
-pub struct GridsMut<'w, 's, P: GridPrecision> {
+pub struct GridsMut<'w, 's> {
     parent: Query<'w, 's, Read<Parent>>,
-    position: Query<'w, 's, (Read<GridCell<P>>, Read<Transform>), With<Grid<P>>>,
-    grid_query: Query<'w, 's, (Entity, Write<Grid<P>>, Option<Read<Parent>>)>,
+    position: Query<'w, 's, (Read<GridCell>, Read<Transform>), With<Grid>>,
+    grid_query: Query<'w, 's, (Entity, Write<Grid>, Option<Read<Parent>>)>,
 }
 
-impl<P: GridPrecision> GridsMut<'_, '_, P> {
+impl GridsMut<'_, '_> {
     /// Get mutable access to the [`Grid`], and run the provided function or closure, optionally
     /// returning data.
     ///
@@ -332,7 +332,7 @@ impl<P: GridPrecision> GridsMut<'_, '_, P> {
     pub fn update<T>(
         &mut self,
         grid_entity: Entity,
-        mut func: impl FnMut(&mut Grid<P>, &GridCell<P>, &Transform) -> T,
+        mut func: impl FnMut(&mut Grid, &GridCell, &Transform) -> T,
     ) -> T {
         let (cell, transform) = self.position(grid_entity);
         self.grid_query
@@ -342,7 +342,7 @@ impl<P: GridPrecision> GridsMut<'_, '_, P> {
     }
 
     /// Get the grid and the position of the grid from its `Entity`.
-    pub fn get(&self, grid_entity: Entity) -> (&Grid<P>, GridCell<P>, Transform) {
+    pub fn get(&self, grid_entity: Entity) -> (&Grid, GridCell, Transform) {
         let (cell, transform) = self.position(grid_entity);
         self.grid_query
             .get(grid_entity)
@@ -356,7 +356,7 @@ impl<P: GridPrecision> GridsMut<'_, '_, P> {
     /// they are missing.
     ///
     /// Needed because the root grid should not have a grid cell or transform.
-    pub fn position(&self, grid_entity: Entity) -> (GridCell<P>, Transform) {
+    pub fn position(&self, grid_entity: Entity) -> (GridCell, Transform) {
         let (cell, transform) = (GridCell::default(), Transform::default());
         let (cell, transform) = self.position.get(grid_entity).unwrap_or_else(|_| {
         assert!(self.parent.get(grid_entity).is_err(), "Grid entity {grid_entity:?} is missing a GridCell and Transform. This is valid only if this is a root grid, but this is not.");
@@ -366,7 +366,7 @@ impl<P: GridPrecision> GridsMut<'_, '_, P> {
     }
 
     /// Get the [`Grid`] that `this` `Entity` is a child of, if it exists.
-    pub fn parent_grid(&self, this: Entity) -> Option<(&Grid<P>, GridCell<P>, Transform)> {
+    pub fn parent_grid(&self, this: Entity) -> Option<(&Grid, GridCell, Transform)> {
         self.parent_grid_entity(this)
             .map(|grid_entity| self.get(grid_entity))
     }
@@ -421,7 +421,7 @@ impl<P: GridPrecision> GridsMut<'_, '_, P> {
     }
 }
 
-impl<P: GridPrecision> LocalFloatingOrigin<P> {
+impl LocalFloatingOrigin {
     /// Update the [`LocalFloatingOrigin`] of every [`Grid`] in the world. This does not update any
     /// entity transforms, instead this is a preceding step that updates every reference grid, so it
     /// knows where the floating origin is located with respect to that reference grid. This is all
@@ -430,10 +430,10 @@ impl<P: GridPrecision> LocalFloatingOrigin<P> {
     /// source of truth and never mutated.
     pub fn compute_all(
         mut stats: ResMut<crate::timing::PropagationStats>,
-        mut grids: GridsMut<P>,
+        mut grids: GridsMut,
         mut grid_stack: Local<Vec<Entity>>,
         mut scratch_buffer: Local<Vec<Entity>>,
-        cells: Query<(Entity, Ref<GridCell<P>>)>,
+        cells: Query<(Entity, Ref<GridCell>)>,
         roots: Query<(Entity, &BigSpace)>,
         parents: Query<&Parent>,
     ) {
@@ -524,13 +524,9 @@ mod tests {
     #[test]
     fn grid_hierarchy_getters() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::default());
 
-        let grid_bundle = (
-            Transform::default(),
-            GridCell::<i32>::default(),
-            Grid::<i32>::default(),
-        );
+        let grid_bundle = (Transform::default(), GridCell::default(), Grid::default());
 
         let child_1 = app.world_mut().spawn(grid_bundle.clone()).id();
         let child_2 = app.world_mut().spawn(grid_bundle.clone()).id();
@@ -542,7 +538,7 @@ mod tests {
             .entity_mut(parent)
             .add_children(&[child_1, child_2]);
 
-        let mut state = SystemState::<GridsMut<i32>>::new(app.world_mut());
+        let mut state = SystemState::<GridsMut>::new(app.world_mut());
         let mut grids = state.get_mut(app.world_mut());
 
         // Children
@@ -573,11 +569,11 @@ mod tests {
     #[test]
     fn child_propagation() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::default());
 
         let root_grid = Grid {
             local_floating_origin: LocalFloatingOrigin::new(
-                GridCell::<i32>::new(1_000_000, -1, -1),
+                GridCell::new(1_000_000, -1, -1),
                 Vec3::ZERO,
                 DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
             ),
@@ -585,7 +581,7 @@ mod tests {
         };
         let root = app
             .world_mut()
-            .spawn((Transform::default(), GridCell::<i32>::default(), root_grid))
+            .spawn((Transform::default(), GridCell::default(), root_grid))
             .id();
 
         let child = app
@@ -593,14 +589,14 @@ mod tests {
             .spawn((
                 Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
-                GridCell::<i32>::new(1_000_000, 0, 0),
-                Grid::<i32>::default(),
+                GridCell::new(1_000_000, 0, 0),
+                Grid::default(),
             ))
             .id();
 
         app.world_mut().entity_mut(root).add_child(child);
 
-        let mut state = SystemState::<GridsMut<i32>>::new(app.world_mut());
+        let mut state = SystemState::<GridsMut>::new(app.world_mut());
         let mut grids = state.get_mut(app.world_mut());
 
         // The function we are testing
@@ -633,13 +629,9 @@ mod tests {
     #[test]
     fn parent_propagation() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i64>::default());
+        app.add_plugins(BigSpacePlugin::default());
 
-        let grid_bundle = (
-            Transform::default(),
-            GridCell::<i64>::default(),
-            Grid::<i64>::default(),
-        );
+        let grid_bundle = (Transform::default(), GridCell::default(), Grid::default());
         let root = app.world_mut().spawn(grid_bundle.clone()).id();
 
         let child = app
@@ -647,10 +639,10 @@ mod tests {
             .spawn((
                 Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
-                GridCell::<i64>::new(150_000_003_000, 0, 0), // roughly radius of earth orbit
+                GridCell::new(150_000_003_000, 0, 0), // roughly radius of earth orbit
                 Grid {
                     local_floating_origin: LocalFloatingOrigin::new(
-                        GridCell::<i64>::new(0, 3_000, 0),
+                        GridCell::new(0, 3_000, 0),
                         Vec3::new(5.0, 5.0, 0.0),
                         DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
                     ),
@@ -661,7 +653,7 @@ mod tests {
 
         app.world_mut().entity_mut(root).add_child(child);
 
-        let mut state = SystemState::<GridsMut<i64>>::new(app.world_mut());
+        let mut state = SystemState::<GridsMut>::new(app.world_mut());
         let mut grids = state.get_mut(app.world_mut());
 
         // The function we are testing
@@ -694,16 +686,16 @@ mod tests {
     #[test]
     fn origin_transform() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i32>::default());
+        app.add_plugins(BigSpacePlugin::default());
 
         let root = app
             .world_mut()
             .spawn((
                 Transform::default(),
-                GridCell::<i32>::default(),
+                GridCell::default(),
                 Grid {
                     local_floating_origin: LocalFloatingOrigin::new(
-                        GridCell::<i32>::new(0, 0, 0),
+                        GridCell::new(0, 0, 0),
                         Vec3::new(1.0, 1.0, 0.0),
                         DQuat::from_rotation_z(0.0),
                     ),
@@ -718,14 +710,14 @@ mod tests {
                 Transform::default()
                     .with_rotation(Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(3.0, 3.0, 0.0)),
-                GridCell::<i32>::new(0, 0, 0),
-                Grid::<i32>::default(),
+                GridCell::new(0, 0, 0),
+                Grid::default(),
             ))
             .id();
 
         app.world_mut().entity_mut(root).add_child(child);
 
-        let mut state = SystemState::<GridsMut<i32>>::new(app.world_mut());
+        let mut state = SystemState::<GridsMut>::new(app.world_mut());
         let mut grids = state.get_mut(app.world_mut());
 
         propagate_origin_to_child(root, &mut grids, child);

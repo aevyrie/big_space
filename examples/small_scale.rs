@@ -17,9 +17,9 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i128>::default(),
-            FloatingOriginDebugPlugin::<i128>::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::<i128>::default(), // Compatible controller
+            BigSpacePlugin::default(),
+            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
+            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, (bounce_atoms, toggle_cam_pos))
@@ -39,7 +39,7 @@ fn setup_scene(
     // Because we are working on such small scales, we need to make the grid very small. This
     // ensures that the maximum floating point error is also very small, because no entities can
     // ever get farther than `SMALL_SCALE * 500` units from the origin.
-    let small_grid = Grid::<i128>::new(PROTON_DIA * 5_000.0, 0.0);
+    let small_grid = Grid::new(PROTON_DIA * 5_000.0, 0.0);
 
     commands.spawn_big_space(small_grid, |root_grid| {
         root_grid.spawn_spatial(DirectionalLight::default());
@@ -99,9 +99,9 @@ fn bounce_atoms(mut atoms: Query<&mut Transform, With<Proton>>, time: Res<Time>)
 }
 
 fn toggle_cam_pos(
-    mut cam: Query<&mut GridCell<i128>, With<Camera>>,
+    mut cam: Query<&mut GridCell, With<Camera>>,
     mut toggle: Local<bool>,
-    grid: Query<&Grid<i128>>,
+    grid: Query<&Grid>,
     keyboard: Res<ButtonInput<KeyCode>>,
     protons: Query<&GlobalTransform, With<Proton>>,
 ) {

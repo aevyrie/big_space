@@ -1,7 +1,5 @@
 //! Provides a camera controller compatible with the floating origin plugin.
 
-use std::marker::PhantomData;
-
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -19,17 +17,17 @@ use bevy_utils::HashSet;
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
-pub struct CameraControllerPlugin<P: GridPrecision>(PhantomData<P>);
-impl<P: GridPrecision> Plugin for CameraControllerPlugin<P> {
+pub struct CameraControllerPlugin(());
+impl Plugin for CameraControllerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraInput>().add_systems(
             PostUpdate,
             (
                 default_camera_inputs
-                    .before(camera_controller::<P>)
+                    .before(camera_controller)
                     .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects_in_grid::<P>.before(camera_controller::<P>),
-                camera_controller::<P>.before(TransformSystem::TransformPropagate),
+                nearest_objects_in_grid.before(camera_controller),
+                camera_controller.before(TransformSystem::TransformPropagate),
             ),
         );
     }
@@ -211,7 +209,7 @@ pub fn default_camera_inputs(
 }
 
 /// Find the object nearest the camera, within the same grid as the camera.
-pub fn nearest_objects_in_grid<P: GridPrecision>(
+pub fn nearest_objects_in_grid(
     objects: Query<(
         Entity,
         &Transform,
@@ -260,16 +258,11 @@ pub fn nearest_objects_in_grid<P: GridPrecision>(
 }
 
 /// Uses [`CameraInput`] state to update the camera position.
-pub fn camera_controller<P: GridPrecision>(
+pub fn camera_controller(
     time: Res<Time>,
-    grids: crate::grid::local_origin::Grids<P>,
+    grids: crate::grid::local_origin::Grids,
     mut input: ResMut<CameraInput>,
-    mut camera: Query<(
-        Entity,
-        &mut GridCell<P>,
-        &mut Transform,
-        &mut CameraController,
-    )>,
+    mut camera: Query<(Entity, &mut GridCell, &mut Transform, &mut CameraController)>,
 ) {
     for (camera, mut cell, mut transform, mut controller) in camera.iter_mut() {
         let Some(grid) = grids.parent_grid(camera) else {

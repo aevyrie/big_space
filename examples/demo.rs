@@ -14,9 +14,9 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i128>::default(),
-            FloatingOriginDebugPlugin::<i128>::default(),
-            big_space::camera::CameraControllerPlugin::<i128>::default(),
+            BigSpacePlugin::default(),
+            FloatingOriginDebugPlugin::default(),
+            big_space::camera::CameraControllerPlugin::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
@@ -33,7 +33,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_big_space_default::<i128>(|root| {
+    commands.spawn_big_space_default(|root| {
         root.spawn_spatial((
             Camera3d::default(),
             Projection::Perspective(PerspectiveProjection {
@@ -150,9 +150,9 @@ fn ui_text_system(
         (With<BigSpaceDebugText>, Without<FunFactText>),
     >,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
-    grids: Grids<i128>,
+    grids: Grids,
     time: Res<Time>,
-    origin: Query<(Entity, GridTransformReadOnly<i128>), With<FloatingOrigin>>,
+    origin: Query<(Entity, GridTransformReadOnly), With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Mesh3d>>,
 ) {

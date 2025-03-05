@@ -1,14 +1,11 @@
 //! Tools for validating high-precision transform hierarchies
 
-use std::marker::PhantomData;
-
-use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 use bevy_utils::{HashMap, HashSet};
 
-use crate::{grid::Grid, precision::GridPrecision, BigSpace, FloatingOrigin, GridCell};
+use crate::{grid::Grid, BigSpace, FloatingOrigin, GridCell};
 
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
@@ -110,7 +107,7 @@ Because it is a child of a {:#?}, the entity must be one of the following:
 However, the entity has the following components, which does not match any of the allowed archetypes listed above:
 {}
 Common errors include:
-  - Using mismatched GridPrecisions, like GridCell<i32> and GridCell<i64>
+  - Using mismatched GridPrecisions, like GridCell and GridCell<i64>
   - Spawning an entity with a GridCell as a child of an entity without a Grid.
 
 If possible, use commands.spawn_big_space(), which prevents these errors, instead of manually assembling a hierarchy. See {} for details.", entity, stack_entry.parent_node.name(), stack_entry.parent_node.name(), possibilities, inspect, file!());
@@ -166,9 +163,9 @@ mod sealed {
 
 /// The root hierarchy validation struct, used as a generic parameter in [`crate::validation`].
 #[derive(Default, Clone)]
-pub struct SpatialHierarchyRoot<P: GridPrecision>(PhantomData<P>);
+pub struct SpatialHierarchyRoot;
 
-impl<P: GridPrecision> ValidHierarchyNode for SpatialHierarchyRoot<P> {
+impl ValidHierarchyNode for SpatialHierarchyRoot {
     fn name(&self) -> &'static str {
         "Root"
     }
@@ -177,40 +174,40 @@ impl<P: GridPrecision> ValidHierarchyNode for SpatialHierarchyRoot<P> {
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<RootFrame<P>>::default(),
-            Box::<RootSpatialLowPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<RootFrame>::default(),
+            Box::<RootSpatialLowPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }
 
 #[derive(Default, Clone)]
-struct AnyNonSpatial<P: GridPrecision>(PhantomData<P>);
+struct AnyNonSpatial;
 
-impl<P: GridPrecision> ValidHierarchyNode for AnyNonSpatial<P> {
+impl ValidHierarchyNode for AnyNonSpatial {
     fn name(&self) -> &'static str {
         "Any non-spatial entity"
     }
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .without::<GridCellAny>()
+            .without::<GridCell>()
             .without::<Transform>()
             .without::<GlobalTransform>()
             .without::<BigSpace>()
-            .without::<Grid<P>>()
+            .without::<Grid>()
             .without::<FloatingOrigin>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
-        vec![Box::<AnyNonSpatial<P>>::default()]
+        vec![Box::<AnyNonSpatial>::default()]
     }
 }
 
 #[derive(Default, Clone)]
-struct RootFrame<P: GridPrecision>(PhantomData<P>);
+struct RootFrame;
 
-impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
+impl ValidHierarchyNode for RootFrame {
     fn name(&self) -> &'static str {
         "Root of a BigSpace"
     }
@@ -218,9 +215,9 @@ impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<BigSpace>()
-            .with::<Grid<P>>()
+            .with::<Grid>()
             .with::<GlobalTransform>()
-            .without::<GridCellAny>()
+            .without::<GridCell>()
             .without::<Transform>()
             .without::<Parent>()
             .without::<FloatingOrigin>();
@@ -228,18 +225,18 @@ impl<P: GridPrecision> ValidHierarchyNode for RootFrame<P> {
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildFrame<P>>::default(),
-            Box::<ChildSpatialLowPrecision<P>>::default(),
-            Box::<ChildSpatialHighPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<ChildFrame>::default(),
+            Box::<ChildSpatialLowPrecision>::default(),
+            Box::<ChildSpatialHighPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }
 
 #[derive(Default, Clone)]
-struct RootSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
+struct RootSpatialLowPrecision;
 
-impl<P: GridPrecision> ValidHierarchyNode for RootSpatialLowPrecision<P> {
+impl ValidHierarchyNode for RootSpatialLowPrecision {
     fn name(&self) -> &'static str {
         "Root of a Transform hierarchy at the root of the tree outside of any BigSpace"
     }
@@ -248,33 +245,33 @@ impl<P: GridPrecision> ValidHierarchyNode for RootSpatialLowPrecision<P> {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .without::<GridCellAny>()
+            .without::<GridCell>()
             .without::<BigSpace>()
-            .without::<Grid<P>>()
+            .without::<Grid>()
             .without::<Parent>()
             .without::<FloatingOrigin>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildSpatialLowPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<ChildSpatialLowPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }
 
 #[derive(Default, Clone)]
-struct ChildFrame<P: GridPrecision>(PhantomData<P>);
+struct ChildFrame;
 
-impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
+impl ValidHierarchyNode for ChildFrame {
     fn name(&self) -> &'static str {
         "Non-root Grid"
     }
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .with::<Grid<P>>()
-            .with::<GridCell<P>>()
+            .with::<Grid>()
+            .with::<GridCell>()
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
@@ -283,18 +280,18 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildFrame<P> {
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildFrame<P>>::default(),
-            Box::<ChildRootSpatialLowPrecision<P>>::default(),
-            Box::<ChildSpatialHighPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<ChildFrame>::default(),
+            Box::<ChildRootSpatialLowPrecision>::default(),
+            Box::<ChildSpatialHighPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }
 
 #[derive(Default, Clone)]
-struct ChildRootSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
+struct ChildRootSpatialLowPrecision;
 
-impl<P: GridPrecision> ValidHierarchyNode for ChildRootSpatialLowPrecision<P> {
+impl ValidHierarchyNode for ChildRootSpatialLowPrecision {
     fn name(&self) -> &'static str {
         "Root of a low-precision Transform hierarchy, within a BigSpace"
     }
@@ -305,24 +302,24 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildRootSpatialLowPrecision<P> {
             .with::<GlobalTransform>()
             .with::<Parent>()
             .with::<crate::grid::propagation::LowPrecisionRoot>()
-            .without::<GridCellAny>()
+            .without::<GridCell>()
             .without::<BigSpace>()
-            .without::<Grid<P>>()
+            .without::<Grid>()
             .without::<FloatingOrigin>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildSpatialLowPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<ChildSpatialLowPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }
 
 #[derive(Default, Clone)]
-struct ChildSpatialLowPrecision<P: GridPrecision>(PhantomData<P>);
+struct ChildSpatialLowPrecision;
 
-impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
+impl ValidHierarchyNode for ChildSpatialLowPrecision {
     fn name(&self) -> &'static str {
         "Non-root low-precision spatial entity"
     }
@@ -332,42 +329,42 @@ impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialLowPrecision<P> {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
-            .without::<GridCellAny>()
+            .without::<GridCell>()
             .without::<BigSpace>()
-            .without::<Grid<P>>()
+            .without::<Grid>()
             .without::<FloatingOrigin>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildSpatialLowPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<ChildSpatialLowPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }
 
 #[derive(Default, Clone)]
-struct ChildSpatialHighPrecision<P: GridPrecision>(PhantomData<P>);
+struct ChildSpatialHighPrecision;
 
-impl<P: GridPrecision> ValidHierarchyNode for ChildSpatialHighPrecision<P> {
+impl ValidHierarchyNode for ChildSpatialHighPrecision {
     fn name(&self) -> &'static str {
         "Non-root high precision spatial entity"
     }
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .with::<GridCell<P>>()
+            .with::<GridCell>()
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<Parent>()
             .without::<BigSpace>()
-            .without::<Grid<P>>();
+            .without::<Grid>();
     }
 
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>> {
         vec![
-            Box::<ChildRootSpatialLowPrecision<P>>::default(),
-            Box::<AnyNonSpatial<P>>::default(),
+            Box::<ChildRootSpatialLowPrecision>::default(),
+            Box::<AnyNonSpatial>::default(),
         ]
     }
 }

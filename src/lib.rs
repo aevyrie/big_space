@@ -106,7 +106,7 @@
 //! grid, in high precision.
 //!
 //! Entities at the root of bevy's entity hierarchy are not in a grid. This allows plugins from the
-//! rest of the ecosystem to operate normally, such as bevy_ui, which relies on the built in
+//! rest of the ecosystem to operate normally, such as bevy_ui, which relies on the built-in
 //! transform propagation system. This also means that if you don't need to place entities in a
 //! high-precision grid, you don't have to, as the process is opt-in. The high-precision
 //! hierarchical grids are explicit. Each high-precision tree must have a [`BigSpace`] at the root,
@@ -209,7 +209,6 @@ pub mod floating_origins;
 pub mod grid;
 pub mod hash;
 pub mod plugin;
-pub mod precision;
 pub mod timing;
 pub mod validation;
 pub mod world_query;
@@ -230,7 +229,7 @@ pub mod prelude {
     pub use debug::FloatingOriginDebugPlugin;
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
-        cell::{GridCell, GridCellAny},
+        cell::GridCell,
         local_origin::{Grids, GridsMut, LocalFloatingOrigin},
         Grid,
     };
@@ -243,4 +242,58 @@ pub mod prelude {
     pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
     pub use precision::GridPrecision;
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
+}
+
+/// Contains [`GridPrecision`], allowing `big_space` to work with many grid integer sizes.
+///
+/// The integer type used is controlled with compile time feature flags like `i8`. The crate
+/// defaults to `i64` grids if none is specified.
+///
+/// Larger grids result in a larger usable volume, at the cost of increased memory usage. In
+/// addition, some platforms may be unable to use larger numeric types (e.g. [`i128`]).
+///
+/// [`big_space`](crate) is generic over a few integer types to allow you to select the grid size
+/// you need. Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter,
+/// these correspond to a total usable volume of a cube with the following edge lengths:
+///
+/// - `i8`: 2,560 km = 74% of the diameter of the Moon
+/// - `i16`: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
+/// - `i32`: 0.0045 light years = ~4 times the width of the solar system
+/// - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
+/// - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
+///
+/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in a worst case
+/// precision of 0.5mm in any of these cases.
+///
+/// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,
+/// there is enough precision to render objects the size of protons anywhere in the observable
+/// universe.
+pub mod precision {
+    #[allow(unused_imports)] // Docs
+    use super::*;
+
+    #[cfg(feature = "i8")]
+    /// Adds 8 bits of precision to bevy's [`Transform`]. See [`precision`].
+    pub type GridPrecision = i8;
+    #[cfg(feature = "i16")]
+    /// Adds 16 bits of precision to bevy's [`Transform`]. See [`precision`].
+    pub type GridPrecision = i16;
+    #[cfg(feature = "i32")]
+    /// Adds 32 bits of precision to bevy's [`Transform`]. See [`precision`].
+    pub type GridPrecision = i32;
+    #[cfg(feature = "i64")]
+    /// Adds 64 bits of precision to bevy's [`Transform`]. See [`precision`].
+    pub type GridPrecision = i64;
+    #[cfg(feature = "i128")]
+    /// Adds 128 bits of precision to bevy's [`Transform`]. See [`precision`].
+    pub type GridPrecision = i128;
+    #[cfg(not(any(
+        feature = "i8",
+        feature = "i16",
+        feature = "i32",
+        feature = "i64",
+        feature = "i128"
+    )))]
+    /// Adds 64 bits of precision to bevy's [`Transform`]. See [`precision`].
+    pub type GridPrecision = i64;
 }

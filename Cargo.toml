@@ -10,8 +10,14 @@ documentation = "https://docs.rs/crate/big_space/latest"
 
 [features]
 default = []
+all = ["debug", "camera"] # Can't use all-features, integer type features are incompatible.
 debug = ["bevy_gizmos", "bevy_color"]
 camera = ["bevy_render", "bevy_time", "bevy_input"]
+i8 = []
+i16 = []
+i32 = []
+i64 = []
+i128 = []
 
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
@@ -69,7 +75,9 @@ doc-scrape-examples = false
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
+required-features = ["i128"]
 doc-scrape-examples = false
+
 
 [[example]]
 name = "error_child"
@@ -84,6 +92,7 @@ doc-scrape-examples = false
 [[example]]
 name = "infinite"
 path = "examples/infinite.rs"
+required-features = ["i8"]
 doc-scrape-examples = false
 
 [[example]]

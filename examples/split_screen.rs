@@ -16,16 +16,16 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i32>::default(),
-            FloatingOriginDebugPlugin::<i32>::default(),
-            big_space::camera::CameraControllerPlugin::<i32>::default(),
+            BigSpacePlugin::default(),
+            FloatingOriginDebugPlugin::default(),
+            big_space::camera::CameraControllerPlugin::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, set_camera_viewports)
         .add_systems(
             PostUpdate,
             update_cameras
-                .after(big_space::camera::camera_controller::<i32>)
+                .after(big_space::camera::camera_controller)
                 .before(TransformSystem::TransformPropagate),
         )
         .run();
@@ -55,7 +55,7 @@ fn setup(
     ));
 
     // Big Space 1
-    commands.spawn_big_space_default::<i32>(|root| {
+    commands.spawn_big_space_default(|root| {
         root.spawn_spatial((
             Camera3d::default(),
             Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
@@ -106,7 +106,7 @@ fn setup(
     });
 
     // Big Space 2
-    commands.spawn_big_space_default::<i32>(|root| {
+    commands.spawn_big_space_default(|root| {
         root.spawn_spatial((
             Camera3d::default(),
             Camera {
@@ -162,9 +162,9 @@ fn setup(
 
 #[allow(clippy::type_complexity)]
 fn update_cameras(
-    left: Query<GridTransformReadOnly<i32>, With<LeftCamera>>,
+    left: Query<GridTransformReadOnly, With<LeftCamera>>,
     mut left_rep: Query<
-        GridTransform<i32>,
+        GridTransform,
         (
             With<LeftCameraReplicated>,
             Without<RightCameraReplicated>,
@@ -172,9 +172,9 @@ fn update_cameras(
             Without<RightCamera>,
         ),
     >,
-    right: Query<GridTransformReadOnly<i32>, With<RightCamera>>,
+    right: Query<GridTransformReadOnly, With<RightCamera>>,
     mut right_rep: Query<
-        GridTransform<i32>,
+        GridTransform,
         (
             With<RightCameraReplicated>,
             Without<LeftCameraReplicated>,
