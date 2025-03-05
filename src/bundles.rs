@@ -8,7 +8,7 @@ use bevy_transform::prelude::*;
 ///
 /// This is the floating origin equivalent of the `bevy` `SpatialBundle`.
 #[derive(Bundle, Default)]
-pub struct BigSpatialBundle<P: GridPrecision> {
+pub struct BigSpatialBundle {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
@@ -23,7 +23,7 @@ pub struct BigSpatialBundle<P: GridPrecision> {
     /// The global transform of the entity.
     pub global_transform: GlobalTransform,
     /// The grid position of the entity
-    pub cell: GridCell<P>,
+    pub cell: GridCell,
 }
 
 /// A `SpatialBundle` that also has a grid, allowing other high precision spatial bundles to be
@@ -31,7 +31,7 @@ pub struct BigSpatialBundle<P: GridPrecision> {
 ///
 /// This is the floating origin equivalent of the `bevy` `SpatialBundle`.
 #[derive(Bundle, Default)]
-pub struct BigGridBundle<P: GridPrecision> {
+pub struct BigGridBundle {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
@@ -40,19 +40,19 @@ pub struct BigGridBundle<P: GridPrecision> {
     /// The global transform of the entity for rendering, computed relative to the floating origin.
     pub global_transform: GlobalTransform,
     /// The grid position of the grid within its parent grid.
-    pub cell: GridCell<P>,
+    pub cell: GridCell,
     /// The grid.
-    pub grid: Grid<P>,
+    pub grid: Grid,
 }
 
 /// The root of any [`BigSpace`] needs these components to function.
 #[derive(Bundle, Default)]
-pub struct BigSpaceRootBundle<P: GridPrecision> {
+pub struct BigSpaceRootBundle {
     /// The visibility of the entity.
     #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
     /// The root grid
-    pub grid: Grid<P>,
+    pub grid: Grid,
     /// The rendered position of the root grid relative to the floating origin.
     pub global_transform: GlobalTransform,
     /// Tracks the current floating origin.

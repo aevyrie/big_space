@@ -7,8 +7,8 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i64>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
+            BigSpacePlugin::default(),
+            big_space::debug::FloatingOriginDebugPlugin::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement, rotation))
@@ -64,7 +64,7 @@ fn setup(
         ..default()
     });
 
-    commands.spawn_big_space::<i64>(Grid::new(1.0, 0.01), |root| {
+    commands.spawn_big_space(Grid::new(1.0, 0.01), |root| {
         root.spawn_spatial((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(matl_handle.clone()),

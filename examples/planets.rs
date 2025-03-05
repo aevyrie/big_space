@@ -16,8 +16,8 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i64>::new(true),
-            big_space::camera::CameraControllerPlugin::<i64>::default(),
+            BigSpacePlugin::new(true),
+            big_space::camera::CameraControllerPlugin::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(AmbientLight {
@@ -35,7 +35,7 @@ fn main() {
                 cursor_grab_system,
                 springy_ship
                     .after(big_space::camera::default_camera_inputs)
-                    .before(big_space::camera::camera_controller::<i64>),
+                    .before(big_space::camera::camera_controller),
             ),
         )
         .register_type::<Sun>()
@@ -138,7 +138,7 @@ fn spawn_solar_system(
         .build(),
     ));
 
-    commands.spawn_big_space_default::<i64>(|root_grid| {
+    commands.spawn_big_space_default(|root_grid| {
         root_grid.with_grid_default(|sun| {
             sun.insert((Sun, Name::new("Sun")));
             sun.spawn_spatial((

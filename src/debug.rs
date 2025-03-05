@@ -1,7 +1,5 @@
 //! Contains tools for debugging the floating origin.
 
-use std::marker::PhantomData;
-
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_color::prelude::*;
@@ -13,14 +11,14 @@ use bevy_transform::prelude::*;
 
 /// This plugin will render the bounds of occupied grid cells.
 #[derive(Default)]
-pub struct FloatingOriginDebugPlugin<P: GridPrecision>(PhantomData<P>);
-impl<P: GridPrecision> Plugin for FloatingOriginDebugPlugin<P> {
+pub struct FloatingOriginDebugPlugin;
+impl Plugin for FloatingOriginDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_gizmo_group::<BigSpaceGizmoConfig>()
             .add_systems(Startup, setup_gizmos)
             .add_systems(
                 PostUpdate,
-                (update_debug_bounds::<P>, update_grid_axes::<P>)
+                (update_debug_bounds, update_grid_axes)
                     .chain()
                     .after(bevy_transform::TransformSystem::TransformPropagate),
             );
@@ -35,10 +33,10 @@ fn setup_gizmos(mut store: ResMut<GizmoConfigStore>) {
 }
 
 /// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.
-fn update_debug_bounds<P: GridPrecision>(
+fn update_debug_bounds(
     mut gizmos: Gizmos<BigSpaceGizmoConfig>,
-    grids: Grids<P>,
-    occupied_cells: Query<(Entity, &GridCell<P>, Option<&FloatingOrigin>)>,
+    grids: Grids,
+    occupied_cells: Query<(Entity, &GridCell, Option<&FloatingOrigin>)>,
 ) {
     for (cell_entity, cell, origin) in occupied_cells.iter() {
         let Some(grid) = grids.parent_grid(cell_entity) else {
@@ -62,9 +60,9 @@ struct BigSpaceGizmoConfig;
 impl GizmoConfigGroup for BigSpaceGizmoConfig {}
 
 /// Draw axes for grids.
-fn update_grid_axes<P: GridPrecision>(
+fn update_grid_axes(
     mut gizmos: Gizmos<BigSpaceGizmoConfig>,
-    grids: Query<(&GlobalTransform, &Grid<P>)>,
+    grids: Query<(&GlobalTransform, &Grid)>,
 ) {
     for (transform, grid) in grids.iter() {
         let start = transform.translation();

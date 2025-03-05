@@ -7,6 +7,7 @@ use bevy_math::{prelude::*, Affine3A, DAffine3, DVec3};
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
+use crate::GridPrecision;
 use local_origin::LocalFloatingOrigin;
 
 pub mod cell;
@@ -30,22 +31,22 @@ pub mod propagation;
 #[reflect(Component)]
 // We do not require the Transform, GlobalTransform, or GridCell, because these are not required in
 // all cases: e.g. BigSpace should not have a Transform or GridCell.
-pub struct Grid<P: GridPrecision> {
+pub struct Grid {
     /// The high-precision position of the floating origin's current grid cell local to this grid.
-    local_floating_origin: LocalFloatingOrigin<P>,
+    local_floating_origin: LocalFloatingOrigin,
     /// Defines the uniform scale of the grid by the length of the edge of a grid cell.
     cell_edge_length: f32,
     /// How far an entity can move from the origin before its grid cell is recomputed.
     maximum_distance_from_origin: f32,
 }
 
-impl<P: GridPrecision> Default for Grid<P> {
+impl Default for Grid {
     fn default() -> Self {
         Self::new(2_000f32, 100f32)
     }
 }
 
-impl<P: GridPrecision> Grid<P> {
+impl Grid {
     /// Construct a new [`Grid`]. The properties of a grid cannot be changed after construction.
     pub fn new(cell_edge_length: f32, switching_threshold: f32) -> Self {
         Self {
@@ -57,7 +58,7 @@ impl<P: GridPrecision> Grid<P> {
 
     /// Get the position of the floating origin relative to the current grid.
     #[inline]
-    pub fn local_floating_origin(&self) -> &LocalFloatingOrigin<P> {
+    pub fn local_floating_origin(&self) -> &LocalFloatingOrigin {
         &self.local_floating_origin
     }
 
@@ -76,37 +77,37 @@ impl<P: GridPrecision> Grid<P> {
     /// Compute the double precision position of an entity's [`Transform`] with respect to the given
     /// [`GridCell`] within this grid.
     #[inline]
-    pub fn grid_position_double(&self, pos: &GridCell<P>, transform: &Transform) -> DVec3 {
+    pub fn grid_position_double(&self, pos: &GridCell, transform: &Transform) -> DVec3 {
         DVec3 {
-            x: pos.x.as_f64() * self.cell_edge_length as f64 + transform.translation.x as f64,
-            y: pos.y.as_f64() * self.cell_edge_length as f64 + transform.translation.y as f64,
-            z: pos.z.as_f64() * self.cell_edge_length as f64 + transform.translation.z as f64,
+            x: pos.x as f64 * self.cell_edge_length as f64 + transform.translation.x as f64,
+            y: pos.y as f64 * self.cell_edge_length as f64 + transform.translation.y as f64,
+            z: pos.z as f64 * self.cell_edge_length as f64 + transform.translation.z as f64,
         }
     }
 
     /// Compute the single precision position of an entity's [`Transform`] with respect to the given
     /// [`GridCell`].
     #[inline]
-    pub fn grid_position(&self, pos: &GridCell<P>, transform: &Transform) -> Vec3 {
+    pub fn grid_position(&self, pos: &GridCell, transform: &Transform) -> Vec3 {
         Vec3 {
-            x: pos.x.as_f64() as f32 * self.cell_edge_length + transform.translation.x,
-            y: pos.y.as_f64() as f32 * self.cell_edge_length + transform.translation.y,
-            z: pos.z.as_f64() as f32 * self.cell_edge_length + transform.translation.z,
+            x: pos.x as f64 as f32 * self.cell_edge_length + transform.translation.x,
+            y: pos.y as f64 as f32 * self.cell_edge_length + transform.translation.y,
+            z: pos.z as f64 as f32 * self.cell_edge_length + transform.translation.z,
         }
     }
 
     /// Returns the floating point position of a [`GridCell`].
-    pub fn cell_to_float(&self, pos: &GridCell<P>) -> DVec3 {
+    pub fn cell_to_float(&self, pos: &GridCell) -> DVec3 {
         DVec3 {
-            x: pos.x.as_f64(),
-            y: pos.y.as_f64(),
-            z: pos.z.as_f64(),
+            x: pos.x as f64,
+            y: pos.y as f64,
+            z: pos.z as f64,
         } * self.cell_edge_length as f64
     }
 
     /// Convert a large translation into a small translation relative to a grid cell.
     #[inline]
-    pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell<P>, Vec3) {
+    pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell, Vec3) {
         let l = self.cell_edge_length as f64;
         let input = input.into();
         let DVec3 { x, y, z } = input;
@@ -124,9 +125,9 @@ impl<P: GridPrecision> Grid<P> {
 
         (
             GridCell {
-                x: P::from_f64(x_r),
-                y: P::from_f64(y_r),
-                z: P::from_f64(z_r),
+                x: x_r as GridPrecision,
+                y: y_r as GridPrecision,
+                z: z_r as GridPrecision,
             },
             Vec3::new(t_x as f32, t_y as f32, t_z as f32),
         )
@@ -134,7 +135,7 @@ impl<P: GridPrecision> Grid<P> {
 
     /// Convert a large translation into a small translation relative to a grid cell.
     #[inline]
-    pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell<P>, Vec3) {
+    pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell, Vec3) {
         self.translation_to_grid(input.as_dvec3())
     }
 
@@ -142,7 +143,7 @@ impl<P: GridPrecision> Grid<P> {
     #[inline]
     pub fn global_transform(
         &self,
-        local_cell: &GridCell<P>,
+        local_cell: &GridCell,
         local_transform: &Transform,
     ) -> GlobalTransform {
         // The grid transform from the floating origin's grid, to the local grid.

@@ -106,7 +106,7 @@
 //! grid, in high precision.
 //!
 //! Entities at the root of bevy's entity hierarchy are not in a grid. This allows plugins from the
-//! rest of the ecosystem to operate normally, such as bevy_ui, which relies on the built in
+//! rest of the ecosystem to operate normally, such as bevy_ui, which relies on the built-in
 //! transform propagation system. This also means that if you don't need to place entities in a
 //! high-precision grid, you don't have to, as the process is opt-in. The high-precision
 //! hierarchical grids are explicit. Each high-precision tree must have a [`BigSpace`] at the root,
@@ -209,7 +209,6 @@ pub mod floating_origins;
 pub mod grid;
 pub mod hash;
 pub mod plugin;
-pub mod precision;
 pub mod timing;
 pub mod validation;
 pub mod world_query;
@@ -230,7 +229,7 @@ pub mod prelude {
     pub use debug::FloatingOriginDebugPlugin;
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
-        cell::{GridCell, GridCellAny},
+        cell::GridCell,
         local_origin::{Grids, GridsMut, LocalFloatingOrigin},
         Grid,
     };
@@ -241,6 +240,30 @@ pub mod prelude {
         GridHashMapSystem, GridHashPlugin,
     };
     pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
-    pub use precision::GridPrecision;
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
 }
+
+#[cfg(feature = "i8")]
+/// Integer type to use for indexing into [`Grid`](crate::Grid)s.
+pub type GridPrecision = i8;
+#[cfg(feature = "i16")]
+/// Integer type to use for indexing into [`Grid`](crate::Grid)s.
+pub type GridPrecision = i16;
+#[cfg(feature = "i32")]
+/// Integer type to use for indexing into [`Grid`](crate::Grid)s.
+pub type GridPrecision = i32;
+#[cfg(feature = "i64")]
+/// Integer type to use for indexing into [`Grid`](crate::Grid)s.
+pub type GridPrecision = i64;
+#[cfg(feature = "i128")]
+/// Integer type to use for indexing into [`Grid`](crate::Grid)s.
+pub type GridPrecision = i128;
+#[cfg(not(any(
+    feature = "i8",
+    feature = "i16",
+    feature = "i32",
+    feature = "i64",
+    feature = "i128"
+)))]
+/// Integer type to use for indexing into [`Grid`](crate::Grid)s.
+pub type GridPrecision = i64;

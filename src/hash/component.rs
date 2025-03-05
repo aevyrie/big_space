@@ -28,14 +28,14 @@ impl Hash for FastGridHash {
     }
 }
 
-impl<P: GridPrecision> PartialEq<GridHash<P>> for FastGridHash {
-    fn eq(&self, other: &GridHash<P>) -> bool {
+impl PartialEq<GridHash> for FastGridHash {
+    fn eq(&self, other: &GridHash) -> bool {
         self.0 == other.pre_hash
     }
 }
 
-impl<P: GridPrecision> From<GridHash<P>> for FastGridHash {
-    fn from(value: GridHash<P>) -> Self {
+impl From<GridHash> for FastGridHash {
+    fn from(value: GridHash) -> Self {
         Self(value.pre_hash)
     }
 }
@@ -50,9 +50,9 @@ impl<P: GridPrecision> From<GridHash<P>> for FastGridHash {
 /// the [`Parent`] of the entity to uniquely identify its position. These two values are then hashed
 /// and stored in this spatial hash component.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
-pub struct GridHash<P: GridPrecision> {
+pub struct GridHash {
     // Needed for equality checks
-    cell: GridCell<P>,
+    cell: GridCell,
     // Needed for equality checks
     grid: Entity,
     // The hashed value of the `cell` and `grid` fields. Hash collisions are possible, especially
@@ -62,7 +62,7 @@ pub struct GridHash<P: GridPrecision> {
     pre_hash: u64,
 }
 
-impl<P: GridPrecision> PartialEq for GridHash<P> {
+impl PartialEq for GridHash {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         // Comparing the hash is redundant.
@@ -74,27 +74,27 @@ impl<P: GridPrecision> PartialEq for GridHash<P> {
     }
 }
 
-impl<P: GridPrecision> Eq for GridHash<P> {}
+impl Eq for GridHash {}
 
-impl<P: GridPrecision> Hash for GridHash<P> {
+impl Hash for GridHash {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.pre_hash);
     }
 }
 
-impl<P: GridPrecision> GridHash<P> {
+impl GridHash {
     /// Generate a new hash from parts.
     ///
     /// Intentionally left private, so we can ensure the only place these are constructed/mutated is
     /// this module. This allows us to optimize change detection using [`ChangedGridHashes`].
     #[inline]
-    pub(super) fn new(parent: &Parent, cell: &GridCell<P>) -> Self {
+    pub(super) fn new(parent: &Parent, cell: &GridCell) -> Self {
         Self::from_parent(parent.get(), cell)
     }
 
     #[inline]
-    pub(super) fn from_parent(parent: Entity, cell: &GridCell<P>) -> Self {
+    pub(super) fn from_parent(parent: Entity, cell: &GridCell) -> Self {
         let hasher = &mut AHasher::default();
         hasher.write_u64(parent.to_bits());
         cell.hash(hasher);
@@ -108,7 +108,7 @@ impl<P: GridPrecision> GridHash<P> {
 
     /// Do not use this to manually construct this component. You've been warned.
     #[doc(hidden)]
-    pub fn __new_manual(parent: Entity, cell: &GridCell<P>) -> Self {
+    pub fn __new_manual(parent: Entity, cell: &GridCell) -> Self {
         Self::from_parent(parent, cell)
     }
 
@@ -139,7 +139,7 @@ impl<P: GridPrecision> GridHash<P> {
 
     /// Returns an iterator over all neighboring grid cells and their hashes, within the
     /// `cell_radius`. This iterator will not visit `cell`.
-    pub fn adjacent(&self, cell_radius: u8) -> impl Iterator<Item = GridHash<P>> + '_ {
+    pub fn adjacent(&self, cell_radius: u8) -> impl Iterator<Item = GridHash> + '_ {
         let radius = cell_radius as i32;
         let search_width = 1 + 2 * radius;
         let search_volume = search_width.pow(3);
@@ -158,21 +158,15 @@ impl<P: GridPrecision> GridHash<P> {
     /// [`GridHashMapFilter`].
     pub(super) fn update<F: GridHashMapFilter>(
         mut commands: Commands,
-        mut changed_hashes: ResMut<ChangedGridHashes<P, F>>,
+        mut changed_hashes: ResMut<ChangedGridHashes<F>>,
         mut spatial_entities: Query<
-            (
-                Entity,
-                &Parent,
-                &GridCell<P>,
-                &mut GridHash<P>,
-                &mut FastGridHash,
-            ),
-            (F, Or<(Changed<Parent>, Changed<GridCell<P>>)>),
+            (Entity, &Parent, &GridCell, &mut GridHash, &mut FastGridHash),
+            (F, Or<(Changed<Parent>, Changed<GridCell>)>),
         >,
-        added_entities: Query<(Entity, &Parent, &GridCell<P>), (F, Without<GridHash<P>>)>,
+        added_entities: Query<(Entity, &Parent, &GridCell), (F, Without<GridHash>)>,
         mut stats: Option<ResMut<crate::timing::GridHashStats>>,
         mut thread_updated_hashes: Local<Parallel<Vec<Entity>>>,
-        mut thread_commands: Local<Parallel<Vec<(Entity, GridHash<P>, FastGridHash)>>>,
+        mut thread_commands: Local<Parallel<Vec<(Entity, GridHash, FastGridHash)>>>,
     ) {
         let start = Instant::now();
 
@@ -208,7 +202,7 @@ impl<P: GridPrecision> GridHash<P> {
     }
 
     /// The [`GridCell`] associated with this spatial hash.
-    pub fn cell(&self) -> GridCell<P> {
+    pub fn cell(&self) -> GridCell {
         self.cell
     }
 

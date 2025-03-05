@@ -5,35 +5,23 @@ use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 use smallvec::SmallVec;
-use std::marker::PhantomData;
 
 /// Adds `big_space` commands to bevy's `Commands`.
 pub trait BigSpaceCommands {
     /// Spawn a root [`BigSpace`] [`Grid`].
-    fn spawn_big_space<P: GridPrecision>(
-        &mut self,
-        root_grid: Grid<P>,
-        child_builder: impl FnOnce(&mut GridCommands<P>),
-    );
+    fn spawn_big_space(&mut self, root_grid: Grid, child_builder: impl FnOnce(&mut GridCommands));
 
     /// Spawn a root [`BigSpace`] with default [`Grid`] settings.
-    fn spawn_big_space_default<P: GridPrecision>(
-        &mut self,
-        child_builder: impl FnOnce(&mut GridCommands<P>),
-    );
+    fn spawn_big_space_default(&mut self, child_builder: impl FnOnce(&mut GridCommands));
 
     /// Access the [`GridCommands`] of an entity by passing in the [`Entity`] and [`Grid`]. Note
     /// that the value of `grid` will be inserted in this entity when the command is applied.
-    fn grid<P: GridPrecision>(&mut self, entity: Entity, grid: Grid<P>) -> GridCommands<P>;
+    fn grid(&mut self, entity: Entity, grid: Grid) -> GridCommands;
 }
 
 impl BigSpaceCommands for Commands<'_, '_> {
-    fn spawn_big_space<P: GridPrecision>(
-        &mut self,
-        grid: Grid<P>,
-        root_grid: impl FnOnce(&mut GridCommands<P>),
-    ) {
-        let mut entity_commands = self.spawn(BigSpaceRootBundle::<P>::default());
+    fn spawn_big_space(&mut self, grid: Grid, root_grid: impl FnOnce(&mut GridCommands)) {
+        let mut entity_commands = self.spawn(BigSpaceRootBundle::default());
         let mut cmd = GridCommands {
             entity: entity_commands.id(),
             commands: entity_commands.commands(),
@@ -43,14 +31,11 @@ impl BigSpaceCommands for Commands<'_, '_> {
         root_grid(&mut cmd);
     }
 
-    fn spawn_big_space_default<P: GridPrecision>(
-        &mut self,
-        child_builder: impl FnOnce(&mut GridCommands<P>),
-    ) {
+    fn spawn_big_space_default(&mut self, child_builder: impl FnOnce(&mut GridCommands)) {
         self.spawn_big_space(Grid::default(), child_builder);
     }
 
-    fn grid<P: GridPrecision>(&mut self, entity: Entity, grid: Grid<P>) -> GridCommands<P> {
+    fn grid(&mut self, entity: Entity, grid: Grid) -> GridCommands {
         GridCommands {
             entity,
             commands: self.reborrow(),
@@ -61,16 +46,16 @@ impl BigSpaceCommands for Commands<'_, '_> {
 }
 
 /// Build [`big_space`](crate) hierarchies more easily, with access to grids.
-pub struct GridCommands<'a, P: GridPrecision> {
+pub struct GridCommands<'a> {
     entity: Entity,
     commands: Commands<'a, 'a>,
-    grid: Grid<P>,
+    grid: Grid,
     children: SmallVec<[Entity; 8]>,
 }
 
-impl<'a, P: GridPrecision> GridCommands<'a, P> {
+impl<'a> GridCommands<'a> {
     /// Get a reference to the current grid.
-    pub fn grid(&mut self) -> &Grid<P> {
+    pub fn grid(&mut self) -> &Grid {
         &self.grid
     }
 
@@ -82,26 +67,25 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
 
     /// Spawn an entity in this grid.
     #[inline]
-    pub fn spawn(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
+    pub fn spawn(&mut self, bundle: impl Bundle) -> SpatialEntityCommands {
         let entity = self.commands.spawn(bundle).id();
         self.children.push(entity);
         SpatialEntityCommands {
             entity,
             commands: self.commands.reborrow(),
-            phantom: PhantomData,
         }
     }
 
     /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and insert the provided
     /// bundle.
     #[inline]
-    pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<P> {
+    pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands {
         let entity = self
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
                 Transform::default(),
-                GridCell::<P>::default(),
+                GridCell::default(),
             ))
             .insert(bundle)
             .id();
@@ -109,7 +93,6 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
         SpatialEntityCommands {
             entity,
             commands: self.commands.reborrow(),
-            phantom: PhantomData,
         }
     }
 
@@ -123,10 +106,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     /// to it via the closure. This allows you to insert bundles on this new spatial entities, and
     /// add more children to it.
     #[inline]
-    pub fn with_spatial(
-        &mut self,
-        spatial: impl FnOnce(&mut SpatialEntityCommands<P>),
-    ) -> &mut Self {
+    pub fn with_spatial(&mut self, spatial: impl FnOnce(&mut SpatialEntityCommands)) -> &mut Self {
         spatial(&mut self.spawn_spatial(()));
         self
     }
@@ -137,8 +117,8 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     #[inline]
     pub fn with_grid(
         &mut self,
-        new_grid: Grid<P>,
-        builder: impl FnOnce(&mut GridCommands<P>),
+        new_grid: Grid,
+        builder: impl FnOnce(&mut GridCommands),
     ) -> &mut Self {
         builder(&mut self.spawn_grid(new_grid, ()));
         self
@@ -146,20 +126,20 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
 
     /// Same as [`Self::with_grid`], but using the default [`Grid`] value.
     #[inline]
-    pub fn with_grid_default(&mut self, builder: impl FnOnce(&mut GridCommands<P>)) -> &mut Self {
+    pub fn with_grid_default(&mut self, builder: impl FnOnce(&mut GridCommands)) -> &mut Self {
         self.with_grid(Grid::default(), builder)
     }
 
     /// Spawn a grid as a child of the current grid.
     #[inline]
-    pub fn spawn_grid(&mut self, new_grid: Grid<P>, bundle: impl Bundle) -> GridCommands<P> {
+    pub fn spawn_grid(&mut self, new_grid: Grid, bundle: impl Bundle) -> GridCommands {
         let entity = self
             .spawn((
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
                 Transform::default(),
-                GridCell::<P>::default(),
-                Grid::<P>::default(),
+                GridCell::default(),
+                Grid::default(),
             ))
             .insert(bundle)
             .id();
@@ -173,7 +153,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
     }
 
     /// Spawn a grid as a child of the current grid.
-    pub fn spawn_grid_default(&mut self, bundle: impl Bundle) -> GridCommands<P> {
+    pub fn spawn_grid_default(&mut self, bundle: impl Bundle) -> GridCommands {
         self.spawn_grid(Grid::default(), bundle)
     }
 
@@ -192,7 +172,7 @@ impl<'a, P: GridPrecision> GridCommands<'a, P> {
 }
 
 /// Insert the grid on drop.
-impl<P: GridPrecision> Drop for GridCommands<'_, P> {
+impl Drop for GridCommands<'_> {
     fn drop(&mut self) {
         let entity = self.entity;
         self.commands
@@ -203,13 +183,12 @@ impl<P: GridPrecision> Drop for GridCommands<'_, P> {
 }
 
 /// Build [`big_space`](crate) hierarchies more easily, with access to grids.
-pub struct SpatialEntityCommands<'a, P: GridPrecision> {
+pub struct SpatialEntityCommands<'a> {
     entity: Entity,
     commands: Commands<'a, 'a>,
-    phantom: PhantomData<P>,
 }
 
-impl<'a, P: GridPrecision> SpatialEntityCommands<'a, P> {
+impl<'a> SpatialEntityCommands<'a> {
     /// Insert a component on this grid
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
         self.commands.entity(self.entity).insert(bundle);

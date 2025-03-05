@@ -7,9 +7,9 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i64>::default(),
-            big_space::camera::CameraControllerPlugin::<i64>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
+            BigSpacePlugin::default(),
+            big_space::camera::CameraControllerPlugin::default(),
+            big_space::debug::FloatingOriginDebugPlugin::default(),
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -37,7 +37,7 @@ fn setup_scene(
 ) {
     let mesh_handle = meshes.add(Sphere::new(SPHERE_RADIUS).mesh());
 
-    commands.spawn_big_space::<i64>(Grid::new(SPHERE_RADIUS * 100.0, 0.0), |root_grid| {
+    commands.spawn_big_space(Grid::new(SPHERE_RADIUS * 100.0, 0.0), |root_grid| {
         root_grid.spawn_spatial((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(materials.add(Color::from(palettes::css::BLUE))),

@@ -8,9 +8,9 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins,
-            BigSpacePlugin::<i64>::default(),
-            big_space::camera::CameraControllerPlugin::<i64>::default(),
-            big_space::debug::FloatingOriginDebugPlugin::<i64>::default(),
+            BigSpacePlugin::default(),
+            big_space::camera::CameraControllerPlugin::default(),
+            big_space::debug::FloatingOriginDebugPlugin::default(),
             bevy_hanabi::HanabiPlugin, // TODO fix once hanabi updates to bevy 0.15
         ))
         .add_systems(Startup, setup_scene)
@@ -28,7 +28,7 @@ fn setup_scene(
     mut effects: ResMut<Assets<bevy_hanabi::EffectAsset>>,
 ) {
     let effect = effects.add(particle_effect());
-    commands.spawn_big_space_default::<i64>(|root| {
+    commands.spawn_big_space_default(|root| {
         root.spawn_spatial(DirectionalLight::default());
         root.spawn_spatial((
             Mesh3d(meshes.add(Sphere::default())),

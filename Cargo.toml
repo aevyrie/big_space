@@ -12,6 +12,11 @@ documentation = "https://docs.rs/crate/big_space/latest"
 default = []
 debug = ["bevy_gizmos", "bevy_color"]
 camera = ["bevy_render", "bevy_time", "bevy_input"]
+i8 = []
+i16 = []
+i32 = []
+i64 = []
+i128 = []
 
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
@@ -85,6 +90,7 @@ doc-scrape-examples = false
 name = "infinite"
 path = "examples/infinite.rs"
 doc-scrape-examples = false
+required-features = ["i8"]
 
 [[example]]
 name = "minimal"

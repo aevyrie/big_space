@@ -3,30 +3,25 @@
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
-use std::marker::PhantomData;
 
 /// Add this plugin to your [`App`] for floating origin functionality.
-pub struct BigSpacePlugin<P: GridPrecision> {
-    phantom: PhantomData<P>,
+pub struct BigSpacePlugin {
     validate_hierarchies: bool,
 }
 
-impl<P: GridPrecision> BigSpacePlugin<P> {
+impl BigSpacePlugin {
     /// Create a big space plugin, and specify whether hierarchy validation should be enabled.
     pub fn new(validate_hierarchies: bool) -> Self {
         Self {
-            phantom: PhantomData::<P>,
             validate_hierarchies,
         }
     }
 }
 
-impl<P: GridPrecision> Default for BigSpacePlugin<P> {
+impl Default for BigSpacePlugin {
     fn default() -> Self {
         Self {
-            phantom: PhantomData,
             validate_hierarchies: cfg!(debug_assertions),
         }
     }
@@ -42,9 +37,7 @@ pub enum FloatingOriginSystem {
     PropagateLowPrecision,
 }
 
-impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetTypeRegistration> Plugin
-    for BigSpacePlugin<P>
-{
+impl Plugin for BigSpacePlugin {
     fn build(&self, app: &mut App) {
         // Silence bevy's built-in error spam about GlobalTransforms in the hierarchy
         app.insert_resource(bevy_hierarchy::ReportHierarchyIssue::<GlobalTransform>::new(false));
@@ -54,21 +47,21 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
 
         let system_set_config = || {
             (
-                Grid::<P>::tag_low_precision_roots // loose ordering on this set
+                Grid::tag_low_precision_roots // loose ordering on this set
                     .after(FloatingOriginSystem::Init)
                     .before(FloatingOriginSystem::PropagateLowPrecision),
                 (
-                    GridCell::<P>::recenter_large_transforms,
+                    GridCell::recenter_large_transforms,
                     BigSpace::find_floating_origin,
                 )
                     .in_set(FloatingOriginSystem::RecenterLargeTransforms),
-                LocalFloatingOrigin::<P>::compute_all
+                LocalFloatingOrigin::compute_all
                     .in_set(FloatingOriginSystem::LocalFloatingOrigins)
                     .after(FloatingOriginSystem::RecenterLargeTransforms),
-                Grid::<P>::propagate_high_precision
+                Grid::propagate_high_precision
                     .in_set(FloatingOriginSystem::PropagateHighPrecision)
                     .after(FloatingOriginSystem::LocalFloatingOrigins),
-                Grid::<P>::propagate_low_precision
+                Grid::propagate_low_precision
                     .in_set(FloatingOriginSystem::PropagateLowPrecision)
                     .after(FloatingOriginSystem::PropagateHighPrecision),
             )
@@ -79,9 +72,8 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
             // Reflect
             .register_type::<Transform>()
             .register_type::<GlobalTransform>()
-            .register_type::<GridCell<P>>()
-            .register_type::<GridCellAny>()
-            .register_type::<Grid<P>>()
+            .register_type::<GridCell>()
+            .register_type::<Grid>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
             // Meat of the plugin, once on startup, as well as every update
@@ -90,7 +82,7 @@ impl<P: GridPrecision + Reflect + FromReflect + TypePath + bevy_reflect::GetType
             // Validation
             .add_systems(
                 PostUpdate,
-                crate::validation::validate_hierarchy::<crate::validation::SpatialHierarchyRoot<P>>
+                crate::validation::validate_hierarchy::<crate::validation::SpatialHierarchyRoot>
                     .after(TransformSystem::TransformPropagate)
                     .run_if({
                         let run = self.validate_hierarchies;

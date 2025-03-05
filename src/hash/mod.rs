@@ -20,27 +20,25 @@ pub mod partition;
 /// If you are adding multiple copies of this plugin with different filters, there are optimizations
 /// in place to avoid duplicating work. However, you should still take care to avoid excessively
 /// overlapping filters.
-pub struct GridHashPlugin<P, F = ()>(PhantomData<(P, F)>)
+pub struct GridHashPlugin<F = ()>(PhantomData<F>)
 where
-    P: GridPrecision,
     F: GridHashMapFilter;
 
-impl<P, F> Plugin for GridHashPlugin<P, F>
+impl<F> Plugin for GridHashPlugin<F>
 where
-    P: GridPrecision,
     F: GridHashMapFilter,
 {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GridHashMap<P, F>>()
-            .init_resource::<ChangedGridHashes<P, F>>()
-            .register_type::<GridHash<P>>()
+        app.init_resource::<GridHashMap<F>>()
+            .init_resource::<ChangedGridHashes<F>>()
+            .register_type::<GridHash>()
             .add_systems(
                 PostUpdate,
                 (
-                    GridHash::<P>::update::<F>
+                    GridHash::update::<F>
                         .in_set(GridHashMapSystem::UpdateHash)
                         .after(FloatingOriginSystem::RecenterLargeTransforms),
-                    GridHashMap::<P, F>::update
+                    GridHashMap::<F>::update
                         .in_set(GridHashMapSystem::UpdateMap)
                         .after(GridHashMapSystem::UpdateHash),
                 ),
@@ -48,7 +46,7 @@ where
     }
 }
 
-impl<P: GridPrecision, F: GridHashMapFilter> Default for GridHashPlugin<P, F> {
+impl<F: GridHashMapFilter> Default for GridHashPlugin<F> {
     fn default() -> Self {
         Self(PhantomData)
     }
@@ -91,12 +89,12 @@ impl<T: QueryFilter + Send + Sync + 'static> GridHashMapFilter for T {}
 /// It may be possible to remove this if bevy gets archetype change detection, or observers that can
 /// react to a component being mutated. For now, this performs well enough.
 #[derive(Resource)]
-struct ChangedGridHashes<P: GridPrecision, F: GridHashMapFilter> {
+struct ChangedGridHashes<F: GridHashMapFilter> {
     updated: Vec<Entity>,
-    spooky: PhantomData<(P, F)>,
+    spooky: PhantomData<F>,
 }
 
-impl<P: GridPrecision, F: GridHashMapFilter> Default for ChangedGridHashes<P, F> {
+impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
     fn default() -> Self {
         Self {
             updated: Vec::new(),
@@ -124,38 +122,30 @@ mod tests {
         static ENTITY: OnceLock<Entity> = OnceLock::new();
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space_default::<i32>(|root| {
-                let entity = root.spawn_spatial(GridCell::<i32>::ZERO).id();
+            commands.spawn_big_space_default(|root| {
+                let entity = root.spawn_spatial(GridCell::ZERO).id();
                 ENTITY.set(entity).ok();
             });
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<i32>::default())
+        app.add_plugins(GridHashPlugin::<()>::default())
             .add_systems(Update, setup)
             .update();
 
         let hash = *app
             .world()
             .entity(*ENTITY.get().unwrap())
-            .get::<GridHash<i32>>()
+            .get::<GridHash>()
             .unwrap();
 
-        assert!(app
-            .world()
-            .resource::<GridHashMap<i32>>()
-            .get(&hash)
-            .is_some());
+        assert!(app.world().resource::<GridHashMap>().get(&hash).is_some());
 
         app.world_mut().despawn(*ENTITY.get().unwrap());
 
         app.update();
 
-        assert!(app
-            .world()
-            .resource::<GridHashMap<i32>>()
-            .get(&hash)
-            .is_none());
+        assert!(app.world().resource::<GridHashMap>().get(&hash).is_none());
     }
 
     #[test]
@@ -177,7 +167,7 @@ mod tests {
         }
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space_default::<i32>(|root| {
+            commands.spawn_big_space_default(|root| {
                 let a = root.spawn_spatial(GridCell::new(0, 1, 2)).id();
                 let b = root.spawn_spatial(GridCell::new(0, 1, 2)).id();
                 let c = root.spawn_spatial(GridCell::new(5, 5, 5)).id();
@@ -194,12 +184,12 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<i32>::default())
+        app.add_plugins(GridHashPlugin::<()>::default())
             .add_systems(Update, setup);
 
         app.update();
 
-        let mut spatial_hashes = app.world_mut().query::<&GridHash<i32>>();
+        let mut spatial_hashes = app.world_mut().query::<&GridHash>();
 
         let parent = app.world().resource::<ParentSet>().clone();
         let child = app.world().resource::<ChildSet>().clone();
@@ -236,7 +226,7 @@ mod tests {
 
         let entities = &app
             .world()
-            .resource::<GridHashMap<i32>>()
+            .resource::<GridHashMap>()
             .get(spatial_hashes.get(app.world(), parent.a).unwrap())
             .unwrap()
             .entities;
@@ -261,7 +251,7 @@ mod tests {
         }
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space_default::<i32>(|root| {
+            commands.spawn_big_space_default(|root| {
                 let a = root.spawn_spatial(GridCell::new(0, 0, 0)).id();
                 let b = root.spawn_spatial(GridCell::new(1, 1, 1)).id();
                 let c = root.spawn_spatial(GridCell::new(2, 2, 2)).id();
@@ -271,7 +261,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<i32>::default())
+        app.add_plugins(GridHashPlugin::<()>::default())
             .add_systems(Startup, setup);
 
         app.update();
@@ -283,7 +273,7 @@ mod tests {
             .get(app.world(), entities.a)
             .unwrap();
 
-        let map = app.world().resource::<GridHashMap<i32>>();
+        let map = app.world().resource::<GridHashMap>();
         let entry = map.get(&GridHash::new(parent, &GridCell::ZERO)).unwrap();
         let neighbors: HashSet<Entity> = map.nearby(entry).entities().collect();
 
@@ -311,40 +301,40 @@ mod tests {
         static ROOT: OnceLock<Entity> = OnceLock::new();
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space_default::<i32>(|root| {
-                root.spawn_spatial((GridCell::<i32>::ZERO, Player));
-                root.spawn_spatial(GridCell::<i32>::ZERO);
-                root.spawn_spatial(GridCell::<i32>::ZERO);
+            commands.spawn_big_space_default(|root| {
+                root.spawn_spatial((GridCell::ZERO, Player));
+                root.spawn_spatial(GridCell::ZERO);
+                root.spawn_spatial(GridCell::ZERO);
                 ROOT.set(root.id()).ok();
             });
         };
 
         let mut app = App::new();
         app.add_plugins((
-            GridHashPlugin::<i32>::default(),
-            GridHashPlugin::<i32, With<Player>>::default(),
-            GridHashPlugin::<i32, Without<Player>>::default(),
+            GridHashPlugin::<()>::default(),
+            GridHashPlugin::<With<Player>>::default(),
+            GridHashPlugin::<Without<Player>>::default(),
         ))
         .add_systems(Startup, setup)
         .update();
 
         let zero_hash = GridHash::from_parent(*ROOT.get().unwrap(), &GridCell::ZERO);
 
-        let map = app.world().resource::<GridHashMap<i32>>();
+        let map = app.world().resource::<GridHashMap>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             3,
             "There are a total of 3 spatial entities"
         );
 
-        let map = app.world().resource::<GridHashMap<i32, With<Player>>>();
+        let map = app.world().resource::<GridHashMap<With<Player>>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             1,
             "There is only one entity with the Player component"
         );
 
-        let map = app.world().resource::<GridHashMap<i32, Without<Player>>>();
+        let map = app.world().resource::<GridHashMap<Without<Player>>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             2,
@@ -366,7 +356,7 @@ mod tests {
         }
 
         let setup = |mut commands: Commands| {
-            commands.spawn_big_space_default::<i32>(|root| {
+            commands.spawn_big_space_default(|root| {
                 let a = root.spawn_spatial(GridCell::new(0, 0, 0)).id();
                 let b = root.spawn_spatial(GridCell::new(1, 1, 1)).id();
                 let c = root.spawn_spatial(GridCell::new(2, 2, 2)).id();
@@ -376,18 +366,15 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins((
-            BigSpacePlugin::<i32>::default(),
-            GridHashPlugin::<i32>::default(),
-        ))
-        .add_systems(Startup, setup);
+        app.add_plugins((BigSpacePlugin::default(), GridHashPlugin::<()>::default()))
+            .add_systems(Startup, setup);
 
         app.update();
 
         let entities = app.world().resource::<Entities>().clone();
         let get_hash = |app: &mut App, entity| {
             *app.world_mut()
-                .query::<&GridHash<i32>>()
+                .query::<&GridHash>()
                 .get(app.world(), entity)
                 .unwrap()
         };
@@ -395,7 +382,7 @@ mod tests {
         let a_hash_t0 = get_hash(&mut app, entities.a);
         let b_hash_t0 = get_hash(&mut app, entities.b);
         let c_hash_t0 = get_hash(&mut app, entities.c);
-        let map = app.world().resource::<GridHashMap<i32>>();
+        let map = app.world().resource::<GridHashMap>();
         assert!(map.just_inserted().contains(&a_hash_t0));
         assert!(map.just_inserted().contains(&b_hash_t0));
         assert!(map.just_inserted().contains(&c_hash_t0));
@@ -403,7 +390,7 @@ mod tests {
         // Move entities and run an update
         app.world_mut()
             .entity_mut(entities.a)
-            .get_mut::<GridCell<i32>>()
+            .get_mut::<GridCell>()
             .unwrap()
             .z += 1;
         app.world_mut()
@@ -417,7 +404,7 @@ mod tests {
         let a_hash_t1 = get_hash(&mut app, entities.a);
         let b_hash_t1 = get_hash(&mut app, entities.b);
         let c_hash_t1 = get_hash(&mut app, entities.c);
-        let map = app.world().resource::<GridHashMap<i32>>();
+        let map = app.world().resource::<GridHashMap>();
 
         // Last grid
         assert!(map.just_removed().contains(&a_hash_t0)); // Moved cell

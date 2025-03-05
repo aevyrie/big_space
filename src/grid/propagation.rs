@@ -16,20 +16,20 @@ use bevy_transform::prelude::*;
 #[derive(Component, Default, Reflect)]
 pub struct LowPrecisionRoot;
 
-impl<P: GridPrecision> Grid<P> {
+impl Grid {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`Grid`] the entity
     /// belongs to.
     pub fn propagate_high_precision(
         mut stats: ResMut<crate::timing::PropagationStats>,
-        grids: Query<&Grid<P>>,
+        grids: Query<&Grid>,
         mut entities: ParamSet<(
             Query<(
-                Ref<GridCell<P>>,
+                Ref<GridCell>,
                 Ref<Transform>,
                 Ref<Parent>,
                 &mut GlobalTransform,
             )>,
-            Query<(&Grid<P>, &mut GlobalTransform), With<BigSpace>>,
+            Query<(&Grid, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
         let start = bevy_utils::Instant::now();
@@ -93,13 +93,13 @@ impl<P: GridPrecision> Grid<P> {
     pub fn tag_low_precision_roots(
         mut stats: ResMut<crate::timing::PropagationStats>,
         mut commands: Commands,
-        valid_parent: Query<(), (With<GridCell<P>>, With<GlobalTransform>, With<Children>)>,
+        valid_parent: Query<(), (With<GridCell>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
             (Entity, &Parent),
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCellAny>,
+                Without<GridCell>,
                 Without<LowPrecisionRoot>,
                 Or<(Changed<Parent>, Added<Transform>)>,
             ),
@@ -111,7 +111,7 @@ impl<P: GridPrecision> Grid<P> {
                 Or<(
                     Without<Transform>,
                     Without<GlobalTransform>,
-                    With<GridCell<P>>,
+                    With<GridCell>,
                     Without<Parent>,
                 )>,
             ),
@@ -147,7 +147,7 @@ impl<P: GridPrecision> Grid<P> {
             (
                 // A root big space does not have a grid cell, and not all high precision entities
                 // have a grid
-                Or<(With<Grid<P>>, With<GridCell<P>>)>,
+                Or<(With<Grid>, With<GridCell>)>,
             ),
         >,
         roots: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
@@ -155,9 +155,8 @@ impl<P: GridPrecision> Grid<P> {
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<Parent>,
-                Without<GridCellAny>,
-                Without<GridCell<P>>, // Used to prove access to GlobalTransform is disjoint
-                Without<Grid<P>>,
+                Without<GridCell>, // Used to prove access to GlobalTransform is disjoint
+                Without<Grid>,
             ),
         >,
         parent_query: Query<
@@ -165,8 +164,8 @@ impl<P: GridPrecision> Grid<P> {
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCellAny>,
-                Without<Grid<P>>,
+                Without<GridCell>,
+                Without<Grid>,
             ),
         >,
     ) {
@@ -228,9 +227,8 @@ impl<P: GridPrecision> Grid<P> {
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<Parent>,
-                Without<GridCellAny>, // ***ADDED*** Only recurse low-precision entities
-                Without<GridCell<P>>, // ***ADDED*** Only recurse low-precision entities
-                Without<Grid<P>>,     // ***ADDED*** Only recurse low-precision entities
+                Without<GridCell>, // ***ADDED*** Only recurse low-precision entities
+                Without<Grid>,     // ***ADDED*** Only recurse low-precision entities
             ),
         >,
         parent_query: &Query<
@@ -238,8 +236,8 @@ impl<P: GridPrecision> Grid<P> {
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCellAny>,
-                Without<Grid<P>>,
+                Without<GridCell>,
+                Without<Grid>,
             ),
         >,
         entity: Entity,
@@ -314,9 +312,10 @@ mod tests {
         struct Test;
 
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::<i32>::default())
-            .add_systems(Startup, |mut commands: Commands| {
-                commands.spawn_big_space_default::<i32>(|root| {
+        app.add_plugins(BigSpacePlugin::default()).add_systems(
+            Startup,
+            |mut commands: Commands| {
+                commands.spawn_big_space_default(|root| {
                     root.spawn_spatial(FloatingOrigin);
                     root.spawn_spatial((
                         Transform::from_xyz(3.0, 3.0, 3.0),
@@ -330,7 +329,8 @@ mod tests {
                         ));
                     });
                 });
-            });
+            },
+        );
 
         app.update();
 

@@ -12,26 +12,26 @@ use bevy_transform::prelude::*;
 /// to read from the position, use [`GridTransformReadOnly`] instead, as this will allow the bevy
 /// ECS to run multiple queries using [`GridTransformReadOnly`] at the same time (just like multiple
 /// queries with `&Transform` are fine).
-pub struct GridTransform<P: GridPrecision> {
+pub struct GridTransform {
     /// Grid local transform
     pub transform: &'static mut Transform,
     /// The grid to which `transform` is relative to.
-    pub cell: &'static mut GridCell<P>,
+    pub cell: &'static mut GridCell,
 }
 
-impl<P: GridPrecision> GridTransformItem<'_, P> {
+impl GridTransformItem<'_> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, grid: &Grid<P>) -> DVec3 {
+    pub fn position_double(&self, grid: &Grid) -> DVec3 {
         grid.grid_position_double(&self.cell, &self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, grid: &Grid<P>) -> Vec3 {
+    pub fn position(&self, grid: &Grid) -> Vec3 {
         grid.grid_position(&self.cell, &self.transform)
     }
 
     /// Get a copy of the fields to work with.
-    pub fn to_owned(&self) -> GridTransformOwned<P> {
+    pub fn to_owned(&self) -> GridTransformOwned {
         GridTransformOwned {
             transform: *self.transform,
             cell: *self.cell,
@@ -39,19 +39,19 @@ impl<P: GridPrecision> GridTransformItem<'_, P> {
     }
 }
 
-impl<P: GridPrecision> GridTransformReadOnlyItem<'_, P> {
+impl GridTransformReadOnlyItem<'_> {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, grid: &Grid<P>) -> DVec3 {
+    pub fn position_double(&self, grid: &Grid) -> DVec3 {
         grid.grid_position_double(self.cell, self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, grid: &Grid<P>) -> Vec3 {
+    pub fn position(&self, grid: &Grid) -> Vec3 {
         grid.grid_position(self.cell, self.transform)
     }
 
     /// Get a copy of the fields to work with.
-    pub fn to_owned(&self) -> GridTransformOwned<P> {
+    pub fn to_owned(&self) -> GridTransformOwned {
         GridTransformOwned {
             transform: *self.transform,
             cell: *self.cell,
@@ -61,14 +61,14 @@ impl<P: GridPrecision> GridTransformReadOnlyItem<'_, P> {
 
 /// A convenience wrapper that allows working with grid and transform easily
 #[derive(Copy, Clone)]
-pub struct GridTransformOwned<P: GridPrecision> {
+pub struct GridTransformOwned {
     /// Grid local transform
     pub transform: Transform,
     /// The grid to which `transform` is relative to.
-    pub cell: GridCell<P>,
+    pub cell: GridCell,
 }
 
-impl<P: GridPrecision> std::ops::Sub for GridTransformOwned<P> {
+impl std::ops::Sub for GridTransformOwned {
     type Output = Self;
 
     /// Compute a new transform that maps from `source` to `self`.
@@ -81,7 +81,7 @@ impl<P: GridPrecision> std::ops::Sub for GridTransformOwned<P> {
     }
 }
 
-impl<P: GridPrecision> std::ops::Add for GridTransformOwned<P> {
+impl std::ops::Add for GridTransformOwned {
     type Output = Self;
 
     /// Compute a new transform that shifts, scales and rotates `self` by `diff`.
@@ -94,14 +94,14 @@ impl<P: GridPrecision> std::ops::Add for GridTransformOwned<P> {
     }
 }
 
-impl<P: GridPrecision> GridTransformOwned<P> {
+impl GridTransformOwned {
     /// Compute the global position with double precision.
-    pub fn position_double(&self, grid: &Grid<P>) -> DVec3 {
+    pub fn position_double(&self, grid: &Grid) -> DVec3 {
         grid.grid_position_double(&self.cell, &self.transform)
     }
 
     /// Compute the global position.
-    pub fn position(&self, grid: &Grid<P>) -> Vec3 {
+    pub fn position(&self, grid: &Grid) -> Vec3 {
         grid.grid_position(&self.cell, &self.transform)
     }
 }

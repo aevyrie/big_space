@@ -38,10 +38,10 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("deep_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(Grid::new(10000.0, 0.0), |root| {
+        commands.spawn_big_space(Grid::new(10000.0, 0.0), |root| {
             let mut parent = root.spawn_grid_default(()).id();
             for _ in 0..N_SPAWN {
-                let child = root.commands().spawn(BigGridBundle::<i32>::default()).id();
+                let child = root.commands().spawn(BigGridBundle::default()).id();
                 root.commands().entity(parent).add_child(child);
                 parent = child;
             }
@@ -58,8 +58,8 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        GridHashPlugin::<i32>::default(),
-        BigSpacePlugin::<i32>::default(),
+        GridHashPlugin::default(),
+        BigSpacePlugin::default(),
     ))
     .add_systems(Startup, setup)
     .add_systems(Update, translate)
@@ -80,7 +80,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("wide_hierarchy {N_SPAWN}"));
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(Grid::new(10000.0, 0.0), |root| {
+        commands.spawn_big_space(Grid::new(10000.0, 0.0), |root| {
             for _ in 0..N_SPAWN {
                 root.spawn_spatial(());
             }
@@ -97,8 +97,8 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        GridHashPlugin::<i32>::default(),
-        BigSpacePlugin::<i32>::default(),
+        GridHashPlugin::default(),
+        BigSpacePlugin::default(),
     ))
     .add_systems(Startup, setup)
     .add_systems(Update, translate)
@@ -122,7 +122,7 @@ fn spatial_hashing(c: &mut Criterion) {
     const N_MOVE: usize = 1_000;
 
     fn setup(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(Grid::new(1.0, 0.0), |root| {
+        commands.spawn_big_space(Grid::new(1.0, 0.0), |root| {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 [
@@ -140,14 +140,14 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     }
 
-    fn translate(mut cells: Query<&mut GridCell<i32>>) {
+    fn translate(mut cells: Query<&mut GridCell>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += GridCell::ONE;
         })
     }
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::<i32>::default())
+    app.add_plugins(GridHashPlugin::default())
         .add_systems(Startup, setup)
         .update();
 
@@ -164,7 +164,7 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let map = app.world().resource::<GridHashMap<i32>>();
+    let map = app.world().resource::<GridHashMap>();
     let first = map
         .all_entries()
         .find(|(_, entry)| !entry.entities.is_empty())
@@ -185,8 +185,8 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    // let parent = app .world_mut() .query::<&GridHash<i32>>() .get(app.world(), ent)
-    //     .unwrap(); let map = app.world().resource::<GridHashMap<i32>>(); let entry =
+    // let parent = app .world_mut() .query::<&GridHash>() .get(app.world(), ent)
+    //     .unwrap(); let map = app.world().resource::<GridHashMap>(); let entry =
     //     map.get(parent).unwrap();
 
     // group.bench_function("Neighbors radius: 4", |b| {
@@ -205,7 +205,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // });
 
     fn setup_uniform<const HALF_EXTENT: i32>(mut commands: Commands) {
-        commands.spawn_big_space::<i32>(Grid::new(1.0, 0.0), |root| {
+        commands.spawn_big_space(Grid::new(1.0, 0.0), |root| {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
                     for z in HALF_EXTENT.neg()..HALF_EXTENT {
@@ -219,7 +219,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::<i32>::default())
+    app.add_plugins(GridHashPlugin::default())
         .add_systems(Startup, setup_uniform::<5>)
         .update();
 
@@ -227,7 +227,7 @@ fn spatial_hashing(c: &mut Criterion) {
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world());
-    let spatial_map = app.world().resource::<GridHashMap<i32>>();
+    let spatial_map = app.world().resource::<GridHashMap>();
     let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
@@ -247,7 +247,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::<i32>::default())
+    app.add_plugins(GridHashPlugin::default())
         .add_systems(Startup, setup_uniform::<50>)
         .update();
 
@@ -255,7 +255,7 @@ fn spatial_hashing(c: &mut Criterion) {
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world());
-    let spatial_map = app.world().resource::<GridHashMap<i32>>();
+    let spatial_map = app.world().resource::<GridHashMap>();
     let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
@@ -296,7 +296,7 @@ fn hash_filtering(c: &mut Criterion) {
         .take(N_ENTITIES)
         .collect();
 
-        commands.spawn_big_space_default::<i32>(|root| {
+        commands.spawn_big_space_default(|root| {
             for (i, pos) in values.iter().enumerate() {
                 let mut cmd = root.spawn_spatial(GridCell::new(pos[0], pos[1], pos[2]));
                 if i < N_PLAYERS {
@@ -306,7 +306,7 @@ fn hash_filtering(c: &mut Criterion) {
         });
     }
 
-    fn translate(mut cells: Query<&mut GridCell<i32>>) {
+    fn translate(mut cells: Query<&mut GridCell>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += IVec3::ONE;
         });
@@ -317,7 +317,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<i32>::default(),));
+    app.add_plugins((GridHashPlugin::default(),));
     group.bench_function("No Filter Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -353,7 +353,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<i32>::default(),))
+    app.add_plugins((GridHashPlugin::default(),))
         .add_plugins((GridHashPlugin::<i32, With<Player>>::default(),))
         .add_plugins((GridHashPlugin::<i32, Without<Player>>::default(),));
     group.bench_function("All Plugins", |b| {
@@ -383,7 +383,7 @@ fn vs_bevy(c: &mut Criterion) {
     }
 
     fn setup_big(mut commands: Commands) {
-        commands.spawn_big_space_default::<i32>(|root| {
+        commands.spawn_big_space_default(|root| {
             for _ in 0..N_ENTITIES {
                 root.spawn_spatial(());
             }
@@ -403,7 +403,7 @@ fn vs_bevy(c: &mut Criterion) {
     });
 
     let mut app = App::new();
-    app.add_plugins((MinimalPlugins, BigSpacePlugin::<i32>::default()))
+    app.add_plugins((MinimalPlugins, BigSpacePlugin::default()))
         .add_systems(Startup, setup_big)
         .update();
 
@@ -432,7 +432,7 @@ fn vs_bevy(c: &mut Criterion) {
     });
 
     let mut app = App::new();
-    app.add_plugins((MinimalPlugins, BigSpacePlugin::<i32>::default()))
+    app.add_plugins((MinimalPlugins, BigSpacePlugin::default()))
         .add_systems(Startup, setup_big)
         .add_systems(Update, translate)
         .update();
