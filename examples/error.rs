@@ -7,7 +7,6 @@
 
 use bevy::prelude::*;
 use big_space::prelude::*;
-use big_space::GridPrecision;
 
 fn main() {
     App::new()

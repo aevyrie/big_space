@@ -58,7 +58,7 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        GridHashPlugin::default(),
+        GridHashPlugin::<()>::default(),
         BigSpacePlugin::default(),
     ))
     .add_systems(Startup, setup)
@@ -97,7 +97,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        GridHashPlugin::default(),
+        GridHashPlugin::<()>::default(),
         BigSpacePlugin::default(),
     ))
     .add_systems(Startup, setup)
@@ -115,7 +115,7 @@ fn wide_hierarchy(c: &mut Criterion) {
 fn spatial_hashing(c: &mut Criterion) {
     let mut group = c.benchmark_group("spatial_hashing");
 
-    const HALF_WIDTH: i32 = 100;
+    const HALF_WIDTH: i64 = 100;
     /// Total number of entities to spawn
     const N_SPAWN: usize = 10_000;
     /// Number of entities that move into a different cell each update
@@ -126,9 +126,9 @@ fn spatial_hashing(c: &mut Criterion) {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 [
-                    rng.i32(-HALF_WIDTH..=HALF_WIDTH),
-                    rng.i32(-HALF_WIDTH..=HALF_WIDTH),
-                    rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
                 ]
             })
             .take(N_SPAWN)
@@ -147,7 +147,7 @@ fn spatial_hashing(c: &mut Criterion) {
     }
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::default())
+    app.add_plugins(GridHashPlugin::<()>::default())
         .add_systems(Startup, setup)
         .update();
 
@@ -204,7 +204,7 @@ fn spatial_hashing(c: &mut Criterion) {
     //     });
     // });
 
-    fn setup_uniform<const HALF_EXTENT: i32>(mut commands: Commands) {
+    fn setup_uniform<const HALF_EXTENT: i64>(mut commands: Commands) {
         commands.spawn_big_space(Grid::new(1.0, 0.0), |root| {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
@@ -219,7 +219,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::default())
+    app.add_plugins(GridHashPlugin::<()>::default())
         .add_systems(Startup, setup_uniform::<5>)
         .update();
 
@@ -247,7 +247,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::default())
+    app.add_plugins(GridHashPlugin::<()>::default())
         .add_systems(Startup, setup_uniform::<50>)
         .update();
 
@@ -279,7 +279,7 @@ fn hash_filtering(c: &mut Criterion) {
     const N_ENTITIES: usize = 100_000;
     const N_PLAYERS: usize = 100;
     const N_MOVE: usize = 1_000;
-    const HALF_WIDTH: i32 = 100;
+    const HALF_WIDTH: i64 = 100;
 
     #[derive(Component)]
     struct Player;
@@ -288,9 +288,9 @@ fn hash_filtering(c: &mut Criterion) {
         let rng = Rng::with_seed(342525);
         let values: Vec<_> = repeat_with(|| {
             [
-                rng.i32(-HALF_WIDTH..=HALF_WIDTH),
-                rng.i32(-HALF_WIDTH..=HALF_WIDTH),
-                rng.i32(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
             ]
         })
         .take(N_ENTITIES)
@@ -317,7 +317,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::default(),));
+    app.add_plugins((GridHashPlugin::<()>::default(),));
     group.bench_function("No Filter Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -329,7 +329,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<i32, With<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<With<Player>>::default(),));
     group.bench_function("With Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -341,7 +341,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<i32, Without<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<Without<Player>>::default(),));
     group.bench_function("Without Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -353,9 +353,9 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::default(),))
-        .add_plugins((GridHashPlugin::<i32, With<Player>>::default(),))
-        .add_plugins((GridHashPlugin::<i32, Without<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<()>::default(),))
+        .add_plugins((GridHashPlugin::<With<Player>>::default(),))
+        .add_plugins((GridHashPlugin::<Without<Player>>::default(),));
     group.bench_function("All Plugins", |b| {
         b.iter(|| {
             black_box(app.update());

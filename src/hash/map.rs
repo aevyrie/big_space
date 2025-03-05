@@ -4,7 +4,6 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 
 use super::GridHashMapFilter;
 use crate::prelude::*;
-use crate::GridPrecision;
 use bevy_ecs::{entity::EntityHash, prelude::*};
 use bevy_utils::{
     hashbrown::{HashMap, HashSet},

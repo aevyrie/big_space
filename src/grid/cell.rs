@@ -1,7 +1,6 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use crate::GridPrecision;
 use bevy_ecs::prelude::*;
 use bevy_hierarchy::prelude::*;
 use bevy_math::{DVec3, IVec3};

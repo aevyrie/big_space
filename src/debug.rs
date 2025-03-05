@@ -11,7 +11,7 @@ use bevy_transform::prelude::*;
 
 /// This plugin will render the bounds of occupied grid cells.
 #[derive(Default)]
-pub struct FloatingOriginDebugPlugin;
+pub struct FloatingOriginDebugPlugin(());
 impl Plugin for FloatingOriginDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_gizmo_group::<BigSpaceGizmoConfig>()

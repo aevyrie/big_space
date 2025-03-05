@@ -17,7 +17,7 @@ use bevy_utils::HashSet;
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
-pub struct CameraControllerPlugin;
+pub struct CameraControllerPlugin(());
 impl Plugin for CameraControllerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraInput>().add_systems(

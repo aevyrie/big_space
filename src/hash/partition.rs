@@ -65,7 +65,7 @@ impl Hash for GridPartitionId {
 /// Partitions divide space into independent groups of cells.
 ///
 /// The map depends on and is built from a corresponding [`GridHashMap`] with the same
-/// `P:`[`GridPrecision`] and `F:`[`GridHashMapFilter`].
+/// `F:`[`GridHashMapFilter`].
 #[derive(Resource)]
 pub struct GridPartitionMap<F = ()>
 where
@@ -355,7 +355,7 @@ struct SplitResult {
 /// Needed to ensure invariants are upheld.
 mod private {
     use super::{GridCell, GridHash};
-    use crate::GridPrecision;
+    use crate::precision::GridPrecision;
     use bevy_ecs::prelude::*;
     use bevy_utils::{hashbrown::HashSet, PassHash};
 

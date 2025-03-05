@@ -7,7 +7,6 @@ use bevy::{
 use bevy_ecs::entity::EntityHasher;
 use bevy_math::DVec3;
 use big_space::prelude::*;
-use big_space::GridPrecision;
 use noise::{NoiseFn, Simplex};
 use smallvec::SmallVec;
 use turborand::prelude::*;

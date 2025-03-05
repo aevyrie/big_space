@@ -7,7 +7,6 @@ use bevy_math::{prelude::*, Affine3A, DAffine3, DVec3};
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
-use crate::GridPrecision;
 use local_origin::LocalFloatingOrigin;
 
 pub mod cell;
