@@ -1,9 +1,8 @@
 //! Tools for validating high-precision transform hierarchies
 
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+use bevy_platform_support::collections::{HashMap, HashSet};
 use bevy_transform::prelude::*;
-use bevy_utils::{HashMap, HashSet};
 
 use crate::{grid::Grid, BigSpace, FloatingOrigin, GridCell};
 
@@ -16,7 +15,7 @@ struct ValidationStackEntry {
 struct ValidatorCaches {
     query_state_cache: HashMap<&'static str, QueryState<(Entity, Option<&'static Children>)>>,
     validator_cache: HashMap<&'static str, Vec<Box<dyn ValidHierarchyNode>>>,
-    root_query: Option<QueryState<Entity, Without<Parent>>>,
+    root_query: Option<QueryState<Entity, Without<ChildOf>>>,
     stack: Vec<ValidationStackEntry>,
     /// Only report errors for an entity one time.
     error_entities: HashSet<Entity>,
@@ -29,7 +28,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
 
     let root_entities = caches
         .root_query
-        .get_or_insert(world.query_filtered::<Entity, Without<Parent>>())
+        .get_or_insert(world.query_filtered::<Entity, Without<ChildOf>>())
         .iter(world)
         .collect();
 
@@ -89,7 +88,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         });
 
                     let mut inspect = String::new();
-                    world.inspect_entity(*entity).for_each(|info| {
+                    world.inspect_entity(*entity).unwrap().for_each(|info| {
                         inspect.push_str("  - ");
                         inspect.push_str(info.name());
                         inspect.push('\n');
@@ -219,7 +218,7 @@ impl ValidHierarchyNode for RootFrame {
             .with::<GlobalTransform>()
             .without::<GridCell>()
             .without::<Transform>()
-            .without::<Parent>()
+            .without::<ChildOf>()
             .without::<FloatingOrigin>();
     }
 
@@ -248,7 +247,7 @@ impl ValidHierarchyNode for RootSpatialLowPrecision {
             .without::<GridCell>()
             .without::<BigSpace>()
             .without::<Grid>()
-            .without::<Parent>()
+            .without::<ChildOf>()
             .without::<FloatingOrigin>();
     }
 
@@ -274,7 +273,7 @@ impl ValidHierarchyNode for ChildFrame {
             .with::<GridCell>()
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .with::<Parent>()
+            .with::<ChildOf>()
             .without::<BigSpace>();
     }
 
@@ -300,7 +299,7 @@ impl ValidHierarchyNode for ChildRootSpatialLowPrecision {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .with::<Parent>()
+            .with::<ChildOf>()
             .with::<crate::grid::propagation::LowPrecisionRoot>()
             .without::<GridCell>()
             .without::<BigSpace>()
@@ -328,7 +327,7 @@ impl ValidHierarchyNode for ChildSpatialLowPrecision {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .with::<Parent>()
+            .with::<ChildOf>()
             .without::<GridCell>()
             .without::<BigSpace>()
             .without::<Grid>()
@@ -356,7 +355,7 @@ impl ValidHierarchyNode for ChildSpatialHighPrecision {
             .with::<GridCell>()
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .with::<Parent>()
+            .with::<ChildOf>()
             .without::<BigSpace>()
             .without::<Grid>();
     }

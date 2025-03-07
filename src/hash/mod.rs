@@ -113,7 +113,7 @@ mod tests {
     use std::sync::OnceLock;
 
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_utils::hashbrown::HashSet;
+    use bevy_platform_support::collections::HashSet;
 
     #[test]
     fn entity_despawn() {
@@ -269,7 +269,7 @@ mod tests {
         let entities = app.world().resource::<Entities>().clone();
         let parent = app
             .world_mut()
-            .query::<&Parent>()
+            .query::<&ChildOf>()
             .get(app.world(), entities.a)
             .unwrap();
 

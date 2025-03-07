@@ -3,9 +3,9 @@
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
+use bevy_platform_support::collections::HashSet;
 use bevy_reflect::prelude::*;
 use bevy_render::{
     primitives::Aabb,
@@ -13,7 +13,6 @@ use bevy_render::{
 };
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
-use bevy_utils::HashSet;
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]

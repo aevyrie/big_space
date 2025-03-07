@@ -10,7 +10,10 @@ documentation = "https://docs.rs/crate/big_space/latest"
 
 [features]
 default = []
-all = ["debug", "camera"] # Can't use all-features, integer type features are incompatible.
+all = [
+    "debug",
+    "camera",
+] # Can't use all-features, integer type features are incompatible.
 debug = ["bevy_gizmos", "bevy_color"]
 camera = ["bevy_render", "bevy_time", "bevy_input"]
 i8 = []
@@ -22,27 +25,48 @@ i128 = []
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
 smallvec = "1.13.2" # Already used by bevy in commands
-bevy_app = { version = "0.15.0", default-features = false }
-bevy_ecs = { version = "0.15.0", default-features = true }
-bevy_hierarchy = { version = "0.15.0", default-features = false }
-bevy_math = { version = "0.15.0", default-features = false }
-bevy_reflect = { version = "0.15.0", default-features = false }
-bevy_tasks = { version = "0.15.0", default-features = false }
-bevy_transform = { version = "0.15.0", default-features = false, features = [
-    "bevy-support",
+bevy_app = { path = "../bevy/crates/bevy_app", default-features = false, features = [
+    "std",
 ] }
-bevy_utils = { version = "0.15.0", default-features = false }
+bevy_ecs = { path = "../bevy/crates/bevy_ecs", default-features = true, features = [
+    "std",
+] }
+bevy_math = { path = "../bevy/crates/bevy_math", default-features = false, features = [
+    "std",
+] }
+bevy_reflect = { path = "../bevy/crates/bevy_reflect", default-features = false, features = [
+    "std",
+] }
+bevy_tasks = { path = "../bevy/crates/bevy_tasks", default-features = false, features = [
+    "std",
+] }
+bevy_transform = { path = "../bevy/crates/bevy_transform", default-features = false, features = [
+    "bevy-support",
+    "std",
+    "bevy_reflect",
+    "async_executor",
+] }
+bevy_utils = { path = "../bevy/crates/bevy_utils", default-features = false, features = [
+    "std",
+] }
+bevy_platform_support = { path = "../bevy/crates/bevy_platform_support", default-features = false, features = [
+    "std",
+] }
 # Optional
-bevy_color = { version = "0.15.0", default-features = false, optional = true }
-bevy_gizmos = { version = "0.15.0", default-features = false, optional = true }
-bevy_render = { version = "0.15.0", default-features = false, optional = true }
-bevy_input = { version = "0.15.0", default-features = false, optional = true }
-bevy_time = { version = "0.15.0", default-features = false, optional = true }
+bevy_color = { path = "../bevy/crates/bevy_color", default-features = false, optional = true, features = [
+    "std",
+] }
+bevy_gizmos = { path = "../bevy/crates/bevy_gizmos", default-features = false, optional = true }
+bevy_render = { path = "../bevy/crates/bevy_render", default-features = false, optional = true }
+bevy_input = { path = "../bevy/crates/bevy_input", default-features = false, optional = true }
+bevy_time = { path = "../bevy/crates/bevy_time", default-features = false, optional = true, features = [
+    "std",
+] }
 
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
-bevy = { version = "0.15.0", default-features = false, features = [
+bevy = { path = "../bevy", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
     "bevy_gltf",
@@ -61,7 +85,7 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.20"
-bevy_hanabi = "0.14"
+# bevy_hanabi = "0.14"
 
 [[bench]]
 name = "benchmarks"
@@ -100,10 +124,10 @@ name = "minimal"
 path = "examples/minimal.rs"
 doc-scrape-examples = false
 
-[[example]]
-name = "particles"
-path = "examples/particles.rs"
-doc-scrape-examples = false
+# [[example]]
+# name = "particles"
+# path = "examples/particles.rs"
+# doc-scrape-examples = false
 
 [[example]]
 name = "planets"

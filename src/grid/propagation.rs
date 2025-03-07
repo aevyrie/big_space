@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 
@@ -26,13 +25,13 @@ impl Grid {
             Query<(
                 Ref<GridCell>,
                 Ref<Transform>,
-                Ref<Parent>,
+                Ref<ChildOf>,
                 &mut GlobalTransform,
             )>,
             Query<(&Grid, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
 
         // Performance note: I've also tried to iterate over each grid's children at once, to avoid
         // the grid and parent lookup, but that made things worse because it prevented dumb
@@ -43,7 +42,7 @@ impl Grid {
             .p0()
             .par_iter_mut()
             .for_each(|(cell, transform, parent, mut global_transform)| {
-                if let Ok(grid) = grids.get(parent.get()) {
+                if let Ok(grid) = grids.get(parent.parent) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
                     // moved and the floating origin's local origin in that grid hasn't changed.
                     //
@@ -95,13 +94,13 @@ impl Grid {
         mut commands: Commands,
         valid_parent: Query<(), (With<GridCell>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
-            (Entity, &Parent),
+            (Entity, &ChildOf),
             (
                 With<Transform>,
                 With<GlobalTransform>,
                 Without<GridCell>,
                 Without<LowPrecisionRoot>,
-                Or<(Changed<Parent>, Added<Transform>)>,
+                Or<(Changed<ChildOf>, Added<Transform>)>,
             ),
         >,
         invalidated: Query<
@@ -112,15 +111,15 @@ impl Grid {
                     Without<Transform>,
                     Without<GlobalTransform>,
                     With<GridCell>,
-                    Without<Parent>,
+                    Without<ChildOf>,
                 )>,
             ),
         >,
-        has_possibly_invalid_parent: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
+        has_possibly_invalid_parent: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
         for (entity, parent) in unmarked.iter() {
-            if valid_parent.contains(parent.get()) {
+            if valid_parent.contains(parent.parent) {
                 commands.entity(entity).insert(LowPrecisionRoot);
             }
         }
@@ -130,7 +129,7 @@ impl Grid {
         }
 
         for (entity, parent) in has_possibly_invalid_parent.iter() {
-            if !valid_parent.contains(parent.get()) {
+            if !valid_parent.contains(parent.parent) {
                 commands.entity(entity).remove::<LowPrecisionRoot>();
             }
         }
@@ -150,17 +149,17 @@ impl Grid {
                 Or<(With<Grid>, With<GridCell>)>,
             ),
         >,
-        roots: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
+        roots: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
         transform_query: Query<
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
-                With<Parent>,
+                With<ChildOf>,
                 Without<GridCell>, // Used to prove access to GlobalTransform is disjoint
                 Without<Grid>,
             ),
         >,
         parent_query: Query<
-            (Entity, Ref<Parent>),
+            (Entity, Ref<ChildOf>),
             (
                 With<Transform>,
                 With<GlobalTransform>,
@@ -169,7 +168,7 @@ impl Grid {
             ),
         >,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
         let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
             // High precision global transforms are change-detected, and are only updated if that
             // entity has moved relative to the floating origin's grid cell.
@@ -198,7 +197,7 @@ impl Grid {
         };
 
         roots.par_iter().for_each(|(low_precision_root, parent)| {
-            if let Ok(parent_transform) = root_parents.get(parent.get()) {
+            if let Ok(parent_transform) = root_parents.get(parent.parent) {
                 update_transforms(low_precision_root, parent_transform);
             }
         });
@@ -226,13 +225,13 @@ impl Grid {
         transform_query: &Query<
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
-                With<Parent>,
+                With<ChildOf>,
                 Without<GridCell>, // ***ADDED*** Only recurse low-precision entities
                 Without<Grid>,     // ***ADDED*** Only recurse low-precision entities
             ),
         >,
         parent_query: &Query<
-            (Entity, Ref<Parent>),
+            (Entity, Ref<ChildOf>),
             (
                 With<Transform>,
                 With<GlobalTransform>,
@@ -280,7 +279,7 @@ impl Grid {
         let Some(children) = children else { return };
         for (child, actual_parent) in parent_query.iter_many(children) {
             assert_eq!(
-            actual_parent.get(), entity,
+            actual_parent.parent, entity,
             "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
         );
             // SAFETY: The caller guarantees that `transform_query` will not be fetched for any
@@ -337,7 +336,7 @@ mod tests {
         let mut q = app
             .world_mut()
             .query_filtered::<&GlobalTransform, With<Test>>();
-        let actual_transform = *q.single(app.world());
+        let actual_transform = *q.single(app.world()).unwrap();
         assert_eq!(
             actual_transform,
             GlobalTransform::from_xyz(2004.0, 2005.0, 2006.0)

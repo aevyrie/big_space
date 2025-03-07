@@ -40,7 +40,7 @@ pub enum FloatingOriginSystem {
 impl Plugin for BigSpacePlugin {
     fn build(&self, app: &mut App) {
         // Silence bevy's built-in error spam about GlobalTransforms in the hierarchy
-        app.insert_resource(bevy_hierarchy::ReportHierarchyIssue::<GlobalTransform>::new(false));
+        // app.insert_resource(ReportHierarchyIssue::<GlobalTransform>::new(false));
 
         // Performance timings
         app.add_plugins(crate::timing::TimingStatsPlugin);
@@ -102,7 +102,7 @@ impl Plugin for BigSpacePlugin {
                 PostStartup,
                 (
                     bevy_transform::systems::sync_simple_transforms,
-                    bevy_transform::systems::propagate_transforms,
+                    bevy_transform::systems::propagate_parent_transforms,
                 )
                     .in_set(TransformSystem::TransformPropagate),
             )
@@ -110,7 +110,7 @@ impl Plugin for BigSpacePlugin {
                 PostUpdate,
                 (
                     bevy_transform::systems::sync_simple_transforms,
-                    bevy_transform::systems::propagate_transforms,
+                    bevy_transform::systems::propagate_parent_transforms,
                 )
                     .in_set(TransformSystem::TransformPropagate),
             );
