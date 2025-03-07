@@ -25,48 +25,48 @@ i128 = []
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
 smallvec = "1.13.2" # Already used by bevy in commands
-bevy_app = { path = "../bevy/crates/bevy_app", default-features = false, features = [
+bevy_app = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "std",
 ] }
-bevy_ecs = { path = "../bevy/crates/bevy_ecs", default-features = true, features = [
+bevy_ecs = { git = "https://github.com/bevyengine/bevy.git", default-features = true, features = [
     "std",
 ] }
-bevy_math = { path = "../bevy/crates/bevy_math", default-features = false, features = [
+bevy_math = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "std",
 ] }
-bevy_reflect = { path = "../bevy/crates/bevy_reflect", default-features = false, features = [
+bevy_reflect = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "std",
 ] }
-bevy_tasks = { path = "../bevy/crates/bevy_tasks", default-features = false, features = [
+bevy_tasks = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "std",
 ] }
-bevy_transform = { path = "../bevy/crates/bevy_transform", default-features = false, features = [
+bevy_transform = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "bevy-support",
     "std",
     "bevy_reflect",
     "async_executor",
 ] }
-bevy_utils = { path = "../bevy/crates/bevy_utils", default-features = false, features = [
+bevy_utils = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "std",
 ] }
-bevy_platform_support = { path = "../bevy/crates/bevy_platform_support", default-features = false, features = [
+bevy_platform_support = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "std",
 ] }
 # Optional
-bevy_color = { path = "../bevy/crates/bevy_color", default-features = false, optional = true, features = [
+bevy_color = { git = "https://github.com/bevyengine/bevy.git", default-features = false, optional = true, features = [
     "std",
 ] }
-bevy_gizmos = { path = "../bevy/crates/bevy_gizmos", default-features = false, optional = true }
-bevy_render = { path = "../bevy/crates/bevy_render", default-features = false, optional = true }
-bevy_input = { path = "../bevy/crates/bevy_input", default-features = false, optional = true }
-bevy_time = { path = "../bevy/crates/bevy_time", default-features = false, optional = true, features = [
+bevy_gizmos = { git = "https://github.com/bevyengine/bevy.git", default-features = false, optional = true }
+bevy_render = { git = "https://github.com/bevyengine/bevy.git", default-features = false, optional = true }
+bevy_input = { git = "https://github.com/bevyengine/bevy.git", default-features = false, optional = true }
+bevy_time = { git = "https://github.com/bevyengine/bevy.git", default-features = false, optional = true, features = [
     "std",
 ] }
 
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
-bevy = { path = "../bevy", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
     "bevy_gltf",
