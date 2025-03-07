@@ -5,9 +5,9 @@ use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 use super::GridHashMapFilter;
 use crate::prelude::*;
 use bevy_ecs::{entity::EntityHash, prelude::*};
-use bevy_utils::{
-    hashbrown::{HashMap, HashSet},
-    PassHash,
+use bevy_platform_support::{
+    collections::{HashMap, HashSet},
+    hash::PassHash,
 };
 
 /// An entry in a [`GridHashMap`], accessed with a [`GridHash`].

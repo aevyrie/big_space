@@ -27,9 +27,9 @@ impl Plugin for FloatingOriginDebugPlugin {
 
 fn setup_gizmos(mut store: ResMut<GizmoConfigStore>) {
     let (config, _) = store.config_mut::<BigSpaceGizmoConfig>();
-    config.line_perspective = false;
-    config.line_joints = GizmoLineJoint::Round(4);
-    config.line_width = 1.0;
+    config.line.perspective = false;
+    config.line.joints = GizmoLineJoint::Round(4);
+    config.line.width = 1.0;
 }
 
 /// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.

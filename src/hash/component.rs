@@ -4,10 +4,11 @@ use std::hash::{Hash, Hasher};
 
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::Parent;
 use bevy_math::IVec3;
+use bevy_platform_support::{hash::FixedState, time::Instant};
 use bevy_reflect::Reflect;
-use bevy_utils::{AHasher, Instant, Parallel};
+use bevy_utils::Parallel;
+use std::hash::BuildHasher;
 
 use super::{ChangedGridHashes, GridHashMapFilter};
 
@@ -89,13 +90,13 @@ impl GridHash {
     /// Intentionally left private, so we can ensure the only place these are constructed/mutated is
     /// this module. This allows us to optimize change detection using [`ChangedGridHashes`].
     #[inline]
-    pub(super) fn new(parent: &Parent, cell: &GridCell) -> Self {
-        Self::from_parent(parent.get(), cell)
+    pub(super) fn new(parent: &ChildOf, cell: &GridCell) -> Self {
+        Self::from_parent(parent.parent, cell)
     }
 
     #[inline]
     pub(super) fn from_parent(parent: Entity, cell: &GridCell) -> Self {
-        let hasher = &mut AHasher::default();
+        let hasher = &mut FixedState::with_seed(0).build_hasher();
         hasher.write_u64(parent.to_bits());
         cell.hash(hasher);
 
@@ -160,10 +161,16 @@ impl GridHash {
         mut commands: Commands,
         mut changed_hashes: ResMut<ChangedGridHashes<F>>,
         mut spatial_entities: Query<
-            (Entity, &Parent, &GridCell, &mut GridHash, &mut FastGridHash),
-            (F, Or<(Changed<Parent>, Changed<GridCell>)>),
+            (
+                Entity,
+                &ChildOf,
+                &GridCell,
+                &mut GridHash,
+                &mut FastGridHash,
+            ),
+            (F, Or<(Changed<ChildOf>, Changed<GridCell>)>),
         >,
-        added_entities: Query<(Entity, &Parent, &GridCell), (F, Without<GridHash>)>,
+        added_entities: Query<(Entity, &ChildOf, &GridCell), (F, Without<GridHash>)>,
         mut stats: Option<ResMut<crate::timing::GridHashStats>>,
         mut thread_updated_hashes: Local<Parallel<Vec<Entity>>>,
         mut thread_commands: Local<Parallel<Vec<(Entity, GridHash, FastGridHash)>>>,
