@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
 use bevy_transform::prelude::*;
 use smallvec::SmallVec;
 
@@ -205,7 +204,10 @@ impl<'a> SpatialEntityCommands<'a> {
     }
 
     /// Takes a closure which provides a [`ChildBuilder`].
-    pub fn with_children(&mut self, spawn_children: impl FnOnce(&mut ChildBuilder)) -> &mut Self {
+    pub fn with_children(
+        &mut self,
+        spawn_children: impl FnOnce(&mut ChildSpawnerCommands),
+    ) -> &mut Self {
         self.commands
             .entity(self.entity)
             .with_children(|child_builder| spawn_children(child_builder));
