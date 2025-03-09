@@ -25,7 +25,7 @@ Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read t
 - 3-5x faster than Bevy's transform propagation for wide hierarchies.
 - 👉 [Extensive documentation you should read.](https://docs.rs/big_space)
 
-![image](https://github.com/user-attachments/assets/cff0c58e-766c-41a0-92f7-de174807e447)
+![screenshot](https://github.com/user-attachments/assets/736a1dec-91a1-4ac1-9382-82084ebe6c1c)
 
 ## Bevy Version Support
 
