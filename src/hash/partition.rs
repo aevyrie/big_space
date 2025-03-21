@@ -1,9 +1,10 @@
 //! Detect and update groups of nearby occupied cells.
 
-use std::{hash::Hash, marker::PhantomData, ops::Deref};
+use core::{hash::Hash, marker::PhantomData, ops::Deref};
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_platform_support::prelude::*;
 use bevy_platform_support::{
     collections::{HashMap, HashSet},
     hash::PassHash,
@@ -56,7 +57,7 @@ impl GridPartitionId {
 
 impl Hash for GridPartitionId {
     #[inline]
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         state.write_u64(self.0);
     }
 }
@@ -358,7 +359,7 @@ mod private {
     use super::{GridCell, GridHash};
     use crate::precision::GridPrecision;
     use bevy_ecs::prelude::*;
-    use bevy_platform_support::{collections::HashSet, hash::PassHash};
+    use bevy_platform_support::{collections::HashSet, hash::PassHash, prelude::*};
 
     /// A group of nearby [`GridCell`](crate::GridCell)s in an island disconnected from all other
     /// [`GridCell`](crate::GridCell)s.

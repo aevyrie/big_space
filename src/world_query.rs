@@ -68,7 +68,7 @@ pub struct GridTransformOwned {
     pub cell: GridCell,
 }
 
-impl std::ops::Sub for GridTransformOwned {
+impl core::ops::Sub for GridTransformOwned {
     type Output = Self;
 
     /// Compute a new transform that maps from `source` to `self`.
@@ -81,7 +81,7 @@ impl std::ops::Sub for GridTransformOwned {
     }
 }
 
-impl std::ops::Add for GridTransformOwned {
+impl core::ops::Add for GridTransformOwned {
     type Output = Self;
 
     /// Compute a new transform that shifts, scales and rotates `self` by `diff`.

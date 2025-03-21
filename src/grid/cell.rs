@@ -110,7 +110,7 @@ impl GridCell {
     }
 }
 
-impl std::ops::Add for GridCell {
+impl core::ops::Add for GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -122,7 +122,7 @@ impl std::ops::Add for GridCell {
     }
 }
 
-impl std::ops::Add<IVec3> for GridCell {
+impl core::ops::Add<IVec3> for GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: IVec3) -> Self::Output {
@@ -134,7 +134,7 @@ impl std::ops::Add<IVec3> for GridCell {
     }
 }
 
-impl std::ops::Sub for GridCell {
+impl core::ops::Sub for GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -146,7 +146,7 @@ impl std::ops::Sub for GridCell {
     }
 }
 
-impl std::ops::Sub<IVec3> for GridCell {
+impl core::ops::Sub<IVec3> for GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: IVec3) -> Self::Output {
@@ -158,7 +158,7 @@ impl std::ops::Sub<IVec3> for GridCell {
     }
 }
 
-impl std::ops::Add for &GridCell {
+impl core::ops::Add for &GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -166,7 +166,7 @@ impl std::ops::Add for &GridCell {
     }
 }
 
-impl std::ops::Add<IVec3> for &GridCell {
+impl core::ops::Add<IVec3> for &GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: IVec3) -> Self::Output {
@@ -174,7 +174,7 @@ impl std::ops::Add<IVec3> for &GridCell {
     }
 }
 
-impl std::ops::Sub for &GridCell {
+impl core::ops::Sub for &GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -182,7 +182,7 @@ impl std::ops::Sub for &GridCell {
     }
 }
 
-impl std::ops::Sub<IVec3> for &GridCell {
+impl core::ops::Sub<IVec3> for &GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: IVec3) -> Self::Output {
@@ -190,35 +190,35 @@ impl std::ops::Sub<IVec3> for &GridCell {
     }
 }
 
-impl std::ops::AddAssign for GridCell {
+impl core::ops::AddAssign for GridCell {
     fn add_assign(&mut self, rhs: Self) {
-        use std::ops::Add;
+        use core::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl std::ops::AddAssign<IVec3> for GridCell {
+impl core::ops::AddAssign<IVec3> for GridCell {
     fn add_assign(&mut self, rhs: IVec3) {
-        use std::ops::Add;
+        use core::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl std::ops::SubAssign for GridCell {
+impl core::ops::SubAssign for GridCell {
     fn sub_assign(&mut self, rhs: Self) {
-        use std::ops::Sub;
+        use core::ops::Sub;
         *self = self.sub(rhs);
     }
 }
 
-impl std::ops::SubAssign<IVec3> for GridCell {
+impl core::ops::SubAssign<IVec3> for GridCell {
     fn sub_assign(&mut self, rhs: IVec3) {
-        use std::ops::Sub;
+        use core::ops::Sub;
         *self = self.sub(rhs);
     }
 }
 
-impl std::ops::Mul<GridPrecision> for GridCell {
+impl core::ops::Mul<GridPrecision> for GridCell {
     type Output = GridCell;
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {
@@ -230,7 +230,7 @@ impl std::ops::Mul<GridPrecision> for GridCell {
     }
 }
 
-impl std::ops::Mul<GridPrecision> for &GridCell {
+impl core::ops::Mul<GridPrecision> for &GridCell {
     type Output = GridCell;
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {

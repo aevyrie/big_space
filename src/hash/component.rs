@@ -1,15 +1,17 @@
 //! Components for spatial hashing.
 
-use std::hash::{BuildHasher, Hash, Hasher};
+use core::hash::{BuildHasher, Hash, Hasher};
 
 use crate::prelude::*;
 use bevy_ecs::{prelude::*, relationship::Relationship};
 use bevy_math::IVec3;
-use bevy_platform_support::{hash::FixedHasher, time::Instant};
+use bevy_platform_support::{hash::FixedHasher, prelude::*, time::Instant};
 use bevy_reflect::Reflect;
-use bevy_utils::Parallel;
 
 use super::{ChangedGridHashes, GridHashMapFilter};
+
+#[cfg(feature = "std")]
+use bevy_utils::Parallel;
 
 /// A fast but lossy version of [`GridHash`]. Use this component when you don't care about false
 /// positives (hash collisions). See the docs on [`GridHash::fast_eq`] for more details on fast but
@@ -156,6 +158,7 @@ impl GridHash {
 
     /// Update or insert the [`GridHash`] of all changed entities that match the optional
     /// [`GridHashMapFilter`].
+    #[cfg(feature = "std")]
     pub(super) fn update<F: GridHashMapFilter>(
         mut commands: Commands,
         mut changed_hashes: ResMut<ChangedGridHashes<F>>,
@@ -201,6 +204,50 @@ impl GridHash {
             },
         );
         thread_updated_hashes.drain_into(&mut changed_hashes.updated);
+
+        if let Some(ref mut stats) = stats {
+            stats.hash_update_duration += start.elapsed();
+        }
+    }
+
+    /// Update or insert the [`GridHash`] of all changed entities that match the optional
+    /// [`GridHashMapFilter`].
+    #[cfg(not(feature = "std"))]
+    pub(super) fn update<F: GridHashMapFilter>(
+        mut commands: Commands,
+        mut changed_hashes: ResMut<ChangedGridHashes<F>>,
+        mut spatial_entities: Query<
+            (
+                Entity,
+                &ChildOf,
+                &GridCell,
+                &mut GridHash,
+                &mut FastGridHash,
+            ),
+            (F, Or<(Changed<ChildOf>, Changed<GridCell>)>),
+        >,
+        added_entities: Query<(Entity, &ChildOf, &GridCell), (F, Without<GridHash>)>,
+        mut stats: Option<ResMut<crate::timing::GridHashStats>>,
+    ) {
+        let start = Instant::now();
+
+        // Create new
+        for (entity, parent, cell) in &added_entities {
+            let spatial_hash = GridHash::new(parent, cell);
+            let fast_hash = FastGridHash::from(spatial_hash);
+            commands.entity(entity).insert((spatial_hash, fast_hash));
+            changed_hashes.updated.push(entity);
+        }
+
+        // Update existing
+        for (entity, parent, cell, mut hash, mut fast_hash) in &mut spatial_entities {
+            let new_hash = GridHash::new(parent, cell);
+            let new_fast_hash = new_hash.pre_hash;
+            if hash.replace_if_neq(new_hash).is_some() {
+                changed_hashes.updated.push(entity);
+            }
+            fast_hash.0 = new_fast_hash;
+        }
 
         if let Some(ref mut stats) = stats {
             stats.hash_update_duration += start.elapsed();

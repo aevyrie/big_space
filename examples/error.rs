@@ -75,7 +75,7 @@ fn toggle_plugin(
             .as_bytes()
             .rchunks(3)
             .rev()
-            .map(std::str::from_utf8)
+            .map(core::str::from_utf8)
             .collect::<Result<Vec<&str>, _>>()
             .unwrap()
             .join(",") // separator

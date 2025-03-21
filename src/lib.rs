@@ -197,6 +197,9 @@
 
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
+#![no_std]
+
+extern crate alloc;
 
 #[allow(unused_imports)] // For docs
 use bevy_transform::prelude::*;

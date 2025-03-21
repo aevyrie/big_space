@@ -1,7 +1,10 @@
 //! Tools for validating high-precision transform hierarchies
 
 use bevy_ecs::prelude::*;
-use bevy_platform_support::collections::{HashMap, HashSet};
+use bevy_platform_support::{
+    collections::{HashMap, HashSet},
+    prelude::*,
+};
 use bevy_transform::prelude::*;
 
 use crate::{grid::Grid, BigSpace, FloatingOrigin, GridCell};
@@ -137,12 +140,13 @@ pub trait ValidHierarchyNode: sealed::CloneHierarchy + Send + Sync {
     fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>>;
     /// A unique identifier of this type
     fn name(&self) -> &'static str {
-        std::any::type_name::<Self>()
+        core::any::type_name::<Self>()
     }
 }
 
 mod sealed {
     use super::ValidHierarchyNode;
+    use bevy_platform_support::prelude::*;
 
     pub trait CloneHierarchy {
         fn clone_box(&self) -> Box<dyn ValidHierarchyNode>;

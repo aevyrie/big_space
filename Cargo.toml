@@ -9,26 +9,30 @@ repository = "https://github.com/aevyrie/big_space"
 documentation = "https://docs.rs/crate/big_space/latest"
 
 [features]
-default = []
+default = ["std"]
 all = ["debug", "camera"] # Can't use all-features, integer type features are incompatible.
-debug = ["bevy_gizmos", "bevy_color"]
-camera = ["bevy_render", "bevy_time", "bevy_input"]
+debug = ["std", "bevy_gizmos", "bevy_color"]
+camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
 i8 = []
 i16 = []
 i32 = []
 i64 = []
 i128 = []
 
+std = ["bevy_math/std"]
+libm = ["bevy_math/libm", "dep:libm"]
+
 [dependencies]
-tracing = "0.1" # Less deps than pulling in bevy_log
-smallvec = "1.13.2" # Already used by bevy in commands
-bevy_app = { version = "0.16.0-rc.1", default-features = false }
+tracing = { version = "0.1", default-features = false } # Less deps than pulling in bevy_log
+smallvec = { version = "1.13.2", default-features = false } # Already used by bevy in commands
+bevy_app = { version = "0.16.0-rc.1", default-features = false, features = ["bevy_reflect"] }
 bevy_ecs = { version = "0.16.0-rc.1", default-features = false }
 bevy_math = { version = "0.16.0-rc.1", default-features = false }
-bevy_reflect = { version = "0.16.0-rc.1", default-features = false }
+bevy_reflect = { version = "0.16.0-rc.1", default-features = false, features = ["glam"] }
 bevy_tasks = { version = "0.16.0-rc.1", default-features = false }
 bevy_transform = { version = "0.16.0-rc.1", default-features = false, features = [
     "bevy-support",
+    "bevy_reflect",
 ] }
 bevy_utils = { version = "0.16.0-rc.1", default-features = false }
 bevy_platform_support = { version = "0.16.0-rc.1", default-features = false, features = ["alloc"] }
@@ -38,7 +42,7 @@ bevy_gizmos = { version = "0.16.0-rc.1", default-features = false, optional = tr
 bevy_render = { version = "0.16.0-rc.1", default-features = false, optional = true }
 bevy_input = { version = "0.16.0-rc.1", default-features = false, optional = true }
 bevy_time = { version = "0.16.0-rc.1", default-features = false, optional = true }
-
+libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
@@ -61,7 +65,12 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.20"
-bevy_hanabi = "0.14" # TODO: Update
+# bevy_hanabi = "0.14" # TODO: Update
+
+[lints.clippy]
+alloc_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+std_instead_of_core = "warn"
 
 [[bench]]
 name = "benchmarks"
@@ -77,7 +86,6 @@ name = "demo"
 path = "examples/demo.rs"
 required-features = ["i128"]
 doc-scrape-examples = false
-
 
 [[example]]
 name = "error_child"

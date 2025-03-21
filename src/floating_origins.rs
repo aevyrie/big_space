@@ -65,7 +65,7 @@ impl BigSpace {
         parent_query: Query<&ChildOf>,
         mut big_spaces: Query<(Entity, &mut BigSpace)>,
     ) {
-        let mut spaces_set = HashMap::new();
+        let mut spaces_set = HashMap::<_, _>::default();
         // Reset all floating origin fields, so we know if any are missing.
         for (entity, mut space) in &mut big_spaces {
             space.floating_origin = None;

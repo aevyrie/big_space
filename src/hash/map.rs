@@ -1,6 +1,7 @@
 //! The [`GridHashMap`] that contains mappings between entities and their spatial hash.
 
-use std::{collections::VecDeque, marker::PhantomData, time::Instant};
+use alloc::collections::VecDeque;
+use core::marker::PhantomData;
 
 use super::GridHashMapFilter;
 use crate::prelude::*;
@@ -8,6 +9,8 @@ use bevy_ecs::{entity::EntityHash, prelude::*};
 use bevy_platform_support::{
     collections::{HashMap, HashSet},
     hash::PassHash,
+    prelude::*,
+    time::Instant,
 };
 
 /// An entry in a [`GridHashMap`], accessed with a [`GridHash`].
@@ -87,11 +90,11 @@ where
     spooky: PhantomData<F>,
 }
 
-impl<F> std::fmt::Debug for GridHashMap<F>
+impl<F> core::fmt::Debug for GridHashMap<F>
 where
     F: GridHashMapFilter,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GridHashMap")
             .field("map", &self.map)
             .field("reverse_map", &self.reverse_map)
@@ -150,9 +153,9 @@ where
         &'a self,
         entry: &'a GridHashEntry,
     ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
-        // Use `std::iter::once` to avoid returning a function-local variable.
+        // Use `core::iter::once` to avoid returning a function-local variable.
         Iterator::chain(
-            std::iter::once(entry),
+            core::iter::once(entry),
             entry.occupied_neighbors.iter().map(|neighbor_hash| {
                 self.get(neighbor_hash)
                     .expect("occupied_neighbors should be occupied")
@@ -177,8 +180,8 @@ where
         center: &'a GridHash,
         radius: u8,
     ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
-        // Use `std::iter::once` to avoid returning a function-local variable.
-        Iterator::chain(std::iter::once(*center), center.adjacent(radius))
+        // Use `core::iter::once` to avoid returning a function-local variable.
+        Iterator::chain(core::iter::once(*center), center.adjacent(radius))
             .filter_map(|hash| self.get(&hash))
     }
 

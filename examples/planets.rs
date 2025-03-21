@@ -1,4 +1,6 @@
-use std::collections::VecDeque;
+extern crate alloc;
+
+use alloc::collections::VecDeque;
 
 use bevy::{
     color::palettes,
@@ -91,7 +93,7 @@ fn springy_ship(
     smoothed_rot.push_front(DVec3::new(cam_input.pitch, cam_input.yaw, cam_input.roll).as_vec3());
     let avg_rot = smoothed_rot.iter().sum::<Vec3>() / smoothed_rot.len() as f32;
 
-    use std::f32::consts::*;
+    use core::f32::consts::*;
     desired_dir.1 = Quat::IDENTITY.slerp(
         Quat::from_euler(
             EulerRot::XYZ,
@@ -248,7 +250,7 @@ fn spawn_solar_system(
                     camera.with_child((
                         Spaceship,
                         SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
-                        Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                        Transform::from_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
                     ));
                 });
             });

@@ -1,4 +1,4 @@
-use std::hash::Hasher;
+use core::hash::Hasher;
 
 use bevy::{
     core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
@@ -240,7 +240,7 @@ Total: {: >22.1?}",
             .as_bytes()
             .rchunks(3)
             .rev()
-            .map(std::str::from_utf8)
+            .map(core::str::from_utf8)
             .collect::<Result<Vec<&str>, _>>()
             .unwrap()
             .join(","),
@@ -351,7 +351,7 @@ fn sample_noise<'a, T: NoiseFn<f64, 3>>(
     noise: &'a T,
     rng: &'a Rng,
 ) -> impl Iterator<Item = Vec3> + use<'a, T> {
-    std::iter::repeat_with(
+    core::iter::repeat_with(
         || loop {
             let noise_scale = 0.05 * HALF_WIDTH as f64;
             let threshold = 0.50;

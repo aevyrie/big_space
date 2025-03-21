@@ -176,7 +176,7 @@ impl Drop for GridCommands<'_> {
         let entity = self.entity;
         self.commands
             .entity(entity)
-            .insert(std::mem::take(&mut self.grid))
+            .insert(core::mem::take(&mut self.grid))
             .add_children(&self.children);
     }
 }
