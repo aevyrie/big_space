@@ -226,7 +226,8 @@ fn spatial_hashing(c: &mut Criterion) {
     let parent = app
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
-        .single(app.world());
+        .single(app.world())
+        .unwrap();
     let spatial_map = app.world().resource::<GridHashMap>();
     let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
@@ -254,7 +255,8 @@ fn spatial_hashing(c: &mut Criterion) {
     let parent = app
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
-        .single(app.world());
+        .single(app.world())
+        .unwrap();
     let spatial_map = app.world().resource::<GridHashMap>();
     let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();

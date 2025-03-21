@@ -125,13 +125,11 @@ fn highlight_nearest_sphere(
     cameras: Query<&CameraController>,
     objects: Query<&GlobalTransform>,
     mut gizmos: Gizmos,
-) {
-    let Some((entity, _)) = cameras.single().nearest_object() else {
-        return;
+) -> Result {
+    let Some((entity, _)) = cameras.single()?.nearest_object() else {
+        return Ok(());
     };
-    let Ok(transform) = objects.get(entity) else {
-        return;
-    };
+    let transform = objects.get(entity)?;
     // Ignore rotation due to panicking in gizmos, as of bevy 0.13
     let (scale, _, translation) = transform.to_scale_rotation_translation();
     gizmos
@@ -141,6 +139,7 @@ fn highlight_nearest_sphere(
             Color::Srgba(palettes::basic::RED),
         )
         .resolution(128);
+    Ok(())
 }
 
 #[allow(clippy::type_complexity)]
@@ -155,8 +154,8 @@ fn ui_text_system(
     origin: Query<(Entity, GridTransformReadOnly), With<FloatingOrigin>>,
     camera: Query<&CameraController>,
     objects: Query<&Transform, With<Mesh3d>>,
-) {
-    let (origin_entity, origin_pos) = origin.single();
+) -> Result {
+    let (origin_entity, origin_pos) = origin.single()?;
     let translation = origin_pos.transform.translation;
 
     let grid_text = format!(
@@ -170,7 +169,7 @@ fn ui_text_system(
     );
 
     let Some(grid) = grids.parent_grid(origin_entity) else {
-        return;
+        return Ok(());
     };
 
     let real_position = grid.grid_position_double(origin_pos.cell, origin_pos.transform);
@@ -183,7 +182,7 @@ fn ui_text_system(
         real_position.x as f32, real_position.y as f32, real_position.z as f32
     );
 
-    let velocity = camera.single().velocity();
+    let velocity = camera.single()?.velocity();
     let speed = velocity.0.length() / time.delta_secs_f64();
     let camera_text = if speed > 3.0e8 {
         format!("Speed: {:.0e} * speed of light", speed / 3.0e8)
@@ -191,8 +190,8 @@ fn ui_text_system(
         format!("Speed: {:.2e} m/s", speed)
     };
 
-    let (nearest_text, fact_text) = if let Some(nearest) = camera.single().nearest_object() {
-        let dia = objects.get(nearest.0).unwrap().scale.max_element();
+    let (nearest_text, fact_text) = if let Some(nearest) = camera.single()?.nearest_object() {
+        let dia = objects.get(nearest.0)?.scale.max_element();
         let (fact_dia, fact) = closest(dia);
         let dist = nearest.1;
         let multiple = dia / fact_dia;
@@ -206,13 +205,15 @@ fn ui_text_system(
         ("".into(), "".into())
     };
 
-    let mut debug_text = debug_text.single_mut();
+    let mut debug_text = debug_text.single_mut()?;
 
     debug_text.0.0 = format!(
         "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
     );
 
-    fun_text.single_mut().0 = fact_text
+    fun_text.single_mut()?.0 = fact_text;
+
+    Ok(())
 }
 
 fn closest<'a>(diameter: f32) -> (f32, &'a str) {
@@ -262,10 +263,8 @@ fn cursor_grab_system(
     mut cam: ResMut<CameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
-) {
-    let Some(mut window) = windows.get_single_mut().ok() else {
-        return;
-    };
+) -> Result {
+    let mut window = windows.single_mut()?;
 
     if btn.just_pressed(MouseButton::Left) {
         window.cursor_options.grab_mode = CursorGrabMode::Locked;
@@ -280,4 +279,6 @@ fn cursor_grab_system(
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }
+
+    Ok(())
 }

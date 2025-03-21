@@ -1,13 +1,13 @@
 //! Components for spatial hashing.
 
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_hierarchy::Parent;
+use bevy_ecs::{prelude::*, relationship::Relationship};
 use bevy_math::IVec3;
+use bevy_platform_support::{hash::FixedHasher, time::Instant};
 use bevy_reflect::Reflect;
-use bevy_utils::{AHasher, Instant, Parallel};
+use bevy_utils::Parallel;
 
 use super::{ChangedGridHashes, GridHashMapFilter};
 
@@ -47,7 +47,7 @@ impl From<GridHash> for FastGridHash {
 /// [`GridHashMap`] resource.
 ///
 /// Due to grids and multiple big spaces in a single world, this must use both the [`GridCell`] and
-/// the [`Parent`] of the entity to uniquely identify its position. These two values are then hashed
+/// the [`ChildOf`] of the entity to uniquely identify its position. These two values are then hashed
 /// and stored in this spatial hash component.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct GridHash {
@@ -89,15 +89,15 @@ impl GridHash {
     /// Intentionally left private, so we can ensure the only place these are constructed/mutated is
     /// this module. This allows us to optimize change detection using [`ChangedGridHashes`].
     #[inline]
-    pub(super) fn new(parent: &Parent, cell: &GridCell) -> Self {
+    pub(super) fn new(parent: &ChildOf, cell: &GridCell) -> Self {
         Self::from_parent(parent.get(), cell)
     }
 
     #[inline]
     pub(super) fn from_parent(parent: Entity, cell: &GridCell) -> Self {
-        let hasher = &mut AHasher::default();
+        let mut hasher = FixedHasher.build_hasher();
         hasher.write_u64(parent.to_bits());
-        cell.hash(hasher);
+        cell.hash(&mut hasher);
 
         GridHash {
             cell: *cell,
@@ -160,10 +160,16 @@ impl GridHash {
         mut commands: Commands,
         mut changed_hashes: ResMut<ChangedGridHashes<F>>,
         mut spatial_entities: Query<
-            (Entity, &Parent, &GridCell, &mut GridHash, &mut FastGridHash),
-            (F, Or<(Changed<Parent>, Changed<GridCell>)>),
+            (
+                Entity,
+                &ChildOf,
+                &GridCell,
+                &mut GridHash,
+                &mut FastGridHash,
+            ),
+            (F, Or<(Changed<ChildOf>, Changed<GridCell>)>),
         >,
-        added_entities: Query<(Entity, &Parent, &GridCell), (F, Without<GridHash>)>,
+        added_entities: Query<(Entity, &ChildOf, &GridCell), (F, Without<GridHash>)>,
         mut stats: Option<ResMut<crate::timing::GridHashStats>>,
         mut thread_updated_hashes: Local<Parallel<Vec<Entity>>>,
         mut thread_commands: Local<Parallel<Vec<(Entity, GridHash, FastGridHash)>>>,
@@ -206,7 +212,7 @@ impl GridHash {
         self.cell
     }
 
-    /// The [`Parent`] [`Grid`] of this spatial hash.
+    /// The [`ChildOf`] [`Grid`] of this spatial hash.
     pub fn grid(&self) -> Entity {
         self.grid
     }

@@ -5,12 +5,12 @@
 use crate::prelude::*;
 use bevy_ecs::{
     prelude::*,
+    relationship::Relationship,
     system::{
         lifetimeless::{Read, Write},
         SystemParam,
     },
 };
-use bevy_hierarchy::prelude::*;
 use bevy_math::{prelude::*, DAffine3, DQuat};
 use bevy_transform::prelude::*;
 
@@ -242,8 +242,8 @@ fn propagate_origin_to_child(
 /// A system param for more easily navigating a hierarchy of [`Grid`]s.
 #[derive(SystemParam)]
 pub struct Grids<'w, 's> {
-    parent: Query<'w, 's, Read<Parent>>,
-    grid_query: Query<'w, 's, (Entity, Read<Grid>, Option<Read<Parent>>)>,
+    parent: Query<'w, 's, Read<ChildOf>>,
+    grid_query: Query<'w, 's, (Entity, Read<Grid>, Option<Read<ChildOf>>)>,
 }
 
 impl Grids<'_, '_> {
@@ -266,7 +266,7 @@ impl Grids<'_, '_> {
     /// Get the ID of the grid that `this` `Entity` is a child of, if it exists.
     #[inline]
     pub fn parent_grid_entity(&self, this: Entity) -> Option<Entity> {
-        match self.parent.get(this).map(|parent| **parent) {
+        match self.parent.get(this).map(|parent| parent.get()) {
             Err(_) => None,
             Ok(parent) => match self.grid_query.contains(parent) {
                 true => Some(parent),
@@ -317,9 +317,9 @@ impl Grids<'_, '_> {
 /// A system param for more easily navigating a hierarchy of grids mutably.
 #[derive(SystemParam)]
 pub struct GridsMut<'w, 's> {
-    parent: Query<'w, 's, Read<Parent>>,
+    parent: Query<'w, 's, Read<ChildOf>>,
     position: Query<'w, 's, (Read<GridCell>, Read<Transform>), With<Grid>>,
-    grid_query: Query<'w, 's, (Entity, Write<Grid>, Option<Read<Parent>>)>,
+    grid_query: Query<'w, 's, (Entity, Write<Grid>, Option<Read<ChildOf>>)>,
 }
 
 impl GridsMut<'_, '_> {
@@ -374,7 +374,7 @@ impl GridsMut<'_, '_> {
     /// Get the ID of the grid that `this` `Entity` is a child of, if it exists.
     #[inline]
     pub fn parent_grid_entity(&self, this: Entity) -> Option<Entity> {
-        match self.parent.get(this).map(|parent| **parent) {
+        match self.parent.get(this).map(|parent| parent.get()) {
             Err(_) => None,
             Ok(parent) => match self.grid_query.contains(parent) {
                 true => Some(parent),
@@ -435,9 +435,9 @@ impl LocalFloatingOrigin {
         mut scratch_buffer: Local<Vec<Entity>>,
         cells: Query<(Entity, Ref<GridCell>)>,
         roots: Query<(Entity, &BigSpace)>,
-        parents: Query<&Parent>,
+        parents: Query<&ChildOf>,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
 
         /// The maximum grid tree depth, defensively prevents infinite looping in case there is a
         /// degenerate hierarchy. It might take a while, but at least it's not forever?
@@ -550,7 +550,7 @@ mod tests {
         let result = grids.child_grids(child_1).collect::<Vec<_>>();
         assert_eq!(result, Vec::new());
 
-        // Parent
+        // ChildOf
         let result = grids.parent_grid_entity(root);
         assert_eq!(result, None);
         let result = grids.parent_grid_entity(parent);

@@ -26,7 +26,7 @@ fn movement(
         Query<&mut Transform, With<Mover<3>>>,
         Query<&mut Transform, With<Mover<4>>>,
     )>,
-) {
+) -> Result {
     let delta_translation = |offset: f32, scale: f32| -> Vec3 {
         let t_1 = time.elapsed_secs() * 0.1 + offset;
         let dt = time.delta_secs() * 0.1;
@@ -38,10 +38,12 @@ fn movement(
         p1 - p0
     };
 
-    q.p0().single_mut().translation += delta_translation(20.0, 1.0);
-    q.p1().single_mut().translation += delta_translation(251.0, 1.0);
-    q.p2().single_mut().translation += delta_translation(812.0, 1.0);
-    q.p3().single_mut().translation += delta_translation(863.0, 0.4);
+    q.p0().single_mut()?.translation += delta_translation(20.0, 1.0);
+    q.p1().single_mut()?.translation += delta_translation(251.0, 1.0);
+    q.p2().single_mut()?.translation += delta_translation(812.0, 1.0);
+    q.p3().single_mut()?.translation += delta_translation(863.0, 0.4);
+
+    Ok(())
 }
 
 #[derive(Component)]

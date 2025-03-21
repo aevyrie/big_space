@@ -1,12 +1,11 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+use bevy_ecs::{prelude::*, relationship::Relationship};
 use bevy_math::{DVec3, IVec3};
+use bevy_platform_support::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
-use bevy_utils::Instant;
 
 /// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
 /// this component is a transformation from the center of this cell.
@@ -84,7 +83,7 @@ impl GridCell {
     pub fn recenter_large_transforms(
         mut stats: ResMut<crate::timing::PropagationStats>,
         grids: Query<&Grid>,
-        mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
+        mut changed_transform: Query<(&mut Self, &mut Transform, &ChildOf), Changed<Transform>>,
     ) {
         let start = Instant::now();
         changed_transform

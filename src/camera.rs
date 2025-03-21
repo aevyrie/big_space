@@ -3,9 +3,9 @@
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
+use bevy_platform_support::collections::HashSet;
 use bevy_reflect::prelude::*;
 use bevy_render::{
     primitives::Aabb,
@@ -13,7 +13,6 @@ use bevy_render::{
 };
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
-use bevy_utils::HashSet;
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
@@ -226,7 +225,7 @@ pub fn nearest_objects_in_grid(
     )>,
     children: Query<&Children>,
 ) {
-    let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.get_single_mut() else {
+    let Ok((cam_entity, mut camera, cam_pos, cam_layer)) = camera.single_mut() else {
         return;
     };
     if !camera.slow_near_objects {

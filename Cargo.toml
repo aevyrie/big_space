@@ -22,27 +22,27 @@ i128 = []
 [dependencies]
 tracing = "0.1" # Less deps than pulling in bevy_log
 smallvec = "1.13.2" # Already used by bevy in commands
-bevy_app = { version = "0.15.0", default-features = false }
-bevy_ecs = { version = "0.15.0", default-features = true }
-bevy_hierarchy = { version = "0.15.0", default-features = false }
-bevy_math = { version = "0.15.0", default-features = false }
-bevy_reflect = { version = "0.15.0", default-features = false }
-bevy_tasks = { version = "0.15.0", default-features = false }
-bevy_transform = { version = "0.15.0", default-features = false, features = [
+bevy_app = { version = "0.16.0-rc.1", default-features = false }
+bevy_ecs = { version = "0.16.0-rc.1", default-features = false }
+bevy_math = { version = "0.16.0-rc.1", default-features = false }
+bevy_reflect = { version = "0.16.0-rc.1", default-features = false }
+bevy_tasks = { version = "0.16.0-rc.1", default-features = false }
+bevy_transform = { version = "0.16.0-rc.1", default-features = false, features = [
     "bevy-support",
 ] }
-bevy_utils = { version = "0.15.0", default-features = false }
+bevy_utils = { version = "0.16.0-rc.1", default-features = false }
+bevy_platform_support = { version = "0.16.0-rc.1", default-features = false, features = ["alloc"] }
 # Optional
-bevy_color = { version = "0.15.0", default-features = false, optional = true }
-bevy_gizmos = { version = "0.15.0", default-features = false, optional = true }
-bevy_render = { version = "0.15.0", default-features = false, optional = true }
-bevy_input = { version = "0.15.0", default-features = false, optional = true }
-bevy_time = { version = "0.15.0", default-features = false, optional = true }
+bevy_color = { version = "0.16.0-rc.1", default-features = false, optional = true }
+bevy_gizmos = { version = "0.16.0-rc.1", default-features = false, optional = true }
+bevy_render = { version = "0.16.0-rc.1", default-features = false, optional = true }
+bevy_input = { version = "0.16.0-rc.1", default-features = false, optional = true }
+bevy_time = { version = "0.16.0-rc.1", default-features = false, optional = true }
 
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
-bevy = { version = "0.15.0", default-features = false, features = [
+bevy = { version = "0.16.0-rc.1", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
     "bevy_gltf",
@@ -61,7 +61,7 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.20"
-bevy_hanabi = "0.14"
+bevy_hanabi = "0.14" # TODO: Update
 
 [[bench]]
 name = "benchmarks"
@@ -100,10 +100,11 @@ name = "minimal"
 path = "examples/minimal.rs"
 doc-scrape-examples = false
 
-[[example]]
-name = "particles"
-path = "examples/particles.rs"
-doc-scrape-examples = false
+# TODO: Uncomment once bevy_hanabi is updated
+# [[example]]
+# name = "particles"
+# path = "examples/particles.rs"
+# doc-scrape-examples = false
 
 [[example]]
 name = "planets"

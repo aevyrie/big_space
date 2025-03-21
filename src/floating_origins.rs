@@ -1,9 +1,8 @@
 //! A floating origin for camera-relative rendering, to maximize precision when converting to f32.
 
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+use bevy_platform_support::collections::HashMap;
 use bevy_reflect::prelude::*;
-use bevy_utils::HashMap;
 
 /// Marks the entity to use as the floating origin.
 ///
@@ -51,7 +50,7 @@ impl BigSpace {
     pub(crate) fn validate_floating_origin(
         &self,
         this_entity: Entity,
-        parents: &Query<&Parent>,
+        parents: &Query<&ChildOf>,
     ) -> Option<Entity> {
         let floating_origin = self.floating_origin?;
         let origin_root_entity = parents.iter_ancestors(floating_origin).last()?;
@@ -63,7 +62,7 @@ impl BigSpace {
     /// `BigSpace` hierarchy.
     pub fn find_floating_origin(
         floating_origins: Query<Entity, With<FloatingOrigin>>,
-        parent_query: Query<&Parent>,
+        parent_query: Query<&ChildOf>,
         mut big_spaces: Query<(Entity, &mut BigSpace)>,
     ) {
         let mut spaces_set = HashMap::new();

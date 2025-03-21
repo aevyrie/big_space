@@ -23,6 +23,7 @@ fn main() {
         .insert_resource(AmbientLight {
             color: Color::WHITE,
             brightness: 200.0,
+            ..Default::default()
         })
         .add_systems(Startup, spawn_solar_system)
         .add_systems(
@@ -69,11 +70,12 @@ fn rotate(mut rotate_query: Query<(&mut Transform, &Rotates)>) {
 fn lighting(
     mut light: Query<(&mut Transform, &mut GlobalTransform), With<PrimaryLight>>,
     sun: Query<&GlobalTransform, (With<Sun>, Without<PrimaryLight>)>,
-) {
-    let sun_pos = sun.single().translation();
-    let (mut light_tr, mut light_gt) = light.single_mut();
+) -> Result {
+    let sun_pos = sun.single()?.translation();
+    let (mut light_tr, mut light_gt) = light.single_mut()?;
     light_tr.look_at(-sun_pos, Vec3::Y);
     *light_gt = (*light_tr).into();
+    Ok(())
 }
 
 fn springy_ship(
@@ -81,7 +83,7 @@ fn springy_ship(
     mut ship: Query<&mut Transform, With<Spaceship>>,
     mut desired_dir: Local<(Vec3, Quat)>,
     mut smoothed_rot: Local<VecDeque<Vec3>>,
-) {
+) -> Result {
     desired_dir.0 = DVec3::new(cam_input.right, cam_input.up, -cam_input.forward).as_vec3()
         * (1.0 + cam_input.boost as u8 as f32);
 
@@ -100,12 +102,14 @@ fn springy_ship(
         0.2,
     ) * Quat::from_rotation_y(PI);
 
-    ship.single_mut().translation = ship
-        .single_mut()
+    ship.single_mut()?.translation = ship
+        .single_mut()?
         .translation
         .lerp(desired_dir.0 * Vec3::new(0.5, 0.5, -2.0), 0.02);
 
-    ship.single_mut().rotation = ship.single_mut().rotation.slerp(desired_dir.1, 0.02);
+    ship.single_mut()?.rotation = ship.single_mut()?.rotation.slerp(desired_dir.1, 0.02);
+
+    Ok(())
 }
 
 fn spawn_solar_system(
@@ -276,10 +280,8 @@ fn cursor_grab_system(
     mut cam: ResMut<big_space::camera::CameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
-) {
-    let Some(mut window) = windows.get_single_mut().ok() else {
-        return;
-    };
+) -> Result<()> {
+    let mut window = windows.single_mut()?;
 
     if btn.just_pressed(MouseButton::Right) {
         window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
@@ -294,4 +296,6 @@ fn cursor_grab_system(
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }
+
+    Ok(())
 }

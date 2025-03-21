@@ -4,11 +4,12 @@ use std::{hash::Hash, marker::PhantomData, ops::Deref};
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
-use bevy_utils::{
-    hashbrown::{HashMap, HashSet},
-    Instant, PassHash,
+use bevy_platform_support::{
+    collections::{HashMap, HashSet},
+    hash::PassHash,
+    time::Instant,
 };
+use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 
 use super::{GridCell, GridHash, GridHashMap, GridHashMapFilter, GridHashMapSystem};
 
@@ -357,7 +358,7 @@ mod private {
     use super::{GridCell, GridHash};
     use crate::precision::GridPrecision;
     use bevy_ecs::prelude::*;
-    use bevy_utils::{hashbrown::HashSet, PassHash};
+    use bevy_platform_support::{collections::HashSet, hash::PassHash};
 
     /// A group of nearby [`GridCell`](crate::GridCell)s in an island disconnected from all other
     /// [`GridCell`](crate::GridCell)s.
@@ -467,7 +468,10 @@ mod private {
                 if table.len() < Self::MIN_TABLE_SIZE {
                     if let Some(i) = self.smallest_table() {
                         for hash in table.drain() {
-                            self.tables[i].insert_unique_unchecked(hash);
+                            // SAFETY: TODO
+                            unsafe {
+                                self.tables[i].insert_unique_unchecked(hash);
+                            }
                         }
                     } else {
                         self.tables.push(table);

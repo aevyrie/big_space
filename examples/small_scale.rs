@@ -9,6 +9,7 @@
 use bevy::prelude::*;
 use bevy_math::DVec3;
 use big_space::prelude::*;
+use tracing::info;
 
 const UNIVERSE_DIA: f64 = 8.8e26; // Diameter of the observable universe
 const PROTON_DIA: f32 = 1.68e-15; // Diameter of a proton
@@ -104,12 +105,15 @@ fn toggle_cam_pos(
     grid: Query<&Grid>,
     keyboard: Res<ButtonInput<KeyCode>>,
     protons: Query<&GlobalTransform, With<Proton>>,
-) {
+) -> Result {
     if !keyboard.just_pressed(KeyCode::KeyT) {
-        return;
+        return Ok(());
     }
-    *cam.single_mut() = if *toggle {
-        grid.single().translation_to_grid(DVec3::X * UNIVERSE_DIA).0
+    *cam.single_mut()? = if *toggle {
+        grid.single()
+            .unwrap()
+            .translation_to_grid(DVec3::X * UNIVERSE_DIA)
+            .0
     } else {
         GridCell::ZERO
     };
@@ -120,4 +124,5 @@ fn toggle_cam_pos(
     for proton in &protons {
         info!("Proton x coord: {}", proton.translation().x);
     }
+    Ok(())
 }

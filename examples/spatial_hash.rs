@@ -4,7 +4,7 @@ use bevy::{
     core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
     prelude::*,
 };
-use bevy_ecs::entity::EntityHasher;
+use bevy_ecs::{entity::EntityHasher, relationship::Relationship};
 use bevy_math::DVec3;
 use big_space::prelude::*;
 use noise::{NoiseFn, Simplex};
@@ -89,10 +89,12 @@ fn draw_partitions(
     partitions: Res<GridPartitionMap>,
     grids: Query<(&GlobalTransform, &Grid)>,
     camera: Query<&GridHash, With<Camera>>,
-) {
+) -> Result {
+    let camera = camera.single()?;
+
     for (id, p) in partitions.iter().take(10_000) {
         let Ok((transform, grid)) = grids.get(p.grid()) else {
-            return;
+            return Ok(());
         };
         let l = grid.cell_edge_length();
 
@@ -102,7 +104,7 @@ fn draw_partitions(
         let hue = (f % 360) as f32;
 
         p.iter()
-            .filter(|hash| *hash != camera.single())
+            .filter(|hash| *hash != camera)
             .take(1_000)
             .for_each(|h| {
                 let center = [h.cell().x as i32, h.cell().y as i32, h.cell().z as i32];
@@ -126,6 +128,8 @@ fn draw_partitions(
             Hsla::new(hue, 1.0, 0.5, 0.2),
         );
     }
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -133,9 +137,9 @@ fn draw_partitions(
 fn move_player(
     time: Res<Time>,
     mut _gizmos: Gizmos,
-    mut player: Query<(&mut Transform, &mut GridCell, &Parent, &GridHash), With<Player>>,
+    mut player: Query<(&mut Transform, &mut GridCell, &ChildOf, &GridHash), With<Player>>,
     mut non_player: Query<
-        (&mut Transform, &mut GridCell, &Parent),
+        (&mut Transform, &mut GridCell, &ChildOf),
         (Without<Player>, With<NonPlayer>),
     >,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
@@ -146,7 +150,7 @@ fn move_player(
     mut text: Query<&mut Text>,
     hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
     prop_stats: Res<big_space::timing::SmoothedStat<big_space::timing::PropagationStats>>,
-) {
+) -> Result {
     let n_entities = non_player.iter().len();
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
@@ -170,7 +174,7 @@ fn move_player(
     }
 
     let t = time.elapsed_secs() * 0.01;
-    let (mut transform, mut cell, parent, hash) = player.single_mut();
+    let (mut transform, mut cell, parent, hash) = player.single_mut()?;
     let absolute_pos = HALF_WIDTH
         * CELL_WIDTH
         * 0.8
@@ -208,7 +212,7 @@ fn move_player(
             }
         });
 
-    let mut text = text.single_mut();
+    let mut text = text.single_mut()?;
     text.0 = format!(
         "\
 Controls:
@@ -254,6 +258,8 @@ Total: {: >22.1?}",
         //
         prop_stats.avg().total() + hash_stats.avg().total(),
     );
+
+    Ok(())
 }
 
 fn spawn(mut commands: Commands) {
@@ -289,17 +295,17 @@ fn spawn_spheres(
     material_presets: Res<MaterialPresets>,
     mut grid: Query<(Entity, &Grid, &mut Children)>,
     non_players: Query<(), With<NonPlayer>>,
-) {
+) -> Result {
     let n_entities = non_players.iter().len().max(1);
     let n_spawn = if input.pressed(KeyCode::KeyG) {
         n_entities
     } else if input.pressed(KeyCode::KeyF) {
         1_000
     } else {
-        return;
+        return Ok(());
     };
 
-    let (entity, _grid, mut children) = grid.single_mut();
+    let (entity, _grid, mut children) = grid.single_mut()?;
     let mut dyn_parent = bevy_reflect::DynamicTupleStruct::default();
     dyn_parent.insert(entity);
     let dyn_parent = dyn_parent.as_partial_reflect();
@@ -315,7 +321,7 @@ fn spawn_spheres(
                     FastGridHash::from(hash),
                     hash,
                     NonPlayer,
-                    Parent::from_reflect(dyn_parent).unwrap(),
+                    ChildOf::from_reflect(dyn_parent).unwrap(),
                     Mesh3d(material_presets.sphere.clone_weak()),
                     MeshMaterial3d(material_presets.default.clone_weak()),
                     bevy_render::view::VisibilityRange {
@@ -327,7 +333,7 @@ fn spawn_spheres(
                 ))
                 .id()
         })
-        .chain(children.iter().copied())
+        .chain(children.iter())
         .collect::<SmallVec<[Entity; 8]>>();
 
     let mut dyn_children = bevy_reflect::DynamicTupleStruct::default();
@@ -335,6 +341,8 @@ fn spawn_spheres(
     let dyn_children = dyn_children.as_partial_reflect();
 
     *children = Children::from_reflect(dyn_children).unwrap();
+
+    Ok(())
 }
 
 #[inline]
@@ -390,8 +398,8 @@ fn cursor_grab(
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
-) {
-    let mut primary_window = windows.single_mut();
+) -> Result {
+    let mut primary_window = windows.single_mut()?;
     if mouse.just_pressed(MouseButton::Left) {
         primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
         primary_window.cursor_options.visible = false;
@@ -400,4 +408,5 @@ fn cursor_grab(
         primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
         primary_window.cursor_options.visible = true;
     }
+    Ok(())
 }

@@ -35,14 +35,16 @@ fn toggle_plugin(
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
     mut floating_origin: Query<(Entity, &mut GridCell), With<FloatingOrigin>>,
-) {
+) -> Result {
     if input.just_pressed(KeyCode::Space) {
         *disabled = !*disabled;
     }
 
-    let this_grid = grids.parent_grid(floating_origin.single().0).unwrap();
+    let this_grid = grids
+        .parent_grid(floating_origin.single().unwrap().0)
+        .unwrap();
 
-    let mut origin_cell = floating_origin.single_mut().1;
+    let mut origin_cell = floating_origin.single_mut()?.1;
     let index_max = DISTANCE / this_grid.cell_edge_length() as GridPrecision;
     let increment = index_max / 100;
 
@@ -79,8 +81,10 @@ fn toggle_plugin(
             .join(",") // separator
     };
 
-    text.single_mut().0 =
-        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nMesh distance from origin: {}", thousands(dist), thousands(DISTANCE))
+    text.single_mut()?.0 =
+        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nMesh distance from origin: {}", thousands(dist), thousands(DISTANCE));
+
+    Ok(())
 }
 
 #[derive(Component)]
