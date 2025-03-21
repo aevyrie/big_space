@@ -5,13 +5,13 @@ use core::hash::{BuildHasher, Hash, Hasher};
 use crate::prelude::*;
 use bevy_ecs::{prelude::*, relationship::Relationship};
 use bevy_math::IVec3;
-use bevy_platform_support::{hash::FixedHasher, prelude::*, time::Instant};
+use bevy_platform_support::{hash::FixedHasher, time::Instant};
 use bevy_reflect::Reflect;
 
 use super::{ChangedGridHashes, GridHashMapFilter};
 
 #[cfg(feature = "std")]
-use bevy_utils::Parallel;
+use {alloc::vec::Vec, bevy_utils::Parallel};
 
 /// A fast but lossy version of [`GridHash`]. Use this component when you don't care about false
 /// positives (hash collisions). See the docs on [`GridHash::fast_eq`] for more details on fast but
