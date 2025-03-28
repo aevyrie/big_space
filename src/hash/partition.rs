@@ -1,4 +1,4 @@
-//! Detect and update groups of nearby occupied cells.
+//! Track groups of contiguously occupied [`GridCell`]s. See [`GridPartitionMap`].
 
 use core::{hash::Hash, marker::PhantomData, ops::Deref};
 
@@ -69,12 +69,17 @@ impl Hash for GridPartitionId {
     }
 }
 
-/// Groups connected [`GridCell`]s into [`GridPartition`]s.
+/// Groups contiguously occupied [`GridCell`]s into [`GridPartition`]s.
 ///
 /// Partitions divide space into independent groups of cells.
 ///
 /// The map depends on and is built from a corresponding [`GridHashMap`] with the same
 /// `F:`[`GridHashMapFilter`].
+///
+/// Partitions are build on top of the [`GridHashMap`], only dealing with [`GridCell`]s. For
+/// performance reasons, partitions do not track grid occupancy at the `Entity` level. Instead,
+/// partitions are only concerned with which [`GridCell`] are occupied. To find what entities are
+/// present, you will need to look up each of the partition's [`GridHash`]s in the [`GridHashMap`]
 #[derive(Resource)]
 pub struct GridPartitionMap<F = ()>
 where
@@ -356,7 +361,10 @@ struct SplitResult {
     new_partitions: Vec<HashSet<GridHash, PassHash>>,
 }
 
-/// A private module to ensure the internal fields of the partition are not accessed directly.
+/// A private module to ensure the internal fields of the partition are not accessed directly from
+/// the outer module. While I could also move this to a standalone module file, this makes it very
+/// clear that the type is trying to uphold certain invariants, and to proceed with caution.
+///
 /// Needed to ensure invariants are upheld.
 mod private {
     use super::{GridCell, GridHash};
@@ -520,7 +528,7 @@ mod private {
             if let Some(min) = self.iter().map(GridHash::cell).reduce(|acc, e| acc.min(e)) {
                 self.min = min;
             } else {
-                self.min = GridCell::ONE * 1e10f64 as GridPrecision;
+                self.min = GridCell::ONE * GridPrecision::MAX;
             }
         }
 
@@ -531,7 +539,7 @@ mod private {
             if let Some(max) = self.iter().map(GridHash::cell).reduce(|acc, e| acc.max(e)) {
                 self.max = max;
             } else {
-                self.min = GridCell::ONE * -1e10 as GridPrecision;
+                self.min = GridCell::ONE * GridPrecision::MIN;
             }
         }
     }

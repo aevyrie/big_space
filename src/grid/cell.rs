@@ -7,8 +7,10 @@ use bevy_platform::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
+/// The integer coordinate of a cubic cell in a [`Grid`].
+///
 /// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
-/// this component is a transformation from the center of this cell.
+/// this component is a transformation relative to the center of this cell.
 ///
 /// All entities with a [`GridCell`] must be children of an entity with a [`Grid`].
 ///
@@ -20,18 +22,15 @@ use bevy_transform::prelude::*;
 /// If an entity's [`Transform`] becomes large enough that the entity leaves the bounds of its cell,
 /// the [`GridCell`] and [`Transform`] will be automatically recomputed to keep the [`Transform`]
 /// small.
-///
-/// [`BigSpace`]s are only allowed to have a single type of `GridCell`, you cannot mix
-/// [`GridPrecision`]s.
 #[derive(Component, Default, Debug, PartialEq, Eq, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 #[require(Transform, GlobalTransform)]
 pub struct GridCell {
-    /// The x-index of the cell.
+    /// X index of a cell in its parent [`Grid`].
     pub x: GridPrecision,
-    /// The y-index of the cell.
+    /// Y index of a cell in its parent [`Grid`].
     pub y: GridPrecision,
-    /// The z-index of the cell.
+    /// Z index of a cell in its parent [`Grid`].
     pub z: GridPrecision,
 }
 

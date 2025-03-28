@@ -16,7 +16,8 @@ all-features = true
 default = ["std"]
 debug = ["std", "bevy_gizmos", "bevy_color"]
 camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
-physics = ["rapier3d"]
+physics = ["rapier3d", "nalgebra", "downcast-rs"]
+serde-serialize = ["serde"]
 i8 = []
 i16 = []
 i32 = []
@@ -65,7 +66,13 @@ bevy_render = { version = "0.16.0", default-features = false, optional = true }
 bevy_input = { version = "0.16.0", default-features = false, optional = true }
 bevy_time = { version = "0.16.0", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
+serde = { version = "1", optional = true }
+# Optional - Physics
 rapier3d = { version = "0.23.0", optional = true }
+nalgebra = { version = "0.33", default-features = false, features = [
+    "convert-glam029",
+], optional = true }
+downcast-rs = { version = "2.0.1", optional = true }
 
 [dev-dependencies]
 bevy = { version = "0.16.0", default-features = false, features = [

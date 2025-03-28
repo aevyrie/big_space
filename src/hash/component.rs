@@ -9,7 +9,7 @@ use bevy_math::IVec3;
 use bevy_platform::{hash::FixedHasher, time::Instant};
 use bevy_reflect::Reflect;
 
-use super::{ChangedGridHashes, GridHashMapFilter};
+use super::{ChangedGridHashes, HashFilter};
 
 use crate::portable_par::PortableParallel;
 
@@ -157,8 +157,8 @@ impl GridHash {
     }
 
     /// Update or insert the [`GridHash`] of all changed entities that match the optional
-    /// [`GridHashMapFilter`].
-    pub(super) fn update<F: GridHashMapFilter>(
+    /// [`HashFilter`].
+    pub(super) fn update<F: HashFilter>(
         mut commands: Commands,
         mut changed_hashes: ResMut<ChangedGridHashes<F>>,
         mut spatial_entities: Query<
