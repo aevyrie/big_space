@@ -188,13 +188,13 @@ pub struct SpatialEntityCommands<'a> {
 }
 
 impl<'a> SpatialEntityCommands<'a> {
-    /// Insert a component on this grid
+    /// Insert a component into this grid.
     pub fn insert(&mut self, bundle: impl Bundle) -> &mut Self {
         self.commands.entity(self.entity).insert(bundle);
         self
     }
 
-    /// Removes a `Bundle`` of components from the entity.
+    /// Removes a `Bundle` of components from the entity.
     pub fn remove<T>(&mut self) -> &mut Self
     where
         T: Bundle,
@@ -203,7 +203,7 @@ impl<'a> SpatialEntityCommands<'a> {
         self
     }
 
-    /// Takes a closure which provides a [`ChildBuilder`].
+    /// Spawns children of this entity (with a [`ChildOf`] relationship) by taking a function that operates on a [`ChildSpawner`].
     pub fn with_children(
         &mut self,
         spawn_children: impl FnOnce(&mut RelatedSpawnerCommands<'_, ChildOf>),
@@ -215,12 +215,16 @@ impl<'a> SpatialEntityCommands<'a> {
     }
 
     /// Spawns the passed bundle and adds it to this entity as a child.
+    ///
+    /// For efficient spawning of multiple children, use [`with_children`].
+    ///
+    /// [`with_children`]: SpatialEntityCommands::with_children
     pub fn with_child<B: Bundle>(&mut self, bundle: B) -> &mut Self {
         self.commands.entity(self.entity).with_child(bundle);
         self
     }
 
-    /// Returns the [`Entity``] id of the entity.
+    /// Returns the [`Entity`] id of the entity.
     pub fn id(&self) -> Entity {
         self.entity
     }
