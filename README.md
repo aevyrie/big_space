@@ -29,13 +29,13 @@ Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read t
 
 ## Showcase
 
-### Floating origin demonstration
-
-https://github.com/user-attachments/assets/9ce5283f-7d48-47dc-beef-9a7626858ed4
-
-### Proton to Observable Universe scale
+### [Proton to Observable Universe scale](examples/demo.rs)
 
 https://github.com/user-attachments/assets/430624ee-e3a4-4ba3-b7cf-72f3d7f00b5f
+
+### [Floating origin demonstration](examples/error.rs)
+
+https://github.com/user-attachments/assets/9ce5283f-7d48-47dc-beef-9a7626858ed4
 
 ## Bevy Version Support
 
