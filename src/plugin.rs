@@ -40,10 +40,6 @@ pub enum FloatingOriginSystem {
 
 impl Plugin for BigSpacePlugin {
     fn build(&self, app: &mut App) {
-        // Silence bevy's built-in error spam about GlobalTransforms in the hierarchy
-        // TODO: What replaced this?
-        // app.insert_resource(bevy_hierarchy::ReportHierarchyIssue::<GlobalTransform>::new(false));
-
         // Performance timings
         app.add_plugins(crate::timing::TimingStatsPlugin);
 
