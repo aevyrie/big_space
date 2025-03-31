@@ -10,7 +10,10 @@ use big_space::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, BigSpacePlugin::default()))
+        .add_plugins((
+            DefaultPlugins.build().disable::<TransformPlugin>(),
+            BigSpacePlugin::default(),
+        ))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
         .run();

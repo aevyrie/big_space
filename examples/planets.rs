@@ -17,7 +17,7 @@ use turborand::{rng::Rng, TurboRand};
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::new(true),
             big_space::camera::CameraControllerPlugin::default(),
         ))

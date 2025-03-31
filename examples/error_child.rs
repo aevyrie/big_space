@@ -6,7 +6,7 @@ use big_space::prelude::*;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             big_space::camera::CameraControllerPlugin::default(),
             big_space::debug::FloatingOriginDebugPlugin::default(),

@@ -6,7 +6,7 @@ use big_space::prelude::*;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
             big_space::camera::CameraControllerPlugin::default(), // Compatible controller

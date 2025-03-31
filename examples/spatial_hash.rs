@@ -1,14 +1,12 @@
-use core::hash::Hasher;
-
 use bevy::{
-    core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
+    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     prelude::*,
 };
 use bevy_ecs::{entity::EntityHasher, relationship::Relationship};
 use bevy_math::DVec3;
 use big_space::prelude::*;
+use core::hash::Hasher;
 use noise::{NoiseFn, Simplex};
-use smallvec::SmallVec;
 use turborand::prelude::*;
 
 // Try bumping this up to really stress test. I'm able to push a million entities with an M3 Max.
@@ -21,7 +19,7 @@ const PERCENT_STATIC: f32 = 0.99;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             GridHashPlugin::<()>::default(),
             GridPartitionPlugin::<()>::default(),
@@ -154,7 +152,7 @@ fn move_player(
     let n_entities = non_player.iter().len();
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
-            **material = material_presets.default.clone_weak();
+            material.set_if_neq(material_presets.default.clone_weak().into());
         }
     }
 
@@ -189,7 +187,7 @@ fn move_player(
     hash_grid.flood(hash, None).entities().for_each(|entity| {
         neighbors.push(entity);
         if let Ok(mut material) = materials.get_mut(entity) {
-            **material = material_presets.flood.clone_weak();
+            material.set_if_neq(material_presets.flood.clone_weak().into());
         }
 
         // let grid = grid.get(entry.grid).unwrap();
@@ -208,7 +206,7 @@ fn move_player(
         .for_each(|entity| {
             neighbors.push(entity);
             if let Ok(mut material) = materials.get_mut(entity) {
-                **material = material_presets.highlight.clone_weak();
+                material.set_if_neq(material_presets.highlight.clone_weak().into());
             }
         });
 
@@ -277,7 +275,6 @@ fn spawn(mut commands: Commands) {
                 .with_smoothness(0.98, 0.93)
                 .with_slowing(false)
                 .with_speed(15.0),
-            Fxaa::default(),
             Bloom::default(),
             GridCell::new(0, 0, HALF_WIDTH as GridPrecision / 2),
         ))
@@ -293,7 +290,7 @@ fn spawn_spheres(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     material_presets: Res<MaterialPresets>,
-    mut grid: Query<(Entity, &Grid, &mut Children)>,
+    grid: Query<Entity, With<Grid>>,
     non_players: Query<(), With<NonPlayer>>,
 ) -> Result {
     let n_entities = non_players.iter().len().max(1);
@@ -305,43 +302,28 @@ fn spawn_spheres(
         return Ok(());
     };
 
-    let (entity, _grid, mut children) = grid.single_mut()?;
-    let mut dyn_parent = bevy_reflect::DynamicTupleStruct::default();
-    dyn_parent.insert(entity);
-    let dyn_parent = dyn_parent.as_partial_reflect();
-
-    let new_children = sample_noise(n_spawn, &Simplex::new(345612), &Rng::new())
-        .map(|value| {
+    let entity = grid.single()?;
+    commands.entity(entity).with_children(|builder| {
+        for value in sample_noise(n_spawn, &Simplex::new(345612), &Rng::new()) {
             let hash = GridHash::__new_manual(entity, &GridCell::default());
-            commands
-                .spawn((
-                    Transform::from_xyz(value.x, value.y, value.z),
-                    GlobalTransform::default(),
-                    GridCell::default(),
-                    FastGridHash::from(hash),
-                    hash,
-                    NonPlayer,
-                    ChildOf::from_reflect(dyn_parent).unwrap(),
-                    Mesh3d(material_presets.sphere.clone_weak()),
-                    MeshMaterial3d(material_presets.default.clone_weak()),
-                    bevy_render::view::VisibilityRange {
-                        start_margin: 1.0..5.0,
-                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                        use_aabb: false,
-                    },
-                    bevy_render::view::NoFrustumCulling,
-                ))
-                .id()
-        })
-        .chain(children.iter())
-        .collect::<SmallVec<[Entity; 8]>>();
-
-    let mut dyn_children = bevy_reflect::DynamicTupleStruct::default();
-    dyn_children.insert(new_children);
-    let dyn_children = dyn_children.as_partial_reflect();
-
-    *children = Children::from_reflect(dyn_children).unwrap();
-
+            builder.spawn((
+                Transform::from_xyz(value.x, value.y, value.z),
+                GlobalTransform::default(),
+                GridCell::default(),
+                FastGridHash::from(hash),
+                hash,
+                NonPlayer,
+                Mesh3d(material_presets.sphere.clone_weak()),
+                MeshMaterial3d(material_presets.default.clone_weak()),
+                bevy_render::view::VisibilityRange {
+                    start_margin: 1.0..5.0,
+                    end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                    use_aabb: false,
+                },
+                // bevy_render::view::NoFrustumCulling,
+            ));
+        }
+    });
     Ok(())
 }
 

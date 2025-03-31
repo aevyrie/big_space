@@ -17,7 +17,7 @@ const PROTON_DIA: f32 = 1.68e-15; // Diameter of a proton
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
             big_space::camera::CameraControllerPlugin::default(), // Compatible controller
