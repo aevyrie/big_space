@@ -126,9 +126,9 @@ fn spatial_hashing(c: &mut Criterion) {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 [
-                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
                 ]
             })
             .take(N_SPAWN)
@@ -204,7 +204,7 @@ fn spatial_hashing(c: &mut Criterion) {
     //     });
     // });
 
-    fn setup_uniform<const HALF_EXTENT: i64>(mut commands: Commands) {
+    fn setup_uniform<const HALF_EXTENT: GridPrecision>(mut commands: Commands) {
         commands.spawn_big_space(Grid::new(1.0, 0.0), |root| {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
@@ -290,9 +290,9 @@ fn hash_filtering(c: &mut Criterion) {
         let rng = Rng::with_seed(342525);
         let values: Vec<_> = repeat_with(|| {
             [
-                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
             ]
         })
         .take(N_ENTITIES)

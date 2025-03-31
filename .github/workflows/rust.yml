@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
-      - run: cargo check --features=all --all-targets
+      - run: cargo check --all-features --all-targets
 
   check-no-defaults:
     runs-on: ubuntu-latest
@@ -48,7 +48,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
       - run: rustup component add clippy
-      - run: cargo clippy --features=all --all-targets -- -D warnings
+      - run: cargo clippy --all-features --all-targets -- -D warnings
 
   doc:
     runs-on: ubuntu-latest
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
-      - run: cargo doc --features=all --no-deps
+      - run: cargo doc --all-features --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
     
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
-      - run: cargo test --features=all
+      - run: cargo test --all-features
 
   doctest:
     runs-on: ubuntu-latest
@@ -77,4 +77,4 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
-      - run: cargo test --features=all --doc
+      - run: cargo test --all-features --doc

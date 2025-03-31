@@ -10,7 +10,6 @@ documentation = "https://docs.rs/crate/big_space/latest"
 
 [features]
 default = ["std"]
-all = ["debug", "camera"] # Can't use all-features, integer type features are incompatible.
 debug = ["std", "bevy_gizmos", "bevy_color"]
 camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
 i8 = []
@@ -19,7 +18,19 @@ i32 = []
 i64 = []
 i128 = []
 
-std = ["bevy_math/std"]
+std = [
+    "bevy_math/std",
+    "bevy_app/std",
+    "bevy_ecs/std",
+    "bevy_reflect/std",
+    "bevy_tasks/std",
+    "bevy_transform/std",
+    "bevy_utils/std",
+    "bevy_platform_support/std",
+    "bevy_color/std",
+    "bevy_input/std",
+    "bevy_time/std",
+]
 libm = ["bevy_math/libm", "dep:libm"]
 
 [dependencies]
