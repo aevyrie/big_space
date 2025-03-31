@@ -206,6 +206,8 @@ use bevy_transform::prelude::*;
 #[allow(unused_imports)] // For docs
 use prelude::*;
 
+pub(crate) mod portable_par;
+
 pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
