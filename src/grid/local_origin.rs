@@ -76,7 +76,7 @@ mod inner {
 
     impl LocalFloatingOrigin {
         /// The grid transform from the local grid, to the floating origin's grid. See
-        /// [Self::grid_transform].
+        /// [`Self::grid_transform`].
         #[inline]
         pub fn grid_transform(&self) -> DAffine3 {
             self.grid_transform
@@ -237,7 +237,7 @@ fn propagate_origin_to_child(
             child_origin_translation_float,
             origin_child_rotation,
         );
-    })
+    });
 }
 
 /// A system param for more easily navigating a hierarchy of [`Grid`]s.
@@ -267,7 +267,7 @@ impl Grids<'_, '_> {
     /// Get the ID of the grid that `this` `Entity` is a child of, if it exists.
     #[inline]
     pub fn parent_grid_entity(&self, this: Entity) -> Option<Entity> {
-        match self.parent.get(this).map(|parent| parent.get()) {
+        match self.parent.get(this).map(Relationship::get) {
             Err(_) => None,
             Ok(parent) => match self.grid_query.contains(parent) {
                 true => Some(parent),
@@ -292,7 +292,7 @@ impl Grids<'_, '_> {
             .iter()
             .filter_map(move |(entity, _, parent)| {
                 parent
-                    .map(|p| p.get())
+                    .map(Relationship::get)
                     .filter(|parent| *parent == this)
                     .map(|_| entity)
             })
@@ -375,7 +375,7 @@ impl GridsMut<'_, '_> {
     /// Get the ID of the grid that `this` `Entity` is a child of, if it exists.
     #[inline]
     pub fn parent_grid_entity(&self, this: Entity) -> Option<Entity> {
-        match self.parent.get(this).map(|parent| parent.get()) {
+        match self.parent.get(this).map(Relationship::get) {
             Err(_) => None,
             Ok(parent) => match self.grid_query.contains(parent) {
                 true => Some(parent),
@@ -400,7 +400,7 @@ impl GridsMut<'_, '_> {
             .iter()
             .filter_map(move |(entity, _, parent)| {
                 parent
-                    .map(|p| p.get())
+                    .map(Relationship::get)
                     .filter(|parent| *parent == this)
                     .map(|_| entity)
             })
@@ -494,7 +494,7 @@ impl LocalFloatingOrigin {
                     // child, these do no alias.
                     for child_grid in scratch_buffer.drain(..) {
                         propagate_origin_to_child(this_grid, &mut grids, child_grid);
-                        grid_stack.push(child_grid) // Push processed child onto the stack
+                        grid_stack.push(child_grid); // Push processed child onto the stack
                     }
                 }
 
@@ -508,7 +508,7 @@ impl LocalFloatingOrigin {
                 }
             }
 
-            tracing::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
+            tracing::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.");
         }
 
         stats.local_origin_propagation += start.elapsed();

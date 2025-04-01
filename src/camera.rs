@@ -131,7 +131,7 @@ impl Default for CameraController {
     }
 }
 
-/// ButtonInput state used to command camera motion. Reset every time the values are read to update
+/// `ButtonInput` state used to command camera motion. Reset every time the values are read to update
 /// the camera. Allows you to map any input to camera motions. Uses aircraft principle axes
 /// conventions.
 #[derive(Clone, Debug, Default, Reflect, Resource)]

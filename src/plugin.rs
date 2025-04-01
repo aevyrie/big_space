@@ -1,4 +1,4 @@
-//! The bevy plugin for big_space.
+//! The bevy plugin for `big_space`.
 
 use crate::prelude::*;
 use alloc::vec::Vec;

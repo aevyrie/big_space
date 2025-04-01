@@ -148,7 +148,7 @@ where
     #[inline]
     fn push(&mut self, partition: &GridPartitionId, hash: &GridHash) {
         if let Some(partition) = self.partitions.get_mut(partition) {
-            partition.insert(*hash)
+            partition.insert(*hash);
         } else {
             return;
         }
@@ -182,11 +182,7 @@ where
     fn merge(&mut self, partitions: &[GridPartitionId]) {
         let Some(largest_partition) = partitions
             .iter()
-            .filter_map(|id| {
-                self.resolve(id)
-                    .map(|partition| partition.num_cells())
-                    .zip(Some(id))
-            })
+            .filter_map(|id| self.resolve(id).map(GridPartition::num_cells).zip(Some(id)))
             .reduce(|acc, elem| if elem.0 > acc.0 { elem } else { acc })
             .map(|(_cells, id)| id)
         else {
@@ -309,10 +305,10 @@ where
                                 // it means the partition has not been split, and we can continue to
                                 // the next partition.
                                 return None;
-                            } else {
-                                new_partitions
-                                    .push(hash_grid.flood(&this_cell, None).map(|n| n.0).collect());
                             }
+                            new_partitions
+                                .push(hash_grid.flood(&this_cell, None).map(|n| n.0).collect());
+
                             counter += 1;
                         }
 
@@ -332,7 +328,7 @@ where
         {
             // We want the original partition to retain the most cells to ensure that the smaller
             // sets are the ones that are assigned a new partition ID.
-            new_partitions.sort_unstable_by_key(|set| set.len());
+            new_partitions.sort_unstable_by_key(HashSet::len);
             if let Some(largest_partition) = new_partitions.pop() {
                 partition_map.insert(*original_partition_id, largest_partition);
             }
@@ -387,7 +383,7 @@ mod private {
         /// Returns the total number of cells in this partition.
         #[inline]
         pub fn num_cells(&self) -> usize {
-            self.tables.iter().map(|t| t.len()).sum()
+            self.tables.iter().map(HashSet::len).sum()
         }
 
         /// The grid this partition resides in.
@@ -515,12 +511,8 @@ mod private {
         /// partition.
         #[inline]
         fn compute_min(&mut self) {
-            if let Some(min) = self
-                .iter()
-                .map(|hash| hash.cell())
-                .reduce(|acc, e| acc.min(e))
-            {
-                self.min = min
+            if let Some(min) = self.iter().map(GridHash::cell).reduce(|acc, e| acc.min(e)) {
+                self.min = min;
             } else {
                 self.min = GridCell::ONE * 1e10f64 as GridPrecision;
             }
@@ -530,12 +522,8 @@ mod private {
         /// partition.
         #[inline]
         fn compute_max(&mut self) {
-            if let Some(max) = self
-                .iter()
-                .map(|hash| hash.cell())
-                .reduce(|acc, e| acc.max(e))
-            {
-                self.max = max
+            if let Some(max) = self.iter().map(GridHash::cell).reduce(|acc, e| acc.max(e)) {
+                self.max = max;
             } else {
                 self.min = GridCell::ONE * -1e10 as GridPrecision;
             }

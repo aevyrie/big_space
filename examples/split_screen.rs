@@ -1,4 +1,4 @@
-//! Demonstrates how a single bevy world can contain multiple big_space hierarchies, each rendered
+//! Demonstrates how a single bevy world can contain multiple `big_space` hierarchies, each rendered
 //! relative to a floating origin inside that big space.
 //!
 //! This takes the simplest approach, of simply duplicating the worlds and players for each split

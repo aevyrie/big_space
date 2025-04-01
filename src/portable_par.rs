@@ -1,4 +1,4 @@
-//! Module for defining a no_std compatible `Parallel` thread local.
+//! Module for defining a `no_std` compatible `Parallel` thread local.
 #![allow(dead_code)]
 
 use alloc::vec::Vec;

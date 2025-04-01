@@ -106,7 +106,7 @@
 //! grid, in high precision.
 //!
 //! Entities at the root of bevy's entity hierarchy are not in a grid. This allows plugins from the
-//! rest of the ecosystem to operate normally, such as bevy_ui, which relies on the built-in
+//! rest of the ecosystem to operate normally, such as `bevy_ui`, which relies on the built-in
 //! transform propagation system. This also means that if you don't need to place entities in a
 //! high-precision grid, you don't have to, as the process is opt-in. The high-precision
 //! hierarchical grids are explicit. Each high-precision tree must have a [`BigSpace`] at the root,
@@ -225,7 +225,7 @@ pub mod debug;
 #[cfg(test)]
 mod tests;
 
-/// Common big_space imports.
+/// Common `big_space` imports.
 pub mod prelude {
     use crate::*;
     pub use bundles::{BigGridBundle, BigSpaceRootBundle, BigSpatialBundle};

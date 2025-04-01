@@ -54,10 +54,10 @@ pub trait SpatialEntryToEntities<'a> {
 impl<'a, T, I> SpatialEntryToEntities<'a> for T
 where
     T: Iterator<Item = I> + 'a,
-    I: SpatialEntryToEntities<'a>,
+    I: SpatialEntryToEntities<'a> + 'a,
 {
     fn entities(self) -> impl Iterator<Item = Entity> + 'a {
-        self.flat_map(|entry| entry.entities())
+        self.flat_map(SpatialEntryToEntities::entities)
     }
 }
 
@@ -197,7 +197,7 @@ where
     ///
     /// Consider the case of a long thin U-shaped set of connected cells. While iterating from one
     /// end of the "U" to the other with this flood fill, if any of the cells near the base of the
-    /// "U" exceed the max_depth (radius), iteration will stop. Even if the "U" loops back within
+    /// "U" exceed the `max_depth` (radius), iteration will stop. Even if the "U" loops back within
     /// the radius, those cells will never be visited.
     ///
     /// Also note that the `max_depth` (radius) is a chebyshev distance, not a euclidean distance.
@@ -264,7 +264,7 @@ where
         spatial_map.map.just_removed.clear();
 
         for entity in removed.read() {
-            spatial_map.remove(entity)
+            spatial_map.remove(entity);
         }
 
         if let Some(ref mut stats) = stats {
@@ -312,7 +312,7 @@ where
     #[inline]
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
-            self.map.remove(entity, old_hash)
+            self.map.remove(entity, old_hash);
         }
     }
 }

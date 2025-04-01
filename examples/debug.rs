@@ -1,4 +1,4 @@
-//! Demonstrates debugging visualization for big_space components.
+//! Demonstrates debugging visualization for `big_space` components.
 #![allow(clippy::type_complexity)]
 
 use bevy::{color::palettes, prelude::*};

@@ -1,4 +1,4 @@
-//! big_space benchmarks.
+//! `big_space` benchmarks.
 #![allow(clippy::type_complexity)]
 #![allow(missing_docs)]
 
@@ -54,7 +54,7 @@ fn deep_hierarchy(c: &mut Criterion) {
     fn translate(mut transforms: Query<&mut Transform>) {
         transforms.iter_mut().for_each(|mut transform| {
             transform.translation += Vec3::ONE;
-        })
+        });
     }
 
     let mut app = App::new();
@@ -93,7 +93,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     fn translate(mut transforms: Query<&mut Transform>) {
         transforms.iter_mut().for_each(|mut transform| {
             transform.translation += Vec3::ONE;
-        })
+        });
     }
 
     let mut app = App::new();
@@ -145,7 +145,7 @@ fn spatial_hashing(c: &mut Criterion) {
     fn translate(mut cells: Query<&mut GridCell>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += GridCell::ONE;
-        })
+        });
     }
 
     let mut app = App::new();

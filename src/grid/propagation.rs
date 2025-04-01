@@ -352,6 +352,6 @@ mod tests {
         assert_eq!(
             actual_transform,
             GlobalTransform::from_xyz(2004.0, 2005.0, 2006.0)
-        )
+        );
     }
 }

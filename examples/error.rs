@@ -25,8 +25,8 @@ fn main() {
 /// floating point error when we disable this plugin.
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
-/// 10_000_000_000_000_000 with the default i64 feature, or
-/// 10_000_000_000_000_000_000_000_000_000_000_000_000 with the i128 feature.
+/// `10_000_000_000_000_000` with the default i64 feature, or
+/// `10_000_000_000_000_000_000_000_000_000_000_000_000` with the i128 feature.
 const DISTANCE: GridPrecision = 2_000_000;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
