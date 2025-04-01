@@ -185,6 +185,10 @@ impl Grid {
             //   other root entities' `propagate_recursive` calls will not conflict with this one.
             // - Since this is the only place where `transform_query` gets used, there will be no
             //   conflicting fetches elsewhere.
+            #[expect(
+                unsafe_code,
+                reason = "`propagate_recursive()` is unsafe due to its use of `Query::get_unchecked()`."
+            )]
             unsafe {
                 Self::propagate_recursive(
                     &parent_transform,
@@ -205,8 +209,6 @@ impl Grid {
         stats.low_precision_propagation += start.elapsed();
     }
 
-    /// COPIED FROM BEVY
-    ///
     /// Recursively propagates the transforms for `entity` and all of its descendants.
     ///
     /// # Panics
@@ -220,6 +222,10 @@ impl Grid {
     ///   nor any of its descendants.
     /// - The caller must ensure that the hierarchy leading to `entity` is well-formed and must
     ///   remain as a tree or a forest. Each entity must have at most one parent.
+    #[expect(
+        unsafe_code,
+        reason = "This function uses `Query::get_unchecked()`, which can result in multiple mutable references if the preconditions are not met."
+    )]
     unsafe fn propagate_recursive(
         parent: &GlobalTransform,
         transform_query: &Query<
@@ -244,28 +250,34 @@ impl Grid {
     ) {
         let (global_matrix, children) = {
             let Ok((transform, mut global_transform, children)) =
-            // SAFETY: This call cannot create aliased mutable references.
-            //   - The top level iteration parallelizes on the roots of the hierarchy.
-            //   - The caller ensures that each child has one and only one unique parent throughout
-            //     the entire hierarchy.
-            //
-            // For example, consider the following malformed hierarchy:
-            //
-            //     A
-            //   /   \
-            //  B     C \   / D
-            //
-            // D has two parents, B and C. If the propagation passes through C, but the ChildOf
-            // component on D points to B, the above check will panic as the origin parent does
-            // match the recorded parent.
-            //
-            // Also consider the following case, where A and B are roots:
-            //
-            //  A       B \     / C   D \ / E
-            //
-            // Even if these A and B start two separate tasks running in parallel, one of them will
-            // panic before attempting to mutably access E.
-            (unsafe { transform_query.get_unchecked(entity) }) else {
+                // SAFETY: This call cannot create aliased mutable references.
+                //   - The top level iteration parallelizes on the roots of the hierarchy.
+                //   - The caller ensures that each child has one and only one unique parent
+                //     throughout the entire hierarchy.
+                //
+                // For example, consider the following malformed hierarchy:
+                //
+                //     A
+                //   /   \
+                //  B     C
+                //   \   /
+                //     D
+                //
+                // D has two parents, B and C. If the propagation passes through C, but the ChildOf
+                // component on D points to B, the above check will panic as the origin parent does
+                // match the recorded parent.
+                //
+                // Also consider the following case, where A and B are roots:
+                //
+                //  A       B
+                //   \     /
+                //    C   D
+                //     \ /
+                //      E
+                //
+                // Even if these A and B start two separate tasks running in parallel, one of them
+                // will panic before attempting to mutably access E.
+                (unsafe { transform_query.get_unchecked(entity) }) else {
                 return;
             };
 
@@ -277,11 +289,11 @@ impl Grid {
         };
 
         let Some(children) = children else { return };
-        for (child, actual_parent) in parent_query.iter_many(children) {
+        for (child, child_of) in parent_query.iter_many(children) {
             assert_eq!(
-            actual_parent.get(), entity,
-            "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
-        );
+                child_of.parent, entity,
+                "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
+            );
             // SAFETY: The caller guarantees that `transform_query` will not be fetched for any
             // descendants of `entity`, so it is safe to call `propagate_recursive` for each child.
             //
@@ -293,7 +305,7 @@ impl Grid {
                     transform_query,
                     parent_query,
                     child,
-                    changed || actual_parent.is_changed(),
+                    changed || child_of.is_changed(),
                 );
             }
         }

@@ -464,25 +464,23 @@ mod private {
         }
 
         #[inline]
-        pub(crate) fn extend(&mut self, mut partition: GridPartition) {
-            for mut table in partition.tables.drain(..) {
-                if table.len() < Self::MIN_TABLE_SIZE {
+        pub(crate) fn extend(&mut self, mut other: GridPartition) {
+            assert_eq!(self.grid, other.grid);
+
+            for other_table in other.tables.drain(..) {
+                if other_table.len() < Self::MIN_TABLE_SIZE {
                     if let Some(i) = self.smallest_table() {
-                        for hash in table.drain() {
-                            // SAFETY: TODO
-                            unsafe {
-                                self.tables[i].insert_unique_unchecked(hash);
-                            }
-                        }
+                        self.tables[i].reserve(other_table.len());
+                        self.tables[i].extend(other_table);
                     } else {
-                        self.tables.push(table);
+                        self.tables.push(other_table);
                     }
                 } else {
-                    self.tables.push(table);
+                    self.tables.push(other_table);
                 }
             }
-            self.min = self.min.min(partition.min);
-            self.max = self.max.max(partition.max);
+            self.min = self.min.min(other.min);
+            self.max = self.max.max(other.max);
         }
 
         /// Removes a grid hash from the partition. Returns whether the value was present.
