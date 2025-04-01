@@ -260,7 +260,7 @@ pub fn nearest_objects_in_grid(
 /// Uses [`CameraInput`] state to update the camera position.
 pub fn camera_controller(
     time: Res<Time>,
-    grids: crate::grid::local_origin::Grids,
+    grids: Grids,
     mut input: ResMut<CameraInput>,
     mut camera: Query<(Entity, &mut GridCell, &mut Transform, &mut CameraController)>,
 ) {

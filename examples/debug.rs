@@ -1,3 +1,4 @@
+//! Demonstrates debugging visualization for big_space components.
 #![allow(clippy::type_complexity)]
 
 use bevy::{color::palettes, prelude::*};
@@ -8,7 +9,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
-            big_space::debug::FloatingOriginDebugPlugin::default(),
+            FloatingOriginDebugPlugin::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement, rotation))

@@ -20,7 +20,7 @@ impl Plugin for FloatingOriginDebugPlugin {
                 PostUpdate,
                 (update_debug_bounds, update_grid_axes)
                     .chain()
-                    .after(bevy_transform::TransformSystem::TransformPropagate),
+                    .after(TransformSystem::TransformPropagate),
             );
     }
 }

@@ -36,28 +36,28 @@ libm = ["bevy_math/libm", "dep:libm"]
 [dependencies]
 tracing = { version = "0.1", default-features = false } # Less deps than pulling in bevy_log
 smallvec = { version = "1.13.2", default-features = false } # Already used by bevy in commands
-bevy_app = { version = "0.16.0-rc.2", default-features = false, features = ["bevy_reflect"] }
-bevy_ecs = { version = "0.16.0-rc.2", default-features = false }
-bevy_math = { version = "0.16.0-rc.2", default-features = false }
-bevy_reflect = { version = "0.16.0-rc.2", default-features = false, features = ["glam"] }
-bevy_tasks = { version = "0.16.0-rc.2", default-features = false }
-bevy_transform = { version = "0.16.0-rc.2", default-features = false, features = [
+bevy_app = { version = "0.16.0-rc.3", default-features = false, features = ["bevy_reflect"] }
+bevy_ecs = { version = "0.16.0-rc.3", default-features = false }
+bevy_math = { version = "0.16.0-rc.3", default-features = false }
+bevy_reflect = { version = "0.16.0-rc.3", default-features = false, features = ["glam"] }
+bevy_tasks = { version = "0.16.0-rc.3", default-features = false }
+bevy_transform = { version = "0.16.0-rc.3", default-features = false, features = [
     "bevy-support",
     "bevy_reflect",
 ] }
-bevy_utils = { version = "0.16.0-rc.2", default-features = false }
-bevy_platform_support = { version = "0.16.0-rc.2", default-features = false, features = ["alloc"] }
+bevy_utils = { version = "0.16.0-rc.3", default-features = false }
+bevy_platform_support = { version = "0.16.0-rc.3", default-features = false, features = ["alloc"] }
 # Optional
-bevy_color = { version = "0.16.0-rc.2", default-features = false, optional = true }
-bevy_gizmos = { version = "0.16.0-rc.2", default-features = false, optional = true }
-bevy_render = { version = "0.16.0-rc.2", default-features = false, optional = true }
-bevy_input = { version = "0.16.0-rc.2", default-features = false, optional = true }
-bevy_time = { version = "0.16.0-rc.2", default-features = false, optional = true }
+bevy_color = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_gizmos = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_render = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_input = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_time = { version = "0.16.0-rc.3", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
-bevy = { version = "0.16.0-rc.2", default-features = false, features = [
+bevy = { version = "0.16.0-rc.3", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
     "bevy_gltf",
@@ -79,9 +79,33 @@ bytemuck = "1.20"
 # bevy_hanabi = "0.14" # TODO: Update
 
 [lints.clippy]
-alloc_instead_of_core = "warn"
-std_instead_of_alloc = "warn"
+doc_markdown = "warn"
+manual_let_else = "warn"
+match_same_arms = "warn"
+redundant_closure_for_method_calls = "warn"
+redundant_else = "warn"
+semicolon_if_nothing_returned = "warn"
+type_complexity = "allow"
+undocumented_unsafe_blocks = "warn"
+unwrap_or_default = "warn"
+
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+ref_as_ptr = "warn"
+
+# see: https://github.com/bevyengine/bevy/pull/15375#issuecomment-2366966219
+too_long_first_doc_paragraph = "allow"
+
 std_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+alloc_instead_of_core = "warn"
+
+[lints.rust]
+missing_docs = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(docsrs_dep)'] }
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "warn"
+unused_qualifications = "warn"
 
 [[bench]]
 name = "benchmarks"

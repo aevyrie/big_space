@@ -1,3 +1,5 @@
+//! Demonstrates the included optional spatial hashing and partitioning of grid cells.
+
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     prelude::*,
@@ -239,8 +241,7 @@ Total: {: >22.1?}",
             .rchunks(3)
             .rev()
             .map(core::str::from_utf8)
-            .collect::<Result<Vec<&str>, _>>()
-            .unwrap()
+            .collect::<Result<Vec<&str>, _>>()?
             .join(","),
         //
         prop_stats.avg().grid_recentering(),

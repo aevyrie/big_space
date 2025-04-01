@@ -1,4 +1,6 @@
+//! big_space benchmarks.
 #![allow(clippy::type_complexity)]
+#![allow(missing_docs)]
 
 use bevy::prelude::*;
 use big_space::prelude::*;

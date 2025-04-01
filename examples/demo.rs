@@ -1,3 +1,5 @@
+//! Demonstrates using the plugin over a wide range of scales, from protons to the universe.
+
 use bevy::{
     color::palettes,
     prelude::*,
@@ -79,10 +81,10 @@ fn setup(
 }
 
 #[derive(Component, Reflect)]
-pub struct BigSpaceDebugText;
+struct BigSpaceDebugText;
 
 #[derive(Component, Reflect)]
-pub struct FunFactText;
+struct FunFactText;
 
 fn ui_setup(mut commands: Commands) {
     commands.spawn((
