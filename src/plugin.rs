@@ -70,6 +70,7 @@ impl Plugin for BigSpacePlugin {
             // Reflect
             .register_type::<Transform>()
             .register_type::<GlobalTransform>()
+            .register_type::<TransformTreeChanged>()
             .register_type::<GridCell>()
             .register_type::<Grid>()
             .register_type::<BigSpace>()

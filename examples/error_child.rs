@@ -7,7 +7,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
-            big_space::camera::CameraControllerPlugin::default(),
+            CameraControllerPlugin::default(),
             FloatingOriginDebugPlugin::default(),
         ))
         .add_systems(Startup, setup_scene)

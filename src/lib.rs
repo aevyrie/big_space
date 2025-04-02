@@ -230,8 +230,6 @@ pub mod prelude {
     use crate::*;
     pub use bundles::{BigGridBundle, BigSpaceRootBundle, BigSpatialBundle};
     pub use commands::{BigSpaceCommands, GridCommands, SpatialEntityCommands};
-    #[cfg(feature = "debug")]
-    pub use debug::FloatingOriginDebugPlugin;
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
         cell::GridCell,
@@ -247,6 +245,11 @@ pub mod prelude {
     pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
     pub use precision::GridPrecision;
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
+
+    #[cfg(feature = "camera")]
+    pub use camera::{CameraController, CameraControllerPlugin};
+    #[cfg(feature = "debug")]
+    pub use debug::FloatingOriginDebugPlugin;
 }
 
 /// Contains the [`GridPrecision`] integer index type, which defines how much precision is available

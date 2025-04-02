@@ -13,7 +13,7 @@ fn main() {
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
+            CameraControllerPlugin::default(),    // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .run();

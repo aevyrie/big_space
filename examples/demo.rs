@@ -18,7 +18,7 @@ fn main() {
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(),
-            big_space::camera::CameraControllerPlugin::default(),
+            CameraControllerPlugin::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))

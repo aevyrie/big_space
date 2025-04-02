@@ -120,7 +120,7 @@ doc-scrape-examples = false
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
-required-features = ["i128", "camera"]
+required-features = ["i128", "camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
@@ -137,7 +137,7 @@ doc-scrape-examples = false
 [[example]]
 name = "infinite"
 path = "examples/infinite.rs"
-required-features = ["i8", "camera"]
+required-features = ["i8", "camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
@@ -173,5 +173,5 @@ doc-scrape-examples = false
 [[example]]
 name = "split_screen"
 path = "examples/split_screen.rs"
-required-features = ["camera"]
+required-features = ["camera", "debug"]
 doc-scrape-examples = false

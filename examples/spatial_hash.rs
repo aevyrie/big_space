@@ -25,7 +25,7 @@ fn main() {
             BigSpacePlugin::default(),
             GridHashPlugin::<()>::default(),
             GridPartitionPlugin::<()>::default(),
-            big_space::camera::CameraControllerPlugin::default(),
+            CameraControllerPlugin::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(

@@ -20,7 +20,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::new(true),
-            big_space::camera::CameraControllerPlugin::default(),
+            CameraControllerPlugin::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(AmbientLight {
