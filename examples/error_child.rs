@@ -1,6 +1,5 @@
 //! This example demonstrates error accumulating from parent to children in nested grids.
-use bevy::{math::DVec3, prelude::*};
-use bevy_color::palettes;
+use bevy::{color::palettes, math::DVec3, prelude::*};
 use big_space::prelude::*;
 
 fn main() {

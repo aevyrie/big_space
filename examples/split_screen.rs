@@ -5,11 +5,11 @@
 //! screen, and synchronizing the player locations between both.
 
 use bevy::{
+    color::palettes,
     prelude::*,
     render::{camera::Viewport, view::RenderLayers},
     transform::TransformSystem,
 };
-use bevy_color::palettes;
 use big_space::prelude::*;
 
 fn main() {

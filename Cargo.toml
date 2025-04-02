@@ -56,10 +56,10 @@ bevy_time = { version = "0.16.0-rc.3", default-features = false, optional = true
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-big_space = { path = "", features = ["debug", "camera"] }
 bevy = { version = "0.16.0-rc.3", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
+    "bevy_color",
     "bevy_gltf",
     "bevy_winit",
     "default_font",
@@ -114,17 +114,19 @@ harness = false
 [[example]]
 name = "debug"
 path = "examples/debug.rs"
+required-features = ["debug"]
 doc-scrape-examples = false
 
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
-required-features = ["i128"]
+required-features = ["i128", "camera"]
 doc-scrape-examples = false
 
 [[example]]
 name = "error_child"
 path = "examples/error_child.rs"
+required-features = ["camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
@@ -135,12 +137,13 @@ doc-scrape-examples = false
 [[example]]
 name = "infinite"
 path = "examples/infinite.rs"
-required-features = ["i8"]
+required-features = ["i8", "camera"]
 doc-scrape-examples = false
 
 [[example]]
 name = "minimal"
 path = "examples/minimal.rs"
+required-features = ["camera"]
 doc-scrape-examples = false
 
 # TODO: Uncomment once bevy_hanabi is updated
@@ -152,9 +155,23 @@ doc-scrape-examples = false
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
+required-features = ["camera"]
+doc-scrape-examples = false
+
+[[example]]
+name = "small_scale"
+path = "examples/small_scale.rs"
+required-features = ["camera", "debug"]
+doc-scrape-examples = false
+
+[[example]]
+name = "spatial_hash"
+path = "examples/spatial_hash.rs"
+required-features = ["camera"]
 doc-scrape-examples = false
 
 [[example]]
 name = "split_screen"
 path = "examples/split_screen.rs"
+required-features = ["camera"]
 doc-scrape-examples = false

@@ -176,4 +176,10 @@ fn round(x: f64) -> f64 {
     {
         x.round()
     }
+
+    #[cfg(all(not(feature = "libm"), not(feature = "std")))]
+    {
+        compile_error!("Must enable the `libm` and/or `std` feature.");
+        f64::NAN
+    }
 }

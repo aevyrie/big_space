@@ -8,14 +8,21 @@ use core::ops::DerefMut;
 #[derive(Default)]
 pub struct PortableParallel<T: Send>(
     #[cfg(feature = "std")] bevy_utils::Parallel<T>,
-    #[cfg(not(feature = "std"))] core::cell::RefCell<Option<T>>,
+    #[cfg(not(feature = "std"))] bevy_platform_support::sync::RwLock<Option<T>>,
 );
 
 /// A scope guard of a `Parallel`, when this struct is dropped ,the value will writeback to its `Parallel`
 impl<T: Send> PortableParallel<T> {
     /// Gets a mutable iterator over all of the per-thread queues.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &'_ mut T> {
-        self.0.iter_mut()
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = impl DerefMut<Target = T> + '_> {
+        #[cfg(feature = "std")]
+        {
+            self.0.iter_mut()
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            self.0.get_mut().unwrap().iter_mut()
+        }
     }
 
     /// Clears all of the stored thread local values.
@@ -24,7 +31,7 @@ impl<T: Send> PortableParallel<T> {
         self.0.clear();
         #[cfg(not(feature = "std"))]
         {
-            *self.0.borrow_mut() = None;
+            *self.0.write().unwrap() = None;
         }
     }
 }
@@ -38,7 +45,7 @@ impl<T: Default + Send> PortableParallel<T> {
         let ret = self.0.scope(f);
         #[cfg(not(feature = "std"))]
         let ret = {
-            let cell = self.0.borrow_mut().deref_mut();
+            let mut cell = self.0.write().unwrap();
             let value = cell.get_or_insert_default();
             f(value)
         };
@@ -52,8 +59,36 @@ impl<T: Default + Send> PortableParallel<T> {
         #[cfg(feature = "std")]
         let ret = self.0.borrow_local_mut();
         #[cfg(not(feature = "std"))]
-        let ret = self.0.borrow_mut();
+        let ret = {
+            if self.0.read().unwrap().is_none() {
+                *self.0.write().unwrap() = Some(Default::default());
+            }
+            let opt = self.0.write().unwrap();
+            no_std_deref::UncheckedDerefMutWrapper(opt)
+        };
+
         ret
+    }
+}
+
+/// Needed until Parallel is portable. This assumes the value is `Some`.
+#[cfg(not(feature = "std"))]
+mod no_std_deref {
+    use bevy_platform_support::sync::RwLockWriteGuard;
+    use core::ops::{Deref, DerefMut};
+
+    pub struct UncheckedDerefMutWrapper<'a, T>(pub(super) RwLockWriteGuard<'a, Option<T>>);
+
+    impl<T> Deref for UncheckedDerefMutWrapper<'_, T> {
+        type Target = T;
+        fn deref(&self) -> &Self::Target {
+            self.0.as_ref().unwrap()
+        }
+    }
+    impl<T> DerefMut for UncheckedDerefMutWrapper<'_, T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            self.0.as_mut().unwrap()
+        }
     }
 }
 
@@ -72,12 +107,12 @@ where
         #[cfg(feature = "std")]
         let ret = self.0.drain();
         #[cfg(not(feature = "std"))]
-        let ret = self.0.borrow_mut().take();
+        let ret = self.0.get_mut().unwrap().take().into_iter().flatten();
         ret
     }
 }
 
-impl<T: Send> PortableParallel<Vec<T>> {
+impl<T: Send + 'static> PortableParallel<Vec<T>> {
     /// Collect all enqueued items from all threads and appends them to the end of a
     /// single Vec.
     ///
