@@ -69,7 +69,7 @@ impl FromWorld for MaterialPresets {
 
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let sphere = meshes.add(
-            Sphere::new(HALF_WIDTH / (1_000_000_f32).powf(0.33) * 0.5)
+            Sphere::new(HALF_WIDTH / 1_000_000_f32.powf(0.33) * 0.5)
                 .mesh()
                 .ico(0)
                 .unwrap(),
@@ -112,7 +112,7 @@ fn draw_partitions(
                     .with_scale(Vec3::splat(l));
                 gizmos.cuboid(
                     transform.mul_transform(local_trans),
-                    Hsla::new(hue, 1.0, 0.5, 0.05),
+                    Hsla::new(hue, 1.0, 0.5, 0.2),
                 );
             });
 
@@ -125,7 +125,7 @@ fn draw_partitions(
 
         gizmos.cuboid(
             transform.mul_transform(local_trans),
-            Hsla::new(hue, 1.0, 0.5, 0.2),
+            Hsla::new(hue, 1.0, 0.5, 0.9),
         );
     }
 
@@ -136,7 +136,6 @@ fn draw_partitions(
 #[allow(clippy::type_complexity)]
 fn move_player(
     time: Res<Time>,
-    mut _gizmos: Gizmos,
     mut player: Query<(&mut Transform, &mut GridCell, &ChildOf, &GridHash), With<Player>>,
     mut non_player: Query<
         (&mut Transform, &mut GridCell, &ChildOf),
@@ -180,8 +179,7 @@ fn move_player(
         * 0.8
         * Vec3::new((5.0 * t).sin(), (7.0 * t).cos(), (20.0 * t).sin());
     (*cell, transform.translation) = grids
-        .get(parent.get())
-        .unwrap()
+        .get(parent.get())?
         .imprecise_translation_to_grid(absolute_pos);
 
     neighbors.clear();
@@ -191,13 +189,6 @@ fn move_player(
         if let Ok(mut material) = materials.get_mut(entity) {
             material.set_if_neq(material_presets.flood.clone_weak().into());
         }
-
-        // let grid = grid.get(entry.grid).unwrap();
-        // let transform = grid.global_transform(
-        //     &entry.cell,
-        //     &Transform::from_scale(Vec3::splat(grid.cell_edge_length() * 0.99)),
-        // );
-        // gizmos.cuboid(transform, Color::linear_rgba(1.0, 1.0, 1.0, 0.2));
     });
 
     hash_grid
@@ -314,14 +305,14 @@ fn spawn_spheres(
                 FastGridHash::from(hash),
                 hash,
                 NonPlayer,
-                // Mesh3d(material_presets.sphere.clone_weak()),
-                // MeshMaterial3d(material_presets.default.clone_weak()),
-                // bevy_render::view::VisibilityRange {
-                //     start_margin: 1.0..5.0,
-                //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                //     use_aabb: false,
-                // },
-                // bevy_render::view::NoFrustumCulling,
+                Mesh3d(material_presets.sphere.clone_weak()),
+                MeshMaterial3d(material_presets.default.clone_weak()),
+                bevy_render::view::VisibilityRange {
+                    start_margin: 1.0..5.0,
+                    end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                    use_aabb: false,
+                },
+                bevy_render::view::NoFrustumCulling,
             ));
         }
     });
