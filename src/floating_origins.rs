@@ -44,7 +44,7 @@ pub struct BigSpace {
 }
 
 impl BigSpace {
-    /// Return the this grid's floating origin if it exists and is a descendent of this root.
+    /// Return this grid's floating origin if it exists and is a descendant of this root.
     ///
     /// `this_entity`: the entity this component belongs to.
     pub(crate) fn validate_floating_origin(

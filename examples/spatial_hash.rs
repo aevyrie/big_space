@@ -272,7 +272,7 @@ fn spawn(mut commands: Commands) {
             },
             Tonemapping::AcesFitted,
             Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
-            big_space::camera::CameraController::default()
+            CameraController::default()
                 .with_smoothness(0.98, 0.93)
                 .with_slowing(false)
                 .with_speed(15.0),
@@ -314,13 +314,13 @@ fn spawn_spheres(
                 FastGridHash::from(hash),
                 hash,
                 NonPlayer,
-                Mesh3d(material_presets.sphere.clone_weak()),
-                MeshMaterial3d(material_presets.default.clone_weak()),
-                bevy_render::view::VisibilityRange {
-                    start_margin: 1.0..5.0,
-                    end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                    use_aabb: false,
-                },
+                // Mesh3d(material_presets.sphere.clone_weak()),
+                // MeshMaterial3d(material_presets.default.clone_weak()),
+                // bevy_render::view::VisibilityRange {
+                //     start_margin: 1.0..5.0,
+                //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                //     use_aabb: false,
+                // },
                 // bevy_render::view::NoFrustumCulling,
             ));
         }

@@ -76,7 +76,7 @@ fn setup_scene(
             Transform::from_xyz(0.0, 0.0, PROTON_DIA * 2.0),
             grid_cell,
             FloatingOrigin,
-            big_space::camera::CameraController::default(),
+            CameraController::default(),
         ));
 
         // A space ship
