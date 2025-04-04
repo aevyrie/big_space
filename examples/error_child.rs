@@ -1,15 +1,14 @@
 //! This example demonstrates error accumulating from parent to children in nested grids.
-use bevy::{math::DVec3, prelude::*};
-use bevy_color::palettes;
+use bevy::{color::palettes, math::DVec3, prelude::*};
 use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
-            big_space::camera::CameraControllerPlugin::default(),
-            big_space::debug::FloatingOriginDebugPlugin::default(),
+            CameraControllerPlugin::default(),
+            FloatingOriginDebugPlugin::default(),
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -86,7 +85,7 @@ fn setup_scene(
                 ..default()
             }),
             FloatingOrigin,
-            big_space::camera::CameraController::default() // Built-in camera controller
+            CameraController::default() // Built-in camera controller
                 .with_speed_bounds([10e-18, 10e35])
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),

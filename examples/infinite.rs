@@ -1,4 +1,5 @@
-//! Big spaces are infinite, looping back on themselves smoothly.
+//! Big spaces are infinite, looping back on themselves smoothly. This example requires the use of
+//! the `i8` feature, because a small world is needed to be able to see the "edge".
 
 use bevy::prelude::*;
 use big_space::prelude::*;
@@ -6,10 +7,10 @@ use big_space::prelude::*;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
+            FloatingOriginDebugPlugin::default(),
+            CameraControllerPlugin::default(),
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -44,7 +45,7 @@ fn setup_scene(
             Camera3d::default(),
             Transform::from_xyz(0.0, 0.0, 10.0),
             FloatingOrigin,
-            big_space::camera::CameraController::default()
+            CameraController::default()
                 .with_speed(10.)
                 .with_smoothness(0.99, 0.95),
         ));

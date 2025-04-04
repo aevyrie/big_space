@@ -9,42 +9,57 @@ repository = "https://github.com/aevyrie/big_space"
 documentation = "https://docs.rs/crate/big_space/latest"
 
 [features]
-default = []
-all = ["debug", "camera"] # Can't use all-features, integer type features are incompatible.
-debug = ["bevy_gizmos", "bevy_color"]
-camera = ["bevy_render", "bevy_time", "bevy_input"]
+default = ["std"]
+debug = ["std", "bevy_gizmos", "bevy_color"]
+camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
 i8 = []
 i16 = []
 i32 = []
 i64 = []
 i128 = []
 
-[dependencies]
-tracing = "0.1" # Less deps than pulling in bevy_log
-smallvec = "1.13.2" # Already used by bevy in commands
-bevy_app = { version = "0.15.0", default-features = false }
-bevy_ecs = { version = "0.15.0", default-features = true }
-bevy_hierarchy = { version = "0.15.0", default-features = false }
-bevy_math = { version = "0.15.0", default-features = false }
-bevy_reflect = { version = "0.15.0", default-features = false }
-bevy_tasks = { version = "0.15.0", default-features = false }
-bevy_transform = { version = "0.15.0", default-features = false, features = [
-    "bevy-support",
-] }
-bevy_utils = { version = "0.15.0", default-features = false }
-# Optional
-bevy_color = { version = "0.15.0", default-features = false, optional = true }
-bevy_gizmos = { version = "0.15.0", default-features = false, optional = true }
-bevy_render = { version = "0.15.0", default-features = false, optional = true }
-bevy_input = { version = "0.15.0", default-features = false, optional = true }
-bevy_time = { version = "0.15.0", default-features = false, optional = true }
+std = [
+    "bevy_app/std",
+    "bevy_ecs/std",
+    "bevy_math/std",
+    "bevy_reflect/std",
+    "bevy_tasks/std",
+    "bevy_transform/std",
+    "bevy_utils/std",
+    "bevy_platform_support/std",
+    "bevy_color?/std",
+    "bevy_input?/std",
+    "bevy_time?/std",
+]
+libm = ["bevy_math/libm", "dep:libm"]
 
+[dependencies]
+tracing = { version = "0.1", default-features = false } # Less deps than pulling in bevy_log
+smallvec = { version = "1.13.2", default-features = false } # Already used by bevy in commands
+bevy_app = { version = "0.16.0-rc.3", default-features = false, features = ["bevy_reflect"] }
+bevy_ecs = { version = "0.16.0-rc.3", default-features = false }
+bevy_math = { version = "0.16.0-rc.3", default-features = false }
+bevy_reflect = { version = "0.16.0-rc.3", default-features = false, features = ["glam"] }
+bevy_tasks = { version = "0.16.0-rc.3", default-features = false }
+bevy_transform = { version = "0.16.0-rc.3", default-features = false, features = [
+    "bevy-support",
+    "bevy_reflect",
+] }
+bevy_utils = { version = "0.16.0-rc.3", default-features = false }
+bevy_platform_support = { version = "0.16.0-rc.3", default-features = false, features = ["alloc"] }
+# Optional
+bevy_color = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_gizmos = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_render = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_input = { version = "0.16.0-rc.3", default-features = false, optional = true }
+bevy_time = { version = "0.16.0-rc.3", default-features = false, optional = true }
+libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-big_space = { path = "", features = ["debug", "camera"] }
-bevy = { version = "0.15.0", default-features = false, features = [
+bevy = { version = "0.16.0-rc.3", default-features = false, features = [
     "bevy_scene",
     "bevy_asset",
+    "bevy_color",
     "bevy_gltf",
     "bevy_winit",
     "default_font",
@@ -61,7 +76,36 @@ noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
 bytemuck = "1.20"
-bevy_hanabi = "0.14"
+# bevy_hanabi = "0.14" # TODO: Update
+
+[lints.clippy]
+doc_markdown = "warn"
+manual_let_else = "warn"
+match_same_arms = "warn"
+redundant_closure_for_method_calls = "warn"
+redundant_else = "warn"
+semicolon_if_nothing_returned = "warn"
+type_complexity = "allow"
+undocumented_unsafe_blocks = "warn"
+unwrap_or_default = "warn"
+
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+ref_as_ptr = "warn"
+
+# see: https://github.com/bevyengine/bevy/pull/15375#issuecomment-2366966219
+too_long_first_doc_paragraph = "allow"
+
+std_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+alloc_instead_of_core = "warn"
+
+[lints.rust]
+missing_docs = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(docsrs_dep)'] }
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "warn"
+unused_qualifications = "warn"
 
 [[bench]]
 name = "benchmarks"
@@ -70,18 +114,19 @@ harness = false
 [[example]]
 name = "debug"
 path = "examples/debug.rs"
+required-features = ["debug"]
 doc-scrape-examples = false
 
 [[example]]
 name = "demo"
 path = "examples/demo.rs"
-required-features = ["i128"]
+required-features = ["i128", "camera", "debug"]
 doc-scrape-examples = false
-
 
 [[example]]
 name = "error_child"
 path = "examples/error_child.rs"
+required-features = ["camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
@@ -92,25 +137,41 @@ doc-scrape-examples = false
 [[example]]
 name = "infinite"
 path = "examples/infinite.rs"
-required-features = ["i8"]
+required-features = ["i8", "camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
 name = "minimal"
 path = "examples/minimal.rs"
+required-features = ["camera"]
 doc-scrape-examples = false
 
-[[example]]
-name = "particles"
-path = "examples/particles.rs"
-doc-scrape-examples = false
+# TODO: Uncomment once bevy_hanabi is updated
+# [[example]]
+# name = "particles"
+# path = "examples/particles.rs"
+# doc-scrape-examples = false
 
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
+required-features = ["camera"]
+doc-scrape-examples = false
+
+[[example]]
+name = "small_scale"
+path = "examples/small_scale.rs"
+required-features = ["camera", "debug"]
+doc-scrape-examples = false
+
+[[example]]
+name = "spatial_hash"
+path = "examples/spatial_hash.rs"
+required-features = ["camera"]
 doc-scrape-examples = false
 
 [[example]]
 name = "split_screen"
 path = "examples/split_screen.rs"
+required-features = ["camera", "debug"]
 doc-scrape-examples = false

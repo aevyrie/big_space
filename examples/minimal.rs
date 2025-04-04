@@ -10,10 +10,10 @@ const BIG_DISTANCE: f64 = 1_000_000_000_000_000_000.0;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
+            CameraControllerPlugin::default(),    // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -67,7 +67,7 @@ fn setup_scene(
             Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
             grid_cell,
             FloatingOrigin,
-            big_space::camera::CameraController::default(),
+            CameraController::default(),
         ));
     });
 }

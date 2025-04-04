@@ -1,6 +1,7 @@
 //! Timing statistics for transform propagation
 
-use std::{collections::VecDeque, iter::Sum, ops::Div, time::Duration};
+use alloc::collections::VecDeque;
+use core::{iter::Sum, ops::Div, time::Duration};
 
 use crate::prelude::*;
 use bevy_app::prelude::*;
@@ -12,7 +13,7 @@ use bevy_transform::TransformSystem;
 pub struct TimingStatsPlugin;
 
 impl Plugin for TimingStatsPlugin {
-    fn build(&self, app: &mut bevy_app::App) {
+    fn build(&self, app: &mut App) {
         app.init_resource::<PropagationStats>()
             .register_type::<PropagationStats>()
             .init_resource::<GridHashStats>()
@@ -108,7 +109,7 @@ impl PropagationStats {
     }
 }
 
-impl<'a> std::iter::Sum<&'a PropagationStats> for PropagationStats {
+impl<'a> Sum<&'a PropagationStats> for PropagationStats {
     fn sum<I: Iterator<Item = &'a PropagationStats>>(iter: I) -> Self {
         iter.fold(PropagationStats::default(), |mut acc, e| {
             acc.grid_recentering += e.grid_recentering;
@@ -122,7 +123,7 @@ impl<'a> std::iter::Sum<&'a PropagationStats> for PropagationStats {
     }
 }
 
-impl std::ops::Div<u32> for PropagationStats {
+impl Div<u32> for PropagationStats {
     type Output = Self;
 
     fn div(self, rhs: u32) -> Self::Output {
@@ -178,7 +179,7 @@ impl GridHashStats {
     }
 }
 
-impl<'a> std::iter::Sum<&'a GridHashStats> for GridHashStats {
+impl<'a> Sum<&'a GridHashStats> for GridHashStats {
     fn sum<I: Iterator<Item = &'a GridHashStats>>(iter: I) -> Self {
         iter.fold(GridHashStats::default(), |mut acc, e| {
             acc.hash_update_duration += e.hash_update_duration;
