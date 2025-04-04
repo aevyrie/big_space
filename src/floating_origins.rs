@@ -1,9 +1,8 @@
 //! A floating origin for camera-relative rendering, to maximize precision when converting to f32.
 
 use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+use bevy_platform_support::collections::HashMap;
 use bevy_reflect::prelude::*;
-use bevy_utils::HashMap;
 
 /// Marks the entity to use as the floating origin.
 ///
@@ -45,13 +44,13 @@ pub struct BigSpace {
 }
 
 impl BigSpace {
-    /// Return the this grid's floating origin if it exists and is a descendent of this root.
+    /// Return this grid's floating origin if it exists and is a descendant of this root.
     ///
     /// `this_entity`: the entity this component belongs to.
     pub(crate) fn validate_floating_origin(
         &self,
         this_entity: Entity,
-        parents: &Query<&Parent>,
+        parents: &Query<&ChildOf>,
     ) -> Option<Entity> {
         let floating_origin = self.floating_origin?;
         let origin_root_entity = parents.iter_ancestors(floating_origin).last()?;
@@ -63,10 +62,10 @@ impl BigSpace {
     /// `BigSpace` hierarchy.
     pub fn find_floating_origin(
         floating_origins: Query<Entity, With<FloatingOrigin>>,
-        parent_query: Query<&Parent>,
+        parent_query: Query<&ChildOf>,
         mut big_spaces: Query<(Entity, &mut BigSpace)>,
     ) {
-        let mut spaces_set = HashMap::new();
+        let mut spaces_set = HashMap::<_, _>::default();
         // Reset all floating origin fields, so we know if any are missing.
         for (entity, mut space) in &mut big_spaces {
             space.floating_origin = None;
@@ -86,7 +85,7 @@ impl BigSpace {
                     tracing::error!(
                         "BigSpace {root:#?} has multiple floating origins. There must be exactly one. Resetting this big space and disabling the floating origin to avoid unexpected propagation behavior.",
                     );
-                    space.floating_origin = None
+                    space.floating_origin = None;
                 } else {
                     space.floating_origin = Some(origin);
                 }
@@ -99,7 +98,7 @@ impl BigSpace {
             .filter(|(_k, v)| **v == 0)
             .map(|(k, _v)| k)
         {
-            tracing::error!("BigSpace {space:#} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",)
+            tracing::error!("BigSpace {space:#} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",);
         }
     }
 }

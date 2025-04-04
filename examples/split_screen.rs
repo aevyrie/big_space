@@ -1,24 +1,24 @@
-//! Demonstrates how a single bevy world can contain multiple big_space hierarchies, each rendered
+//! Demonstrates how a single bevy world can contain multiple `big_space` hierarchies, each rendered
 //! relative to a floating origin inside that big space.
 //!
 //! This takes the simplest approach, of simply duplicating the worlds and players for each split
 //! screen, and synchronizing the player locations between both.
 
 use bevy::{
+    color::palettes,
     prelude::*,
     render::{camera::Viewport, view::RenderLayers},
     transform::TransformSystem,
 };
-use bevy_color::palettes;
 use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(),
-            big_space::camera::CameraControllerPlugin::default(),
+            CameraControllerPlugin::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, set_camera_viewports)
@@ -60,7 +60,7 @@ fn setup(
             Camera3d::default(),
             Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
                 .looking_to(Vec3::NEG_X, Vec3::Y),
-            big_space::camera::CameraController::default().with_smoothness(0.8, 0.8),
+            CameraController::default().with_smoothness(0.8, 0.8),
             RenderLayers::layer(2),
             LeftCamera,
             FloatingOrigin,
@@ -182,12 +182,14 @@ fn update_cameras(
             Without<RightCamera>,
         ),
     >,
-) {
-    *left_rep.single_mut().cell = *left.single().cell;
-    *left_rep.single_mut().transform = *left.single().transform;
+) -> Result {
+    *left_rep.single_mut()?.cell = *left.single()?.cell;
+    *left_rep.single_mut()?.transform = *left.single()?.transform;
 
-    *right_rep.single_mut().cell = *right.single().cell;
-    *right_rep.single_mut().transform = *right.single().transform;
+    *right_rep.single_mut()?.cell = *right.single()?.cell;
+    *right_rep.single_mut()?.transform = *right.single()?.transform;
+
+    Ok(())
 }
 
 fn set_camera_viewports(
@@ -195,13 +197,13 @@ fn set_camera_viewports(
     mut resize_events: EventReader<bevy::window::WindowResized>,
     mut left_camera: Query<&mut Camera, (With<LeftCamera>, Without<RightCamera>)>,
     mut right_camera: Query<&mut Camera, With<RightCamera>>,
-) {
+) -> Result {
     // We need to dynamically resize the camera's viewports whenever the window size changes
     // so then each camera always takes up half the screen.
     // A resize_event is sent when the window is first created, allowing us to reuse this system for initial setup.
     for resize_event in resize_events.read() {
-        let window = windows.get(resize_event.window).unwrap();
-        let mut left_camera = left_camera.single_mut();
+        let window = windows.get(resize_event.window)?;
+        let mut left_camera = left_camera.single_mut()?;
         left_camera.viewport = Some(Viewport {
             physical_position: UVec2::new(0, 0),
             physical_size: UVec2::new(
@@ -211,7 +213,7 @@ fn set_camera_viewports(
             ..default()
         });
 
-        let mut right_camera = right_camera.single_mut();
+        let mut right_camera = right_camera.single_mut()?;
         right_camera.viewport = Some(Viewport {
             physical_position: UVec2::new(window.resolution.physical_width() / 2, 0),
             physical_size: UVec2::new(
@@ -221,4 +223,6 @@ fn set_camera_viewports(
             ..default()
         });
     }
+
+    Ok(())
 }

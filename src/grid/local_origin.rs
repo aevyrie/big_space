@@ -5,13 +5,14 @@
 use crate::prelude::*;
 use bevy_ecs::{
     prelude::*,
+    relationship::Relationship,
     system::{
         lifetimeless::{Read, Write},
         SystemParam,
     },
 };
-use bevy_hierarchy::prelude::*;
 use bevy_math::{prelude::*, DAffine3, DQuat};
+use bevy_platform_support::prelude::*;
 use bevy_transform::prelude::*;
 
 pub use inner::LocalFloatingOrigin;
@@ -75,7 +76,7 @@ mod inner {
 
     impl LocalFloatingOrigin {
         /// The grid transform from the local grid, to the floating origin's grid. See
-        /// [Self::grid_transform].
+        /// [`Self::grid_transform`].
         #[inline]
         pub fn grid_transform(&self) -> DAffine3 {
             self.grid_transform
@@ -236,14 +237,14 @@ fn propagate_origin_to_child(
             child_origin_translation_float,
             origin_child_rotation,
         );
-    })
+    });
 }
 
 /// A system param for more easily navigating a hierarchy of [`Grid`]s.
 #[derive(SystemParam)]
 pub struct Grids<'w, 's> {
-    parent: Query<'w, 's, Read<Parent>>,
-    grid_query: Query<'w, 's, (Entity, Read<Grid>, Option<Read<Parent>>)>,
+    parent: Query<'w, 's, Read<ChildOf>>,
+    grid_query: Query<'w, 's, (Entity, Read<Grid>, Option<Read<ChildOf>>)>,
 }
 
 impl Grids<'_, '_> {
@@ -266,7 +267,7 @@ impl Grids<'_, '_> {
     /// Get the ID of the grid that `this` `Entity` is a child of, if it exists.
     #[inline]
     pub fn parent_grid_entity(&self, this: Entity) -> Option<Entity> {
-        match self.parent.get(this).map(|parent| **parent) {
+        match self.parent.get(this).map(Relationship::get) {
             Err(_) => None,
             Ok(parent) => match self.grid_query.contains(parent) {
                 true => Some(parent),
@@ -291,7 +292,7 @@ impl Grids<'_, '_> {
             .iter()
             .filter_map(move |(entity, _, parent)| {
                 parent
-                    .map(|p| p.get())
+                    .map(Relationship::get)
                     .filter(|parent| *parent == this)
                     .map(|_| entity)
             })
@@ -317,9 +318,9 @@ impl Grids<'_, '_> {
 /// A system param for more easily navigating a hierarchy of grids mutably.
 #[derive(SystemParam)]
 pub struct GridsMut<'w, 's> {
-    parent: Query<'w, 's, Read<Parent>>,
+    parent: Query<'w, 's, Read<ChildOf>>,
     position: Query<'w, 's, (Read<GridCell>, Read<Transform>), With<Grid>>,
-    grid_query: Query<'w, 's, (Entity, Write<Grid>, Option<Read<Parent>>)>,
+    grid_query: Query<'w, 's, (Entity, Write<Grid>, Option<Read<ChildOf>>)>,
 }
 
 impl GridsMut<'_, '_> {
@@ -374,7 +375,7 @@ impl GridsMut<'_, '_> {
     /// Get the ID of the grid that `this` `Entity` is a child of, if it exists.
     #[inline]
     pub fn parent_grid_entity(&self, this: Entity) -> Option<Entity> {
-        match self.parent.get(this).map(|parent| **parent) {
+        match self.parent.get(this).map(Relationship::get) {
             Err(_) => None,
             Ok(parent) => match self.grid_query.contains(parent) {
                 true => Some(parent),
@@ -399,7 +400,7 @@ impl GridsMut<'_, '_> {
             .iter()
             .filter_map(move |(entity, _, parent)| {
                 parent
-                    .map(|p| p.get())
+                    .map(Relationship::get)
                     .filter(|parent| *parent == this)
                     .map(|_| entity)
             })
@@ -435,9 +436,9 @@ impl LocalFloatingOrigin {
         mut scratch_buffer: Local<Vec<Entity>>,
         cells: Query<(Entity, Ref<GridCell>)>,
         roots: Query<(Entity, &BigSpace)>,
-        parents: Query<&Parent>,
+        parents: Query<&ChildOf>,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
 
         /// The maximum grid tree depth, defensively prevents infinite looping in case there is a
         /// degenerate hierarchy. It might take a while, but at least it's not forever?
@@ -493,7 +494,7 @@ impl LocalFloatingOrigin {
                     // child, these do no alias.
                     for child_grid in scratch_buffer.drain(..) {
                         propagate_origin_to_child(this_grid, &mut grids, child_grid);
-                        grid_stack.push(child_grid) // Push processed child onto the stack
+                        grid_stack.push(child_grid); // Push processed child onto the stack
                     }
                 }
 
@@ -507,7 +508,7 @@ impl LocalFloatingOrigin {
                 }
             }
 
-            tracing::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.")
+            tracing::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.");
         }
 
         stats.local_origin_propagation += start.elapsed();
@@ -550,7 +551,7 @@ mod tests {
         let result = grids.child_grids(child_1).collect::<Vec<_>>();
         assert_eq!(result, Vec::new());
 
-        // Parent
+        // ChildOf
         let result = grids.parent_grid_entity(root);
         assert_eq!(result, None);
         let result = grids.parent_grid_entity(parent);
@@ -575,7 +576,7 @@ mod tests {
             local_floating_origin: LocalFloatingOrigin::new(
                 GridCell::new(1_000_000, -1, -1),
                 Vec3::ZERO,
-                DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
+                DQuat::from_rotation_z(-core::f64::consts::FRAC_PI_2),
             ),
             ..default()
         };
@@ -587,7 +588,7 @@ mod tests {
         let child = app
             .world_mut()
             .spawn((
-                Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
+                Transform::from_rotation(Quat::from_rotation_z(core::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
                 GridCell::new(1_000_000, 0, 0),
                 Grid::default(),
@@ -609,7 +610,7 @@ mod tests {
         assert_eq!(computed_grid, correct_grid);
 
         let computed_rot = child_grid.local_floating_origin.rotation();
-        let correct_rot = DQuat::from_rotation_z(std::f64::consts::PI);
+        let correct_rot = DQuat::from_rotation_z(core::f64::consts::PI);
         let rot_error = computed_rot.angle_between(correct_rot);
         assert!(rot_error < 1e-10);
 
@@ -637,14 +638,14 @@ mod tests {
         let child = app
             .world_mut()
             .spawn((
-                Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_2))
+                Transform::from_rotation(Quat::from_rotation_z(core::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(1.0, 1.0, 0.0)),
                 GridCell::new(150_000_003_000, 0, 0), // roughly radius of earth orbit
                 Grid {
                     local_floating_origin: LocalFloatingOrigin::new(
                         GridCell::new(0, 3_000, 0),
                         Vec3::new(5.0, 5.0, 0.0),
-                        DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
+                        DQuat::from_rotation_z(-core::f64::consts::FRAC_PI_2),
                     ),
                     ..Default::default()
                 },
@@ -708,7 +709,7 @@ mod tests {
             .world_mut()
             .spawn((
                 Transform::default()
-                    .with_rotation(Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2))
+                    .with_rotation(Quat::from_rotation_z(-core::f32::consts::FRAC_PI_2))
                     .with_translation(Vec3::new(3.0, 3.0, 0.0)),
                 GridCell::new(0, 0, 0),
                 Grid::default(),
@@ -729,7 +730,7 @@ mod tests {
         let computed_pos = computed_transform.transform_point3(child_local_point);
 
         let correct_transform = DAffine3::from_rotation_translation(
-            DQuat::from_rotation_z(-std::f64::consts::FRAC_PI_2),
+            DQuat::from_rotation_z(-core::f64::consts::FRAC_PI_2),
             DVec3::new(2.0, 2.0, 0.0),
         );
         let correct_pos = correct_transform.transform_point3(child_local_point);

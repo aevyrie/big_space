@@ -1,14 +1,14 @@
-use std::hash::Hasher;
+//! Demonstrates the included optional spatial hashing and partitioning of grid cells.
 
 use bevy::{
-    core_pipeline::{bloom::Bloom, fxaa::Fxaa, tonemapping::Tonemapping},
+    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     prelude::*,
 };
-use bevy_ecs::entity::EntityHasher;
+use bevy_ecs::{entity::EntityHasher, relationship::Relationship};
 use bevy_math::DVec3;
 use big_space::prelude::*;
+use core::hash::Hasher;
 use noise::{NoiseFn, Simplex};
-use smallvec::SmallVec;
 use turborand::prelude::*;
 
 // Try bumping this up to really stress test. I'm able to push a million entities with an M3 Max.
@@ -21,11 +21,11 @@ const PERCENT_STATIC: f32 = 0.99;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             GridHashPlugin::<()>::default(),
             GridPartitionPlugin::<()>::default(),
-            big_space::camera::CameraControllerPlugin::default(),
+            CameraControllerPlugin::default(),
         ))
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(
@@ -69,7 +69,7 @@ impl FromWorld for MaterialPresets {
 
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let sphere = meshes.add(
-            Sphere::new(HALF_WIDTH / (1_000_000_f32).powf(0.33) * 0.5)
+            Sphere::new(HALF_WIDTH / 1_000_000_f32.powf(0.33) * 0.5)
                 .mesh()
                 .ico(0)
                 .unwrap(),
@@ -89,10 +89,12 @@ fn draw_partitions(
     partitions: Res<GridPartitionMap>,
     grids: Query<(&GlobalTransform, &Grid)>,
     camera: Query<&GridHash, With<Camera>>,
-) {
+) -> Result {
+    let camera = camera.single()?;
+
     for (id, p) in partitions.iter().take(10_000) {
         let Ok((transform, grid)) = grids.get(p.grid()) else {
-            return;
+            return Ok(());
         };
         let l = grid.cell_edge_length();
 
@@ -102,7 +104,7 @@ fn draw_partitions(
         let hue = (f % 360) as f32;
 
         p.iter()
-            .filter(|hash| *hash != camera.single())
+            .filter(|hash| *hash != camera)
             .take(1_000)
             .for_each(|h| {
                 let center = [h.cell().x as i32, h.cell().y as i32, h.cell().z as i32];
@@ -110,7 +112,7 @@ fn draw_partitions(
                     .with_scale(Vec3::splat(l));
                 gizmos.cuboid(
                     transform.mul_transform(local_trans),
-                    Hsla::new(hue, 1.0, 0.5, 0.05),
+                    Hsla::new(hue, 1.0, 0.5, 0.2),
                 );
             });
 
@@ -123,19 +125,20 @@ fn draw_partitions(
 
         gizmos.cuboid(
             transform.mul_transform(local_trans),
-            Hsla::new(hue, 1.0, 0.5, 0.2),
+            Hsla::new(hue, 1.0, 0.5, 0.9),
         );
     }
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
 fn move_player(
     time: Res<Time>,
-    mut _gizmos: Gizmos,
-    mut player: Query<(&mut Transform, &mut GridCell, &Parent, &GridHash), With<Player>>,
+    mut player: Query<(&mut Transform, &mut GridCell, &ChildOf, &GridHash), With<Player>>,
     mut non_player: Query<
-        (&mut Transform, &mut GridCell, &Parent),
+        (&mut Transform, &mut GridCell, &ChildOf),
         (Without<Player>, With<NonPlayer>),
     >,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
@@ -146,11 +149,11 @@ fn move_player(
     mut text: Query<&mut Text>,
     hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
     prop_stats: Res<big_space::timing::SmoothedStat<big_space::timing::PropagationStats>>,
-) {
+) -> Result {
     let n_entities = non_player.iter().len();
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
-            **material = material_presets.default.clone_weak();
+            material.set_if_neq(material_presets.default.clone_weak().into());
         }
     }
 
@@ -170,14 +173,13 @@ fn move_player(
     }
 
     let t = time.elapsed_secs() * 0.01;
-    let (mut transform, mut cell, parent, hash) = player.single_mut();
+    let (mut transform, mut cell, parent, hash) = player.single_mut()?;
     let absolute_pos = HALF_WIDTH
         * CELL_WIDTH
         * 0.8
         * Vec3::new((5.0 * t).sin(), (7.0 * t).cos(), (20.0 * t).sin());
     (*cell, transform.translation) = grids
-        .get(parent.get())
-        .unwrap()
+        .get(parent.get())?
         .imprecise_translation_to_grid(absolute_pos);
 
     neighbors.clear();
@@ -185,15 +187,8 @@ fn move_player(
     hash_grid.flood(hash, None).entities().for_each(|entity| {
         neighbors.push(entity);
         if let Ok(mut material) = materials.get_mut(entity) {
-            **material = material_presets.flood.clone_weak();
+            material.set_if_neq(material_presets.flood.clone_weak().into());
         }
-
-        // let grid = grid.get(entry.grid).unwrap();
-        // let transform = grid.global_transform(
-        //     &entry.cell,
-        //     &Transform::from_scale(Vec3::splat(grid.cell_edge_length() * 0.99)),
-        // );
-        // gizmos.cuboid(transform, Color::linear_rgba(1.0, 1.0, 1.0, 0.2));
     });
 
     hash_grid
@@ -204,11 +199,11 @@ fn move_player(
         .for_each(|entity| {
             neighbors.push(entity);
             if let Ok(mut material) = materials.get_mut(entity) {
-                **material = material_presets.highlight.clone_weak();
+                material.set_if_neq(material_presets.highlight.clone_weak().into());
             }
         });
 
-    let mut text = text.single_mut();
+    let mut text = text.single_mut()?;
     text.0 = format!(
         "\
 Controls:
@@ -236,9 +231,8 @@ Total: {: >22.1?}",
             .as_bytes()
             .rchunks(3)
             .rev()
-            .map(std::str::from_utf8)
-            .collect::<Result<Vec<&str>, _>>()
-            .unwrap()
+            .map(core::str::from_utf8)
+            .collect::<Result<Vec<&str>, _>>()?
             .join(","),
         //
         prop_stats.avg().grid_recentering(),
@@ -254,6 +248,8 @@ Total: {: >22.1?}",
         //
         prop_stats.avg().total() + hash_stats.avg().total(),
     );
+
+    Ok(())
 }
 
 fn spawn(mut commands: Commands) {
@@ -267,11 +263,10 @@ fn spawn(mut commands: Commands) {
             },
             Tonemapping::AcesFitted,
             Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
-            big_space::camera::CameraController::default()
+            CameraController::default()
                 .with_smoothness(0.98, 0.93)
                 .with_slowing(false)
                 .with_speed(15.0),
-            Fxaa::default(),
             Bloom::default(),
             GridCell::new(0, 0, HALF_WIDTH as GridPrecision / 2),
         ))
@@ -287,54 +282,41 @@ fn spawn_spheres(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     material_presets: Res<MaterialPresets>,
-    mut grid: Query<(Entity, &Grid, &mut Children)>,
+    grid: Query<Entity, With<Grid>>,
     non_players: Query<(), With<NonPlayer>>,
-) {
+) -> Result {
     let n_entities = non_players.iter().len().max(1);
     let n_spawn = if input.pressed(KeyCode::KeyG) {
         n_entities
     } else if input.pressed(KeyCode::KeyF) {
         1_000
     } else {
-        return;
+        return Ok(());
     };
 
-    let (entity, _grid, mut children) = grid.single_mut();
-    let mut dyn_parent = bevy_reflect::DynamicTupleStruct::default();
-    dyn_parent.insert(entity);
-    let dyn_parent = dyn_parent.as_partial_reflect();
-
-    let new_children = sample_noise(n_spawn, &Simplex::new(345612), &Rng::new())
-        .map(|value| {
+    let entity = grid.single()?;
+    commands.entity(entity).with_children(|builder| {
+        for value in sample_noise(n_spawn, &Simplex::new(345612), &Rng::new()) {
             let hash = GridHash::__new_manual(entity, &GridCell::default());
-            commands
-                .spawn((
-                    Transform::from_xyz(value.x, value.y, value.z),
-                    GlobalTransform::default(),
-                    GridCell::default(),
-                    FastGridHash::from(hash),
-                    hash,
-                    NonPlayer,
-                    Parent::from_reflect(dyn_parent).unwrap(),
-                    Mesh3d(material_presets.sphere.clone_weak()),
-                    MeshMaterial3d(material_presets.default.clone_weak()),
-                    bevy_render::view::VisibilityRange {
-                        start_margin: 1.0..5.0,
-                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                        use_aabb: false,
-                    },
-                    bevy_render::view::NoFrustumCulling,
-                ))
-                .id()
-        })
-        .chain(children.iter().copied())
-        .collect::<SmallVec<[Entity; 8]>>();
-
-    let mut dyn_children = bevy_reflect::DynamicTupleStruct::default();
-    dyn_children.insert(new_children);
-    let dyn_children = dyn_children.as_partial_reflect();
-
-    *children = Children::from_reflect(dyn_children).unwrap();
+            builder.spawn((
+                Transform::from_xyz(value.x, value.y, value.z),
+                GlobalTransform::default(),
+                GridCell::default(),
+                FastGridHash::from(hash),
+                hash,
+                NonPlayer,
+                Mesh3d(material_presets.sphere.clone_weak()),
+                MeshMaterial3d(material_presets.default.clone_weak()),
+                bevy_render::view::VisibilityRange {
+                    start_margin: 1.0..5.0,
+                    end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                    use_aabb: false,
+                },
+                bevy_render::view::NoFrustumCulling,
+            ));
+        }
+    });
+    Ok(())
 }
 
 #[inline]
@@ -343,7 +325,7 @@ fn sample_noise<'a, T: NoiseFn<f64, 3>>(
     noise: &'a T,
     rng: &'a Rng,
 ) -> impl Iterator<Item = Vec3> + use<'a, T> {
-    std::iter::repeat_with(
+    core::iter::repeat_with(
         || loop {
             let noise_scale = 0.05 * HALF_WIDTH as f64;
             let threshold = 0.50;
@@ -390,8 +372,8 @@ fn cursor_grab(
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
-) {
-    let mut primary_window = windows.single_mut();
+) -> Result {
+    let mut primary_window = windows.single_mut()?;
     if mouse.just_pressed(MouseButton::Left) {
         primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
         primary_window.cursor_options.visible = false;
@@ -400,4 +382,5 @@ fn cursor_grab(
         primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
         primary_window.cursor_options.visible = true;
     }
+    Ok(())
 }

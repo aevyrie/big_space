@@ -10,7 +10,10 @@ use big_space::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, BigSpacePlugin::default()))
+        .add_plugins((
+            DefaultPlugins.build().disable::<TransformPlugin>(),
+            BigSpacePlugin::default(),
+        ))
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(Update, (rotator_system, toggle_plugin))
         .run();
@@ -22,8 +25,8 @@ fn main() {
 /// floating point error when we disable this plugin.
 ///
 /// This plugin can function much further from the origin without any issues. Try setting this to:
-/// 10_000_000_000_000_000 with the default i64 feature, or
-/// 10_000_000_000_000_000_000_000_000_000_000_000_000 with the i128 feature.
+/// `10_000_000_000_000_000` with the default i64 feature, or
+/// `10_000_000_000_000_000_000_000_000_000_000_000_000` with the i128 feature.
 const DISTANCE: GridPrecision = 2_000_000;
 
 /// Move the floating origin back to the "true" origin when the user presses the spacebar to emulate
@@ -35,14 +38,16 @@ fn toggle_plugin(
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
     mut floating_origin: Query<(Entity, &mut GridCell), With<FloatingOrigin>>,
-) {
+) -> Result {
     if input.just_pressed(KeyCode::Space) {
         *disabled = !*disabled;
     }
 
-    let this_grid = grids.parent_grid(floating_origin.single().0).unwrap();
+    let this_grid = grids
+        .parent_grid(floating_origin.single().unwrap().0)
+        .unwrap();
 
-    let mut origin_cell = floating_origin.single_mut().1;
+    let mut origin_cell = floating_origin.single_mut()?.1;
     let index_max = DISTANCE / this_grid.cell_edge_length() as GridPrecision;
     let increment = index_max / 100;
 
@@ -73,14 +78,16 @@ fn toggle_plugin(
             .as_bytes()
             .rchunks(3)
             .rev()
-            .map(std::str::from_utf8)
+            .map(core::str::from_utf8)
             .collect::<Result<Vec<&str>, _>>()
             .unwrap()
             .join(",") // separator
     };
 
-    text.single_mut().0 =
-        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nMesh distance from origin: {}", thousands(dist), thousands(DISTANCE))
+    text.single_mut()?.0 =
+        format!("Press Spacebar to toggle: {msg}\nCamera distance to floating origin: {}\nMesh distance from origin: {}", thousands(dist), thousands(DISTANCE));
+
+    Ok(())
 }
 
 #[derive(Component)]

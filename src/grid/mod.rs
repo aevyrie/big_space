@@ -115,9 +115,9 @@ impl Grid {
             return (GridCell::default(), input.as_vec3());
         }
 
-        let x_r = (x / l).round();
-        let y_r = (y / l).round();
-        let z_r = (z / l).round();
+        let x_r = round(x / l);
+        let y_r = round(y / l);
+        let z_r = round(z / l);
         let t_x = x - x_r * l;
         let t_y = y - y_r * l;
         let t_z = z - z_r * l;
@@ -163,5 +163,23 @@ impl Grid {
             translation: global_64.translation.as_vec3a(),
         }
         .into()
+    }
+}
+
+fn round(x: f64) -> f64 {
+    #[cfg(feature = "libm")]
+    {
+        libm::round(x)
+    }
+
+    #[cfg(all(not(feature = "libm"), feature = "std"))]
+    {
+        x.round()
+    }
+
+    #[cfg(all(not(feature = "libm"), not(feature = "std")))]
+    {
+        compile_error!("Must enable the `libm` and/or `std` feature.");
+        f64::NAN
     }
 }

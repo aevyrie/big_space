@@ -1,8 +1,7 @@
 //! Logic for propagating transforms through the hierarchy of grids.
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+use bevy_ecs::{prelude::*, relationship::Relationship};
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 
@@ -26,13 +25,13 @@ impl Grid {
             Query<(
                 Ref<GridCell>,
                 Ref<Transform>,
-                Ref<Parent>,
+                Ref<ChildOf>,
                 &mut GlobalTransform,
             )>,
             Query<(&Grid, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
 
         // Performance note: I've also tried to iterate over each grid's children at once, to avoid
         // the grid and parent lookup, but that made things worse because it prevented dumb
@@ -95,13 +94,13 @@ impl Grid {
         mut commands: Commands,
         valid_parent: Query<(), (With<GridCell>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
-            (Entity, &Parent),
+            (Entity, &ChildOf),
             (
                 With<Transform>,
                 With<GlobalTransform>,
                 Without<GridCell>,
                 Without<LowPrecisionRoot>,
-                Or<(Changed<Parent>, Added<Transform>)>,
+                Or<(Changed<ChildOf>, Added<Transform>)>,
             ),
         >,
         invalidated: Query<
@@ -112,13 +111,13 @@ impl Grid {
                     Without<Transform>,
                     Without<GlobalTransform>,
                     With<GridCell>,
-                    Without<Parent>,
+                    Without<ChildOf>,
                 )>,
             ),
         >,
-        has_possibly_invalid_parent: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
+        has_possibly_invalid_parent: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
         for (entity, parent) in unmarked.iter() {
             if valid_parent.contains(parent.get()) {
                 commands.entity(entity).insert(LowPrecisionRoot);
@@ -150,17 +149,17 @@ impl Grid {
                 Or<(With<Grid>, With<GridCell>)>,
             ),
         >,
-        roots: Query<(Entity, &Parent), With<LowPrecisionRoot>>,
+        roots: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
         transform_query: Query<
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
-                With<Parent>,
+                With<ChildOf>,
                 Without<GridCell>, // Used to prove access to GlobalTransform is disjoint
                 Without<Grid>,
             ),
         >,
         parent_query: Query<
-            (Entity, Ref<Parent>),
+            (Entity, Ref<ChildOf>),
             (
                 With<Transform>,
                 With<GlobalTransform>,
@@ -169,7 +168,7 @@ impl Grid {
             ),
         >,
     ) {
-        let start = bevy_utils::Instant::now();
+        let start = bevy_platform_support::time::Instant::now();
         let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
             // High precision global transforms are change-detected, and are only updated if that
             // entity has moved relative to the floating origin's grid cell.
@@ -186,6 +185,10 @@ impl Grid {
             //   other root entities' `propagate_recursive` calls will not conflict with this one.
             // - Since this is the only place where `transform_query` gets used, there will be no
             //   conflicting fetches elsewhere.
+            #[expect(
+                unsafe_code,
+                reason = "`propagate_recursive()` is unsafe due to its use of `Query::get_unchecked()`."
+            )]
             unsafe {
                 Self::propagate_recursive(
                     &parent_transform,
@@ -206,8 +209,6 @@ impl Grid {
         stats.low_precision_propagation += start.elapsed();
     }
 
-    /// COPIED FROM BEVY
-    ///
     /// Recursively propagates the transforms for `entity` and all of its descendants.
     ///
     /// # Panics
@@ -221,18 +222,22 @@ impl Grid {
     ///   nor any of its descendants.
     /// - The caller must ensure that the hierarchy leading to `entity` is well-formed and must
     ///   remain as a tree or a forest. Each entity must have at most one parent.
+    #[expect(
+        unsafe_code,
+        reason = "This function uses `Query::get_unchecked()`, which can result in multiple mutable references if the preconditions are not met."
+    )]
     unsafe fn propagate_recursive(
         parent: &GlobalTransform,
         transform_query: &Query<
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
-                With<Parent>,
+                With<ChildOf>,
                 Without<GridCell>, // ***ADDED*** Only recurse low-precision entities
                 Without<Grid>,     // ***ADDED*** Only recurse low-precision entities
             ),
         >,
         parent_query: &Query<
-            (Entity, Ref<Parent>),
+            (Entity, Ref<ChildOf>),
             (
                 With<Transform>,
                 With<GlobalTransform>,
@@ -245,28 +250,34 @@ impl Grid {
     ) {
         let (global_matrix, children) = {
             let Ok((transform, mut global_transform, children)) =
-            // SAFETY: This call cannot create aliased mutable references.
-            //   - The top level iteration parallelizes on the roots of the hierarchy.
-            //   - The caller ensures that each child has one and only one unique parent throughout
-            //     the entire hierarchy.
-            //
-            // For example, consider the following malformed hierarchy:
-            //
-            //     A
-            //   /   \
-            //  B     C \   / D
-            //
-            // D has two parents, B and C. If the propagation passes through C, but the Parent
-            // component on D points to B, the above check will panic as the origin parent does
-            // match the recorded parent.
-            //
-            // Also consider the following case, where A and B are roots:
-            //
-            //  A       B \     / C   D \ / E
-            //
-            // Even if these A and B start two separate tasks running in parallel, one of them will
-            // panic before attempting to mutably access E.
-            (unsafe { transform_query.get_unchecked(entity) }) else {
+                // SAFETY: This call cannot create aliased mutable references.
+                //   - The top level iteration parallelizes on the roots of the hierarchy.
+                //   - The caller ensures that each child has one and only one unique parent
+                //     throughout the entire hierarchy.
+                //
+                // For example, consider the following malformed hierarchy:
+                //
+                //     A
+                //   /   \
+                //  B     C
+                //   \   /
+                //     D
+                //
+                // D has two parents, B and C. If the propagation passes through C, but the ChildOf
+                // component on D points to B, the above check will panic as the origin parent does
+                // match the recorded parent.
+                //
+                // Also consider the following case, where A and B are roots:
+                //
+                //  A       B
+                //   \     /
+                //    C   D
+                //     \ /
+                //      E
+                //
+                // Even if these A and B start two separate tasks running in parallel, one of them
+                // will panic before attempting to mutably access E.
+                (unsafe { transform_query.get_unchecked(entity) }) else {
                 return;
             };
 
@@ -278,11 +289,11 @@ impl Grid {
         };
 
         let Some(children) = children else { return };
-        for (child, actual_parent) in parent_query.iter_many(children) {
+        for (child, child_of) in parent_query.iter_many(children) {
             assert_eq!(
-            actual_parent.get(), entity,
-            "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
-        );
+                child_of.parent, entity,
+                "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
+            );
             // SAFETY: The caller guarantees that `transform_query` will not be fetched for any
             // descendants of `entity`, so it is safe to call `propagate_recursive` for each child.
             //
@@ -294,7 +305,7 @@ impl Grid {
                     transform_query,
                     parent_query,
                     child,
-                    changed || actual_parent.is_changed(),
+                    changed || child_of.is_changed(),
                 );
             }
         }
@@ -337,10 +348,10 @@ mod tests {
         let mut q = app
             .world_mut()
             .query_filtered::<&GlobalTransform, With<Test>>();
-        let actual_transform = *q.single(app.world());
+        let actual_transform = *q.single(app.world()).unwrap();
         assert_eq!(
             actual_transform,
             GlobalTransform::from_xyz(2004.0, 2005.0, 2006.0)
-        )
+        );
     }
 }

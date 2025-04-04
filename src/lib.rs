@@ -106,7 +106,7 @@
 //! grid, in high precision.
 //!
 //! Entities at the root of bevy's entity hierarchy are not in a grid. This allows plugins from the
-//! rest of the ecosystem to operate normally, such as bevy_ui, which relies on the built-in
+//! rest of the ecosystem to operate normally, such as `bevy_ui`, which relies on the built-in
 //! transform propagation system. This also means that if you don't need to place entities in a
 //! high-precision grid, you don't have to, as the process is opt-in. The high-precision
 //! hierarchical grids are explicit. Each high-precision tree must have a [`BigSpace`] at the root,
@@ -197,11 +197,16 @@
 
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
+#![no_std]
+
+extern crate alloc;
 
 #[allow(unused_imports)] // For docs
 use bevy_transform::prelude::*;
 #[allow(unused_imports)] // For docs
 use prelude::*;
+
+pub(crate) mod portable_par;
 
 pub mod bundles;
 pub mod commands;
@@ -220,13 +225,11 @@ pub mod debug;
 #[cfg(test)]
 mod tests;
 
-/// Common big_space imports.
+/// Common `big_space` imports.
 pub mod prelude {
     use crate::*;
     pub use bundles::{BigGridBundle, BigSpaceRootBundle, BigSpatialBundle};
     pub use commands::{BigSpaceCommands, GridCommands, SpatialEntityCommands};
-    #[cfg(feature = "debug")]
-    pub use debug::FloatingOriginDebugPlugin;
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
         cell::GridCell,
@@ -242,19 +245,23 @@ pub mod prelude {
     pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
     pub use precision::GridPrecision;
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
+
+    #[cfg(feature = "camera")]
+    pub use camera::{CameraController, CameraControllerPlugin};
+    #[cfg(feature = "debug")]
+    pub use debug::FloatingOriginDebugPlugin;
 }
 
-/// Contains [`GridPrecision`], allowing `big_space` to work with many grid integer sizes.
+/// Contains the [`GridPrecision`] integer index type, which defines how much precision is available
+/// when indexing into a [`Grid`].
 ///
-/// The integer type used is controlled with compile time feature flags like `i8`. The crate
-/// defaults to `i64` grids if none is specified.
+/// The integer type is controlled with feature flags like `i8`. The crate defaults to `i64` grids
+/// if none is specified. If multiple integer precisions are enabled, the largest enabled precision
+/// will be used.
 ///
-/// Larger grids result in a larger usable volume, at the cost of increased memory usage. In
-/// addition, some platforms may be unable to use larger numeric types (e.g. [`i128`]).
-///
-/// [`big_space`](crate) is generic over a few integer types to allow you to select the grid size
-/// you need. Assuming you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter,
-/// these correspond to a total usable volume of a cube with the following edge lengths:
+/// Larger grids result in a larger usable volume, at the cost of increased memory usage. Assuming
+/// you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter, these correspond
+/// to a total usable volume of a cube with the following edge lengths:
 ///
 /// - `i8`: 2,560 km = 74% of the diameter of the Moon
 /// - `i16`: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
@@ -272,21 +279,42 @@ pub mod precision {
     #[allow(unused_imports)] // Docs
     use super::*;
 
-    #[cfg(feature = "i8")]
-    /// Adds 8 bits of precision to bevy's [`Transform`]. See [`precision`].
+    #[cfg(all(
+        feature = "i8",
+        not(any(feature = "i128", feature = "i64", feature = "i32", feature = "i16"))
+    ))]
+    /// The integer type used as the index for a `big_space` grid. Adds 8 bits of precision, in
+    /// addition to bevy's 32 bit [`Transform`], for a total of 40 bits of translational precision.
+    /// See [`precision`].
     pub type GridPrecision = i8;
-    #[cfg(feature = "i16")]
-    /// Adds 16 bits of precision to bevy's [`Transform`]. See [`precision`].
+
+    #[cfg(all(
+        feature = "i16",
+        not(any(feature = "i128", feature = "i64", feature = "i32"))
+    ))]
+    /// The integer type used as the index for a `big_space` grid. Adds 16 bits of precision, in
+    /// addition to bevy's 32 bit [`Transform`], for a total of 48 bits of translational precision.
+    /// See [`precision`].
     pub type GridPrecision = i16;
-    #[cfg(feature = "i32")]
-    /// Adds 32 bits of precision to bevy's [`Transform`]. See [`precision`].
+
+    #[cfg(all(feature = "i32", not(any(feature = "i128", feature = "i64"))))]
+    /// The integer type used as the index for a `big_space` grid. Adds 32 bits of precision, in
+    /// addition to bevy's 32 bit [`Transform`], for a total of 64 bits of translational precision.
+    /// See [`precision`].
     pub type GridPrecision = i32;
-    #[cfg(feature = "i64")]
-    /// Adds 64 bits of precision to bevy's [`Transform`]. See [`precision`].
+
+    #[cfg(all(feature = "i64", not(feature = "i128")))]
+    /// The integer type used as the index for a `big_space` grid. Adds 64 bits of precision, in
+    /// addition to bevy's 32 bit [`Transform`], for a total of 96 bits of translational precision.
+    /// See [`precision`].
     pub type GridPrecision = i64;
+
     #[cfg(feature = "i128")]
-    /// Adds 128 bits of precision to bevy's [`Transform`]. See [`precision`].
+    /// The integer type used as the index for a `big_space` grid. Adds 128 bits of precision, in
+    /// addition to bevy's 32 bit [`Transform`], for a total of 160 bits of translational precision.
+    /// See [`precision`].
     pub type GridPrecision = i128;
+
     #[cfg(not(any(
         feature = "i8",
         feature = "i16",
@@ -294,6 +322,10 @@ pub mod precision {
         feature = "i64",
         feature = "i128"
     )))]
-    /// Adds 64 bits of precision to bevy's [`Transform`]. See [`precision`].
+    /// No integer [`precision`] feature was enabled; `i64` is used by default.
+    ///
+    /// The integer type used as the index for a `big_space` grid. Adds 64 bits of precision, in
+    /// addition to bevy's 32 bit [`Transform`], for a total of 96 bits of translational precision.
+    /// See [`precision`].
     pub type GridPrecision = i64;
 }

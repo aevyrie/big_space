@@ -1,9 +1,11 @@
+//! `big_space` benchmarks.
 #![allow(clippy::type_complexity)]
+#![allow(missing_docs)]
 
 use bevy::prelude::*;
 use big_space::prelude::*;
+use core::{iter::repeat_with, ops::Neg};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use std::{iter::repeat_with, ops::Neg};
 use turborand::prelude::*;
 
 criterion_group!(
@@ -52,7 +54,7 @@ fn deep_hierarchy(c: &mut Criterion) {
     fn translate(mut transforms: Query<&mut Transform>) {
         transforms.iter_mut().for_each(|mut transform| {
             transform.translation += Vec3::ONE;
-        })
+        });
     }
 
     let mut app = App::new();
@@ -91,7 +93,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     fn translate(mut transforms: Query<&mut Transform>) {
         transforms.iter_mut().for_each(|mut transform| {
             transform.translation += Vec3::ONE;
-        })
+        });
     }
 
     let mut app = App::new();
@@ -126,9 +128,9 @@ fn spatial_hashing(c: &mut Criterion) {
             let rng = Rng::with_seed(342525);
             let values: Vec<_> = repeat_with(|| {
                 [
-                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                    rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                    rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
                 ]
             })
             .take(N_SPAWN)
@@ -143,7 +145,7 @@ fn spatial_hashing(c: &mut Criterion) {
     fn translate(mut cells: Query<&mut GridCell>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += GridCell::ONE;
-        })
+        });
     }
 
     let mut app = App::new();
@@ -204,7 +206,7 @@ fn spatial_hashing(c: &mut Criterion) {
     //     });
     // });
 
-    fn setup_uniform<const HALF_EXTENT: i64>(mut commands: Commands) {
+    fn setup_uniform<const HALF_EXTENT: GridPrecision>(mut commands: Commands) {
         commands.spawn_big_space(Grid::new(1.0, 0.0), |root| {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
@@ -226,7 +228,8 @@ fn spatial_hashing(c: &mut Criterion) {
     let parent = app
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
-        .single(app.world());
+        .single(app.world())
+        .unwrap();
     let spatial_map = app.world().resource::<GridHashMap>();
     let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
@@ -254,7 +257,8 @@ fn spatial_hashing(c: &mut Criterion) {
     let parent = app
         .world_mut()
         .query_filtered::<Entity, With<BigSpace>>()
-        .single(app.world());
+        .single(app.world())
+        .unwrap();
     let spatial_map = app.world().resource::<GridHashMap>();
     let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
@@ -288,9 +292,9 @@ fn hash_filtering(c: &mut Criterion) {
         let rng = Rng::with_seed(342525);
         let values: Vec<_> = repeat_with(|| {
             [
-                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
-                rng.i64(-HALF_WIDTH..=HALF_WIDTH),
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
+                rng.i64(-HALF_WIDTH..=HALF_WIDTH) as GridPrecision,
             ]
         })
         .take(N_ENTITIES)

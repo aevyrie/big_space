@@ -5,7 +5,7 @@
 <img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="80%">
 
 Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read the docs](https://docs.rs/big_space)
- 
+
 [![crates.io](https://img.shields.io/crates/v/big_space)](https://crates.io/crates/big_space)
 [![docs.rs](https://docs.rs/big_space/badge.svg)](https://docs.rs/big_space)
 [![test suite](https://github.com/aevyrie/big_space/actions/workflows/rust.yml/badge.svg)](https://github.com/aevyrie/big_space/actions/workflows/rust.yml)
@@ -18,19 +18,29 @@ Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read t
 - Uses `Transform`, making it compatible with most of the Bevy ecosystem.
 - No added dependencies.
 - Absolute coordinates without drift, unlike camera-relative or periodic recentering solutions.
-- Chunks the world into integer grids, from `i8` up to `i128`.
-- Grids can be nested.
+- Chunks the world into nestable integer grids, from `i8` up to `i128`.
 - Spatial hashing for fast grid cell lookups and neighbor search.
-- Spatial partitioning to group sets of disconnected entities.
-- 3-5x faster than Bevy's transform propagation for wide hierarchies.
+- Spatial partitioning to group sets of connected cells.
+- Great performance scaling and parallelism with massive entity counts.
 - 👉 [Extensive documentation you should read.](https://docs.rs/big_space)
 
-![image](https://github.com/user-attachments/assets/cff0c58e-766c-41a0-92f7-de174807e447)
+![screenshot](https://github.com/user-attachments/assets/736a1dec-91a1-4ac1-9382-82084ebe6c1c)
+
+## Showcase
+
+### [Proton to Observable Universe scale](examples/demo.rs)
+
+https://github.com/user-attachments/assets/430624ee-e3a4-4ba3-b7cf-72f3d7f00b5f
+
+### [Floating origin demonstration](examples/error.rs)
+
+https://github.com/user-attachments/assets/9ce5283f-7d48-47dc-beef-9a7626858ed4
 
 ## Bevy Version Support
 
 | bevy | big_space |
-| ---- | --------- |
+|------|-----------|
+| 0.16 | 0.10      |
 | 0.15 | 0.8, 0.9  |
 | 0.14 | 0.7       |
 | 0.13 | 0.5, 0.6  |
