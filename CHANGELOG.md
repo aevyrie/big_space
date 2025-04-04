@@ -2,6 +2,12 @@
 
 ## UNRELEASED
 
+### New: `no_std` Support
+
+Thanks to `bushrat011899`'s efforts upstream and in this crate, it is now possible to use the plugin without the rust standard library. This is particularly useful when targeting embedded or console targets.
+
+## v0.9.0 - 2024-12-23
+
 ### New: `GridCell` Spatial Hashing
 
 Spatial hashing makes fast spatial queries and neighbor lookups possible. This release adds the `GridHashMap`, an automatically updated map of the entities in each grid cell. This makes it possible to query things like:
@@ -36,6 +42,5 @@ The newly added types follow this pattern:
 - `GridHashMap`: A map for entity, grid cell, and neighbor lookups.
 - `GridPartition`: Group of adjacent grid cells.
 - `GridPartitionMap`: A map for finding independent partitions of entities.
-
 
 It should now be more clear how all of the `Grid` types are related to each other.
