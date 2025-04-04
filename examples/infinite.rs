@@ -44,7 +44,7 @@ fn setup_scene(
             Camera3d::default(),
             Transform::from_xyz(0.0, 0.0, 10.0),
             FloatingOrigin,
-            big_space::camera::CameraController::default()
+            CameraController::default()
                 .with_speed(10.)
                 .with_smoothness(0.99, 0.95),
         ));

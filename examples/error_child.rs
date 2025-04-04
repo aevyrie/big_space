@@ -85,7 +85,7 @@ fn setup_scene(
                 ..default()
             }),
             FloatingOrigin,
-            big_space::camera::CameraController::default() // Built-in camera controller
+            CameraController::default() // Built-in camera controller
                 .with_speed_bounds([10e-18, 10e35])
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),
