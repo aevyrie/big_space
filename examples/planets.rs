@@ -225,7 +225,7 @@ fn spawn_solar_system(
                     camera.insert((
                         FloatingOrigin,
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
-                        big_space::camera::CameraController::default() // Built-in camera controller
+                        CameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
                             .with_smoothness(0.98, 0.98)
                             .with_speed(1.0),

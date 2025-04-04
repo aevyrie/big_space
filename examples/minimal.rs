@@ -67,7 +67,7 @@ fn setup_scene(
             Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
             grid_cell,
             FloatingOrigin,
-            big_space::camera::CameraController::default(),
+            CameraController::default(),
         ));
     });
 }
