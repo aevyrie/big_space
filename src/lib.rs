@@ -269,7 +269,7 @@ pub mod prelude {
 /// - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
 /// - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
 ///
-/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in a worst case
+/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
 /// precision of 0.5mm in any of these cases.
 ///
 /// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,

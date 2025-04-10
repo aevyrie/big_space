@@ -2,7 +2,7 @@
 
 # Big Space
 
-<img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="80%">
+<img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" width="80%" alt="partitioning screenshot">
 
 Huge worlds, high performance, no dependencies, ecosystem compatibility. [Read the docs](https://docs.rs/big_space)
 

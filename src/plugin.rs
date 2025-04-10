@@ -8,15 +8,18 @@ use bevy_transform::prelude::*;
 
 /// Add this plugin to your [`App`] for floating origin functionality.
 pub struct BigSpacePlugin {
-    validate_hierarchies: bool,
+    /// Enables runtime validation of `big_space` hierarchies, generating a detailed report on error
+    /// using [`BigSpaceValidationPlugin`].
+    pub validate_hierarchies: bool,
+    /// When enabled, the crate runs all updates in the fixed timestep schedule.
+    pub fixed_timestep: bool,
 }
 
 impl BigSpacePlugin {
-    /// Create a big space plugin, and specify whether hierarchy validation should be enabled.
-    pub fn new(validate_hierarchies: bool) -> Self {
-        Self {
-            validate_hierarchies,
-        }
+    /// Enable runtime hierarchy validation. See [`Self::validate_hierarchies`].
+    pub fn validate(mut self) -> Self {
+        self.validate_hierarchies = true;
+        self
     }
 }
 
@@ -24,6 +27,7 @@ impl Default for BigSpacePlugin {
     fn default() -> Self {
         Self {
             validate_hierarchies: cfg!(debug_assertions),
+            fixed_timestep: false,
         }
     }
 }
@@ -40,18 +44,88 @@ pub enum FloatingOriginSystem {
 
 impl Plugin for BigSpacePlugin {
     fn build(&self, app: &mut App) {
-        // Performance timings
-        app.add_plugins(crate::timing::TimingStatsPlugin);
+        app.add_plugins((
+            BigSpaceMinimalPlugin {
+                fixed_timestep: self.fixed_timestep,
+            },
+            BigSpacePropagationPlugin {
+                fixed_timestep: self.fixed_timestep,
+            },
+            crate::timing::TimingStatsPlugin,
+        ));
+        if self.validate_hierarchies {
+            app.add_plugins(BigSpaceValidationPlugin {
+                fixed_timestep: self.fixed_timestep,
+            });
+        }
+    }
+}
 
-        let system_set_config = || {
+/// Core setup needed for all uses of big space - reflection and grid cell recentering.
+pub struct BigSpaceMinimalPlugin {
+    /// When enabled, the plugin runs [`GridCell`] recentering in the fixed update schedule.
+    pub fixed_timestep: bool,
+}
+impl Plugin for BigSpaceMinimalPlugin {
+    fn build(&self, app: &mut App) {
+        app.register_type::<Transform>()
+            .register_type::<GlobalTransform>()
+            .register_type::<TransformTreeChanged>()
+            .register_type::<GridCell>()
+            .register_type::<Grid>()
+            .register_type::<BigSpace>()
+            .register_type::<FloatingOrigin>();
+
+        let recenter_grid_cells = GridCell::recenter_large_transforms
+            .in_set(FloatingOriginSystem::RecenterLargeTransforms);
+
+        if self.fixed_timestep {
+            app.add_systems(FixedPostUpdate, recenter_grid_cells);
+        } else {
+            app.add_systems(PostUpdate, recenter_grid_cells);
+        }
+    }
+}
+
+/// Adds hierarchy validation features.
+pub struct BigSpaceValidationPlugin {
+    /// When enabled, the plugin runs validation in the fixed update schedule.
+    fixed_timestep: bool,
+}
+
+impl Plugin for BigSpaceValidationPlugin {
+    fn build(&self, app: &mut App) {
+        let config =
+            crate::validation::validate_hierarchy::<crate::validation::SpatialHierarchyRoot>
+                .after(TransformSystem::TransformPropagate);
+
+        if self.fixed_timestep {
+            app.add_systems(FixedPostUpdate, config);
+        } else {
+            app.add_systems(PostUpdate, config);
+        }
+    }
+}
+
+/// Adds transform propagation, computing `GlobalTransforms` from hierarchies of [`Transform`],
+/// [`GridCell`], [`Grid`], and [`BigSpace`]s.
+///
+/// Disable Bevy's [`TransformPlugin`] while using this plugin.
+///
+/// This also adds support for Bevy's low-precision [`Transform`] hierarchies.
+pub struct BigSpacePropagationPlugin {
+    /// When enabled, the plugin runs transform propagation in the fixed update schedule.
+    fixed_timestep: bool,
+}
+
+impl Plugin for BigSpacePropagationPlugin {
+    fn build(&self, app: &mut App) {
+        let configs = || {
             (
                 Grid::tag_low_precision_roots // loose ordering on this set
                     .after(FloatingOriginSystem::Init)
                     .before(FloatingOriginSystem::PropagateLowPrecision),
-                (
-                    GridCell::recenter_large_transforms,
-                    BigSpace::find_floating_origin,
-                )
+                BigSpace::find_floating_origin
                     .in_set(FloatingOriginSystem::RecenterLargeTransforms),
                 LocalFloatingOrigin::compute_all
                     .in_set(FloatingOriginSystem::LocalFloatingOrigins)
@@ -66,53 +140,39 @@ impl Plugin for BigSpacePlugin {
                 .in_set(TransformSystem::TransformPropagate)
         };
 
-        app
-            // Reflect
-            .register_type::<Transform>()
-            .register_type::<GlobalTransform>()
-            .register_type::<TransformTreeChanged>()
-            .register_type::<GridCell>()
-            .register_type::<Grid>()
-            .register_type::<BigSpace>()
-            .register_type::<FloatingOrigin>()
-            // Meat of the plugin, once on startup, as well as every update
-            .add_systems(PostStartup, system_set_config())
-            .add_systems(PostUpdate, system_set_config())
-            // Validation
-            .add_systems(
-                PostUpdate,
-                crate::validation::validate_hierarchy::<crate::validation::SpatialHierarchyRoot>
-                    .after(TransformSystem::TransformPropagate)
-                    .run_if({
-                        let run = self.validate_hierarchies;
-                        move || run
-                    }),
+        app.add_systems(PostStartup, configs());
+
+        if self.fixed_timestep {
+            app.add_systems(FixedPostUpdate, configs());
+        } else {
+            app.add_systems(PostUpdate, configs());
+        };
+
+        // These are the bevy transform propagation systems. Because these start from the root
+        // of the hierarchy, and BigSpace bundles (at the root) do not contain a Transform,
+        // these systems will not interact with any high precision entities in big space. These
+        // systems are added for ecosystem compatibility with bevy, although the rendered
+        // behavior might look strange if they share a camera with one using the floating
+        // origin.
+        //
+        // This is most useful for bevy_ui, which relies on the transform systems to work, or if
+        // you want to render a camera that only needs to render a low-precision scene.
+        app.add_systems(
+            PostStartup,
+            (
+                propagate_parent_transforms,
+                bevy_transform::systems::sync_simple_transforms,
             )
-            // These are the bevy transform propagation systems. Because these start from the root
-            // of the hierarchy, and BigSpace bundles (at the root) do not contain a Transform,
-            // these systems will not interact with any high precision entities in big space. These
-            // systems are added for ecosystem compatibility with bevy, although the rendered
-            // behavior might look strange if they share a camera with one using the floating
-            // origin.
-            //
-            // This is most useful for bevy_ui, which relies on the transform systems to work, or if
-            // you want to render a camera that only needs to render a low-precision scene.
-            .add_systems(
-                PostStartup,
-                (
-                    propagate_parent_transforms,
-                    bevy_transform::systems::sync_simple_transforms,
-                )
-                    .in_set(TransformSystem::TransformPropagate),
+                .in_set(TransformSystem::TransformPropagate),
+        )
+        .add_systems(
+            PostUpdate,
+            (
+                propagate_parent_transforms,
+                bevy_transform::systems::sync_simple_transforms,
             )
-            .add_systems(
-                PostUpdate,
-                (
-                    propagate_parent_transforms,
-                    bevy_transform::systems::sync_simple_transforms,
-                )
-                    .in_set(TransformSystem::TransformPropagate),
-            );
+                .in_set(TransformSystem::TransformPropagate),
+        );
     }
 }
 

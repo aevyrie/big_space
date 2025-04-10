@@ -200,13 +200,13 @@ where
     /// "U" exceed the `max_depth` (radius), iteration will stop. Even if the "U" loops back within
     /// the radius, those cells will never be visited.
     ///
-    /// Also note that the `max_depth` (radius) is a chebyshev distance, not a euclidean distance.
+    /// Also note that the `max_depth` (radius) is a Chebyshev distance, not a Euclidean distance.
     #[doc(alias = "bfs")]
-    pub fn flood<'a>(
-        &'a self,
+    pub fn flood(
+        &self,
         seed: &GridHash,
         max_depth: Option<GridPrecision>,
-    ) -> impl Iterator<Item = Neighbor<'a>> {
+    ) -> impl Iterator<Item = Neighbor> {
         let starting_cell_cell = seed.cell();
         ContiguousNeighborsIter {
             initial_hash: Some(*seed),

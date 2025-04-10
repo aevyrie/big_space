@@ -79,7 +79,7 @@ fn setup_scene(
             CameraController::default(),
         ));
 
-        // A space ship
+        // A spaceship
         root_grid.spawn_spatial((
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)

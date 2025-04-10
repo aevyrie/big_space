@@ -68,7 +68,7 @@ pub enum GridHashMapSystem {
 /// hashing.The trait is automatically implemented for all compatible types, like [`With`] or
 /// [`Without`].
 ///
-/// By default, this is `()`, but it can be overidden when adding the [`GridHashPlugin`] and
+/// By default, this is `()`, but it can be overridden when adding the [`GridHashPlugin`] and
 /// [`GridHashMap`]. For example, if you use `With<Players>` as your filter, only `Player`s would be
 /// considered when building spatial hash maps. This is useful when you only care about querying
 /// certain entities, and want to avoid the plugin doing bookkeeping work for entities you don't

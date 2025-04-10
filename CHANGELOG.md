@@ -24,7 +24,7 @@ The map has received a few rounds of optimization passes to make incremental upd
 
 Built on top of the new spatial hashing feature is the `GridPartitionMap`. This map tracks groups of adjacent grid cells that have at least one entity. Each of these partitions contains many entities, and each partition is independent. That is, entities in partition A are guaranteed to be unable to collide with entities in partition B.
 
-This lays the groundwork for adding physics integrations. Because each partition is a clump of entities independent from all other entities, it should be possible to have independent physics simulations for each partition. Not only will this allow for extreme parallelism, it becomes possible to use 32-bit physics simulations in a 160-bit big_space.
+This lays the groundwork for adding physics integrations. Because each partition is a clump of entities independent of all other entities, it should be possible to have independent physics simulations for each partition. Not only will this allow for extreme parallelism, it becomes possible to use 32-bit physics simulations in a 160-bit big_space.
 
 ### `ReferenceFrame` Renamed `Grid`
 

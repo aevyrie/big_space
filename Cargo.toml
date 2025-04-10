@@ -34,7 +34,7 @@ std = [
 libm = ["bevy_math/libm", "dep:libm"]
 
 [dependencies]
-tracing = { version = "0.1", default-features = false } # Less deps than pulling in bevy_log
+tracing = { version = "0.1", default-features = false } # Fewer deps than pulling in bevy_log
 smallvec = { version = "1.13.2", default-features = false } # Already used by bevy in commands
 bevy_app = { version = "0.16.0-rc.3", default-features = false, features = ["bevy_reflect"] }
 bevy_ecs = { version = "0.16.0-rc.3", default-features = false }
@@ -75,7 +75,6 @@ bevy = { version = "0.16.0-rc.3", default-features = false, features = [
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
-bytemuck = "1.20"
 # bevy_hanabi = "0.14" # TODO: Update
 
 [lints.clippy]

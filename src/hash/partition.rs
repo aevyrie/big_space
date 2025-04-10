@@ -357,8 +357,7 @@ mod private {
     use bevy_ecs::prelude::*;
     use bevy_platform_support::{collections::HashSet, hash::PassHash, prelude::*};
 
-    /// A group of nearby [`GridCell`](crate::GridCell)s in an island disconnected from all other
-    /// [`GridCell`](crate::GridCell)s.
+    /// A group of nearby [`GridCell`]s on an island disconnected from all other [`GridCell`]s.
     #[derive(Debug)]
     pub struct GridPartition {
         grid: Entity,
