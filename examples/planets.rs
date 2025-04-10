@@ -19,7 +19,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::new(true),
+            BigSpacePlugin::default().validate(),
             CameraControllerPlugin::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))

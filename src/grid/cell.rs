@@ -58,7 +58,7 @@ impl GridCell {
 
     /// Returns a cell containing the minimum values for each element of self and rhs.
     ///
-    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ..].
+    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ...].
     pub fn min(&self, rhs: Self) -> Self {
         Self {
             x: self.x.min(rhs.x),
@@ -69,7 +69,7 @@ impl GridCell {
 
     /// Returns a cell containing the maximum values for each element of self and rhs.
     ///
-    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ..].
+    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ...].
     pub fn max(&self, rhs: Self) -> Self {
         Self {
             x: self.x.max(rhs.x),

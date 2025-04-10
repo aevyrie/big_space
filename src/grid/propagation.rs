@@ -254,29 +254,6 @@ impl Grid {
                 //   - The top level iteration parallelizes on the roots of the hierarchy.
                 //   - The caller ensures that each child has one and only one unique parent
                 //     throughout the entire hierarchy.
-                //
-                // For example, consider the following malformed hierarchy:
-                //
-                //     A
-                //   /   \
-                //  B     C
-                //   \   /
-                //     D
-                //
-                // D has two parents, B and C. If the propagation passes through C, but the ChildOf
-                // component on D points to B, the above check will panic as the origin parent does
-                // match the recorded parent.
-                //
-                // Also consider the following case, where A and B are roots:
-                //
-                //  A       B
-                //   \     /
-                //    C   D
-                //     \ /
-                //      E
-                //
-                // Even if these A and B start two separate tasks running in parallel, one of them
-                // will panic before attempting to mutably access E.
                 (unsafe { transform_query.get_unchecked(entity) }) else {
                 return;
             };

@@ -155,7 +155,7 @@ pub struct CameraInput {
 }
 
 impl CameraInput {
-    /// Reset the controller back to zero to ready fro the next grid.
+    /// Reset the controller back to zero to ready for the next grid.
     pub fn reset(&mut self) {
         *self = CameraInput {
             defaults_disabled: self.defaults_disabled,

@@ -15,6 +15,14 @@ pub struct BigSpacePlugin {
     pub fixed_timestep: bool,
 }
 
+impl BigSpacePlugin {
+    /// Enable runtime hierarchy validation. See [`Self::validate_hierarchies`].
+    pub fn validate(mut self) -> Self {
+        self.validate_hierarchies = true;
+        self
+    }
+}
+
 impl Default for BigSpacePlugin {
     fn default() -> Self {
         Self {

@@ -485,9 +485,9 @@ impl LocalFloatingOrigin {
                     }
                 }
 
-                // All of the grids pushed on the stack have been processed. We can now pop those
-                // off the stack and recursively process their children all the way out to the
-                // leaves of the tree.
+                // All the grids pushed on the stack have been processed. We can now pop those off
+                // the stack and recursively process their children all the way out to the leaves of
+                // the tree.
                 while let Some(this_grid) = grid_stack.pop() {
                     scratch_buffer.extend(grids.child_grids(this_grid));
                     // TODO: This loop could be run in parallel, because we are mutating each unique
