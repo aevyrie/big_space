@@ -1,10 +1,11 @@
 //! Spatial hashing acceleration structure. See [`GridHashPlugin`].
 
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
+use bevy_platform_support::prelude::*;
 
 pub mod component;
 pub mod map;
@@ -110,10 +111,8 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 //   hash ever recomputed? Is it removed? Is the spatial map updated?
 #[cfg(test)]
 mod tests {
-    use std::sync::OnceLock;
-
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_utils::hashbrown::HashSet;
+    use bevy_platform_support::{collections::HashSet, sync::OnceLock};
 
     #[test]
     fn entity_despawn() {
@@ -269,7 +268,7 @@ mod tests {
         let entities = app.world().resource::<Entities>().clone();
         let parent = app
             .world_mut()
-            .query::<&Parent>()
+            .query::<&ChildOf>()
             .get(app.world(), entities.a)
             .unwrap();
 

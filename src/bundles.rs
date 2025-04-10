@@ -1,4 +1,4 @@
-//! Component bundles for big_space.
+//! Component bundles for `big_space`.
 
 use crate::prelude::*;
 use bevy_ecs::prelude::*;

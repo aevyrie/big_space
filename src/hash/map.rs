@@ -1,13 +1,16 @@
 //! The [`GridHashMap`] that contains mappings between entities and their spatial hash.
 
-use std::{collections::VecDeque, marker::PhantomData, time::Instant};
+use alloc::collections::VecDeque;
+use core::marker::PhantomData;
 
 use super::GridHashMapFilter;
 use crate::prelude::*;
 use bevy_ecs::{entity::EntityHash, prelude::*};
-use bevy_utils::{
-    hashbrown::{HashMap, HashSet},
-    PassHash,
+use bevy_platform_support::{
+    collections::{HashMap, HashSet},
+    hash::PassHash,
+    prelude::*,
+    time::Instant,
 };
 
 /// An entry in a [`GridHashMap`], accessed with a [`GridHash`].
@@ -51,10 +54,10 @@ pub trait SpatialEntryToEntities<'a> {
 impl<'a, T, I> SpatialEntryToEntities<'a> for T
 where
     T: Iterator<Item = I> + 'a,
-    I: SpatialEntryToEntities<'a>,
+    I: SpatialEntryToEntities<'a> + 'a,
 {
     fn entities(self) -> impl Iterator<Item = Entity> + 'a {
-        self.flat_map(|entry| entry.entities())
+        self.flat_map(SpatialEntryToEntities::entities)
     }
 }
 
@@ -87,11 +90,11 @@ where
     spooky: PhantomData<F>,
 }
 
-impl<F> std::fmt::Debug for GridHashMap<F>
+impl<F> core::fmt::Debug for GridHashMap<F>
 where
     F: GridHashMapFilter,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GridHashMap")
             .field("map", &self.map)
             .field("reverse_map", &self.reverse_map)
@@ -150,9 +153,9 @@ where
         &'a self,
         entry: &'a GridHashEntry,
     ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
-        // Use `std::iter::once` to avoid returning a function-local variable.
+        // Use `core::iter::once` to avoid returning a function-local variable.
         Iterator::chain(
-            std::iter::once(entry),
+            core::iter::once(entry),
             entry.occupied_neighbors.iter().map(|neighbor_hash| {
                 self.get(neighbor_hash)
                     .expect("occupied_neighbors should be occupied")
@@ -177,8 +180,8 @@ where
         center: &'a GridHash,
         radius: u8,
     ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
-        // Use `std::iter::once` to avoid returning a function-local variable.
-        Iterator::chain(std::iter::once(*center), center.adjacent(radius))
+        // Use `core::iter::once` to avoid returning a function-local variable.
+        Iterator::chain(core::iter::once(*center), center.adjacent(radius))
             .filter_map(|hash| self.get(&hash))
     }
 
@@ -194,7 +197,7 @@ where
     ///
     /// Consider the case of a long thin U-shaped set of connected cells. While iterating from one
     /// end of the "U" to the other with this flood fill, if any of the cells near the base of the
-    /// "U" exceed the max_depth (radius), iteration will stop. Even if the "U" loops back within
+    /// "U" exceed the `max_depth` (radius), iteration will stop. Even if the "U" loops back within
     /// the radius, those cells will never be visited.
     ///
     /// Also note that the `max_depth` (radius) is a chebyshev distance, not a euclidean distance.
@@ -261,7 +264,7 @@ where
         spatial_map.map.just_removed.clear();
 
         for entity in removed.read() {
-            spatial_map.remove(entity)
+            spatial_map.remove(entity);
         }
 
         if let Some(ref mut stats) = stats {
@@ -309,7 +312,7 @@ where
     #[inline]
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
-            self.map.remove(entity, old_hash)
+            self.map.remove(entity, old_hash);
         }
     }
 }

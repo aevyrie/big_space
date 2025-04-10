@@ -1,12 +1,11 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_hierarchy::prelude::*;
+use bevy_ecs::{prelude::*, relationship::Relationship};
 use bevy_math::{DVec3, IVec3};
+use bevy_platform_support::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
-use bevy_utils::Instant;
 
 /// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
 /// this component is a transformation from the center of this cell.
@@ -84,7 +83,7 @@ impl GridCell {
     pub fn recenter_large_transforms(
         mut stats: ResMut<crate::timing::PropagationStats>,
         grids: Query<&Grid>,
-        mut changed_transform: Query<(&mut Self, &mut Transform, &Parent), Changed<Transform>>,
+        mut changed_transform: Query<(&mut Self, &mut Transform, &ChildOf), Changed<Transform>>,
     ) {
         let start = Instant::now();
         changed_transform
@@ -111,7 +110,7 @@ impl GridCell {
     }
 }
 
-impl std::ops::Add for GridCell {
+impl core::ops::Add for GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -123,7 +122,7 @@ impl std::ops::Add for GridCell {
     }
 }
 
-impl std::ops::Add<IVec3> for GridCell {
+impl core::ops::Add<IVec3> for GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: IVec3) -> Self::Output {
@@ -135,7 +134,7 @@ impl std::ops::Add<IVec3> for GridCell {
     }
 }
 
-impl std::ops::Sub for GridCell {
+impl core::ops::Sub for GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -147,7 +146,7 @@ impl std::ops::Sub for GridCell {
     }
 }
 
-impl std::ops::Sub<IVec3> for GridCell {
+impl core::ops::Sub<IVec3> for GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: IVec3) -> Self::Output {
@@ -159,7 +158,7 @@ impl std::ops::Sub<IVec3> for GridCell {
     }
 }
 
-impl std::ops::Add for &GridCell {
+impl core::ops::Add for &GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -167,7 +166,7 @@ impl std::ops::Add for &GridCell {
     }
 }
 
-impl std::ops::Add<IVec3> for &GridCell {
+impl core::ops::Add<IVec3> for &GridCell {
     type Output = GridCell;
 
     fn add(self, rhs: IVec3) -> Self::Output {
@@ -175,7 +174,7 @@ impl std::ops::Add<IVec3> for &GridCell {
     }
 }
 
-impl std::ops::Sub for &GridCell {
+impl core::ops::Sub for &GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -183,7 +182,7 @@ impl std::ops::Sub for &GridCell {
     }
 }
 
-impl std::ops::Sub<IVec3> for &GridCell {
+impl core::ops::Sub<IVec3> for &GridCell {
     type Output = GridCell;
 
     fn sub(self, rhs: IVec3) -> Self::Output {
@@ -191,35 +190,35 @@ impl std::ops::Sub<IVec3> for &GridCell {
     }
 }
 
-impl std::ops::AddAssign for GridCell {
+impl core::ops::AddAssign for GridCell {
     fn add_assign(&mut self, rhs: Self) {
-        use std::ops::Add;
+        use core::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl std::ops::AddAssign<IVec3> for GridCell {
+impl core::ops::AddAssign<IVec3> for GridCell {
     fn add_assign(&mut self, rhs: IVec3) {
-        use std::ops::Add;
+        use core::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl std::ops::SubAssign for GridCell {
+impl core::ops::SubAssign for GridCell {
     fn sub_assign(&mut self, rhs: Self) {
-        use std::ops::Sub;
+        use core::ops::Sub;
         *self = self.sub(rhs);
     }
 }
 
-impl std::ops::SubAssign<IVec3> for GridCell {
+impl core::ops::SubAssign<IVec3> for GridCell {
     fn sub_assign(&mut self, rhs: IVec3) {
-        use std::ops::Sub;
+        use core::ops::Sub;
         *self = self.sub(rhs);
     }
 }
 
-impl std::ops::Mul<GridPrecision> for GridCell {
+impl core::ops::Mul<GridPrecision> for GridCell {
     type Output = GridCell;
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {
@@ -231,7 +230,7 @@ impl std::ops::Mul<GridPrecision> for GridCell {
     }
 }
 
-impl std::ops::Mul<GridPrecision> for &GridCell {
+impl core::ops::Mul<GridPrecision> for &GridCell {
     type Output = GridCell;
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {

@@ -9,6 +9,7 @@
 use bevy::prelude::*;
 use bevy_math::DVec3;
 use big_space::prelude::*;
+use tracing::info;
 
 const UNIVERSE_DIA: f64 = 8.8e26; // Diameter of the observable universe
 const PROTON_DIA: f32 = 1.68e-15; // Diameter of a proton
@@ -16,10 +17,10 @@ const PROTON_DIA: f32 = 1.68e-15; // Diameter of a proton
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
             FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            big_space::camera::CameraControllerPlugin::default(), // Compatible controller
+            CameraControllerPlugin::default(),    // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, (bounce_atoms, toggle_cam_pos))
@@ -75,14 +76,14 @@ fn setup_scene(
             Transform::from_xyz(0.0, 0.0, PROTON_DIA * 2.0),
             grid_cell,
             FloatingOrigin,
-            big_space::camera::CameraController::default(),
+            CameraController::default(),
         ));
 
         // A space ship
         root_grid.spawn_spatial((
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)
-                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                .with_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
             grid_cell,
         ));
     });
@@ -104,12 +105,15 @@ fn toggle_cam_pos(
     grid: Query<&Grid>,
     keyboard: Res<ButtonInput<KeyCode>>,
     protons: Query<&GlobalTransform, With<Proton>>,
-) {
+) -> Result {
     if !keyboard.just_pressed(KeyCode::KeyT) {
-        return;
+        return Ok(());
     }
-    *cam.single_mut() = if *toggle {
-        grid.single().translation_to_grid(DVec3::X * UNIVERSE_DIA).0
+    *cam.single_mut()? = if *toggle {
+        grid.single()
+            .unwrap()
+            .translation_to_grid(DVec3::X * UNIVERSE_DIA)
+            .0
     } else {
         GridCell::ZERO
     };
@@ -120,4 +124,5 @@ fn toggle_cam_pos(
     for proton in &protons {
         info!("Proton x coord: {}", proton.translation().x);
     }
+    Ok(())
 }
