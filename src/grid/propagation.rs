@@ -291,7 +291,7 @@ impl Grid {
         let Some(children) = children else { return };
         for (child, child_of) in parent_query.iter_many(children) {
             assert_eq!(
-                child_of.parent, entity,
+                child_of.parent(), entity,
                 "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
             );
             // SAFETY: The caller guarantees that `transform_query` will not be fetched for any
