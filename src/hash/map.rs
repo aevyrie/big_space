@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use super::GridHashMapFilter;
 use crate::prelude::*;
 use bevy_ecs::{entity::EntityHash, prelude::*};
-use bevy_platform_support::{
+use bevy_platform::{
     collections::{HashMap, HashSet},
     hash::PassHash,
     prelude::*,

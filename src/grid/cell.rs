@@ -1,9 +1,9 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_math::{DVec3, IVec3};
-use bevy_platform_support::time::Instant;
+use bevy_platform::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
@@ -89,7 +89,7 @@ impl GridCell {
         changed_transform
             .par_iter_mut()
             .for_each(|(mut grid_pos, mut transform, parent)| {
-                let Ok(grid) = grids.get(parent.get()) else {
+                let Ok(grid) = grids.get(parent.parent()) else {
                     return;
                 };
                 if transform

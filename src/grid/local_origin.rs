@@ -12,7 +12,7 @@ use bevy_ecs::{
     },
 };
 use bevy_math::{prelude::*, DAffine3, DQuat};
-use bevy_platform_support::prelude::*;
+use bevy_platform::prelude::*;
 use bevy_transform::prelude::*;
 
 pub use inner::LocalFloatingOrigin;
@@ -438,7 +438,7 @@ impl LocalFloatingOrigin {
         roots: Query<(Entity, &BigSpace)>,
         parents: Query<&ChildOf>,
     ) {
-        let start = bevy_platform_support::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
 
         /// The maximum grid tree depth, defensively prevents infinite looping in case there is a
         /// degenerate hierarchy. It might take a while, but at least it's not forever?

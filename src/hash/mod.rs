@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
-use bevy_platform_support::prelude::*;
+use bevy_platform::prelude::*;
 
 pub mod component;
 pub mod map;
@@ -112,7 +112,7 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 #[cfg(test)]
 mod tests {
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_platform_support::{collections::HashSet, sync::OnceLock};
+    use bevy_platform::{collections::HashSet, sync::OnceLock};
 
     #[test]
     fn entity_despawn() {

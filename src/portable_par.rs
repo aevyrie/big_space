@@ -8,7 +8,7 @@ use core::ops::DerefMut;
 #[derive(Default)]
 pub struct PortableParallel<T: Send>(
     #[cfg(feature = "std")] bevy_utils::Parallel<T>,
-    #[cfg(not(feature = "std"))] bevy_platform_support::sync::RwLock<Option<T>>,
+    #[cfg(not(feature = "std"))] bevy_platform::sync::RwLock<Option<T>>,
 );
 
 /// A scope guard of a `Parallel`, when this struct is dropped ,the value will write back to its
@@ -75,7 +75,7 @@ impl<T: Default + Send> PortableParallel<T> {
 /// Needed until Parallel is portable. This assumes the value is `Some`.
 #[cfg(not(feature = "std"))]
 mod no_std_deref {
-    use bevy_platform_support::sync::RwLockWriteGuard;
+    use bevy_platform::sync::RwLockWriteGuard;
     use core::ops::{Deref, DerefMut};
 
     pub struct UncheckedDerefMutWrapper<'a, T>(pub(super) RwLockWriteGuard<'a, Option<T>>);
