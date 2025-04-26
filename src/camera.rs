@@ -5,8 +5,7 @@ use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
-use bevy_platform_support::collections::HashSet;
-use bevy_platform_support::prelude::*;
+use bevy_platform::{collections::HashSet, prelude::*};
 use bevy_reflect::prelude::*;
 use bevy_render::{
     primitives::Aabb,
@@ -17,8 +16,8 @@ use bevy_transform::{prelude::*, TransformSystem};
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
-pub struct CameraControllerPlugin(());
-impl Plugin for CameraControllerPlugin {
+pub struct BigSpaceCameraControllerPlugin;
+impl Plugin for BigSpaceCameraControllerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraInput>().add_systems(
             PostUpdate,
@@ -155,7 +154,7 @@ pub struct CameraInput {
 }
 
 impl CameraInput {
-    /// Reset the controller back to zero to ready fro the next grid.
+    /// Reset the controller back to zero to ready for the next grid.
     pub fn reset(&mut self) {
         *self = CameraInput {
             defaults_disabled: self.defaults_disabled,

@@ -1,9 +1,9 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_math::{DVec3, IVec3};
-use bevy_platform_support::time::Instant;
+use bevy_platform::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
@@ -58,7 +58,7 @@ impl GridCell {
 
     /// Returns a cell containing the minimum values for each element of self and rhs.
     ///
-    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ..].
+    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ...].
     pub fn min(&self, rhs: Self) -> Self {
         Self {
             x: self.x.min(rhs.x),
@@ -69,7 +69,7 @@ impl GridCell {
 
     /// Returns a cell containing the maximum values for each element of self and rhs.
     ///
-    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ..].
+    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ...].
     pub fn max(&self, rhs: Self) -> Self {
         Self {
             x: self.x.max(rhs.x),
@@ -89,7 +89,7 @@ impl GridCell {
         changed_transform
             .par_iter_mut()
             .for_each(|(mut grid_pos, mut transform, parent)| {
-                let Ok(grid) = grids.get(parent.get()) else {
+                let Ok(grid) = grids.get(parent.parent()) else {
                     return;
                 };
                 if transform

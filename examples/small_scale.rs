@@ -19,8 +19,8 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            CameraControllerPlugin::default(),    // Compatible controller
+            BigSpaceDebugPlugin::default(), // Draws cell AABBs and grids
+            BigSpaceCameraControllerPlugin::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, (bounce_atoms, toggle_cam_pos))
@@ -79,7 +79,7 @@ fn setup_scene(
             CameraController::default(),
         ));
 
-        // A space ship
+        // A spaceship
         root_grid.spawn_spatial((
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)

@@ -208,6 +208,7 @@ use prelude::*;
 
 pub(crate) mod portable_par;
 
+pub mod bevy_compat;
 pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
@@ -247,9 +248,9 @@ pub mod prelude {
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
 
     #[cfg(feature = "camera")]
-    pub use camera::{CameraController, CameraControllerPlugin};
+    pub use camera::{BigSpaceCameraControllerPlugin, CameraController};
     #[cfg(feature = "debug")]
-    pub use debug::FloatingOriginDebugPlugin;
+    pub use debug::BigSpaceDebugPlugin;
 }
 
 /// Contains the [`GridPrecision`] integer index type, which defines how much precision is available
@@ -269,7 +270,7 @@ pub mod prelude {
 /// - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
 /// - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
 ///
-/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in a worst case
+/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
 /// precision of 0.5mm in any of these cases.
 ///
 /// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,

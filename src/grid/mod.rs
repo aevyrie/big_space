@@ -25,7 +25,7 @@ pub mod propagation;
 /// Entities in the same grid as the [`FloatingOrigin`] will be rendered with the most precision.
 /// Transforms are propagated starting from the floating origin, ensuring that grids in a similar
 /// point in the hierarchy have accumulated the least error. Grids are transformed relative to each
-/// other using 64 bit float transforms.
+/// other using 64-bit float transforms.
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Component)]
 // We do not require the Transform, GlobalTransform, or GridCell, because these are not required in

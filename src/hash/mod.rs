@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
-use bevy_platform_support::prelude::*;
+use bevy_platform::prelude::*;
 
 pub mod component;
 pub mod map;
@@ -68,7 +68,7 @@ pub enum GridHashMapSystem {
 /// hashing.The trait is automatically implemented for all compatible types, like [`With`] or
 /// [`Without`].
 ///
-/// By default, this is `()`, but it can be overidden when adding the [`GridHashPlugin`] and
+/// By default, this is `()`, but it can be overridden when adding the [`GridHashPlugin`] and
 /// [`GridHashMap`]. For example, if you use `With<Players>` as your filter, only `Player`s would be
 /// considered when building spatial hash maps. This is useful when you only care about querying
 /// certain entities, and want to avoid the plugin doing bookkeeping work for entities you don't
@@ -112,7 +112,7 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 #[cfg(test)]
 mod tests {
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_platform_support::{collections::HashSet, sync::OnceLock};
+    use bevy_platform::{collections::HashSet, sync::OnceLock};
 
     #[test]
     fn entity_despawn() {

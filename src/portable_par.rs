@@ -8,12 +8,13 @@ use core::ops::DerefMut;
 #[derive(Default)]
 pub struct PortableParallel<T: Send>(
     #[cfg(feature = "std")] bevy_utils::Parallel<T>,
-    #[cfg(not(feature = "std"))] bevy_platform_support::sync::RwLock<Option<T>>,
+    #[cfg(not(feature = "std"))] bevy_platform::sync::RwLock<Option<T>>,
 );
 
-/// A scope guard of a `Parallel`, when this struct is dropped ,the value will writeback to its `Parallel`
+/// A scope guard of a `Parallel`, when this struct is dropped ,the value will write back to its
+/// `Parallel`
 impl<T: Send> PortableParallel<T> {
-    /// Gets a mutable iterator over all of the per-thread queues.
+    /// Gets a mutable iterator over all the per-thread queues.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = impl DerefMut<Target = T> + '_> {
         #[cfg(feature = "std")]
         {
@@ -25,7 +26,7 @@ impl<T: Send> PortableParallel<T> {
         }
     }
 
-    /// Clears all of the stored thread local values.
+    /// Clears all the stored thread local values.
     pub fn clear(&mut self) {
         #[cfg(feature = "std")]
         self.0.clear();
@@ -54,7 +55,7 @@ impl<T: Default + Send> PortableParallel<T> {
 
     /// Mutably borrows the thread-local value.
     ///
-    /// If there is no thread-local value, it will be initialized to it's default.
+    /// If there is no thread-local value, it will be initialized to its default.
     pub fn borrow_local_mut(&self) -> impl DerefMut<Target = T> + '_ {
         #[cfg(feature = "std")]
         let ret = self.0.borrow_local_mut();
@@ -74,7 +75,7 @@ impl<T: Default + Send> PortableParallel<T> {
 /// Needed until Parallel is portable. This assumes the value is `Some`.
 #[cfg(not(feature = "std"))]
 mod no_std_deref {
-    use bevy_platform_support::sync::RwLockWriteGuard;
+    use bevy_platform::sync::RwLockWriteGuard;
     use core::ops::{Deref, DerefMut};
 
     pub struct UncheckedDerefMutWrapper<'a, T>(pub(super) RwLockWriteGuard<'a, Option<T>>);
