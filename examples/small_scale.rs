@@ -19,8 +19,8 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            CameraControllerPlugin::default(),    // Compatible controller
+            BigSpaceDebugPlugin::default(), // Draws cell AABBs and grids
+            BigSpaceCameraControllerPlugin::default(), // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, (bounce_atoms, toggle_cam_pos))

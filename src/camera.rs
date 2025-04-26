@@ -17,8 +17,8 @@ use bevy_transform::{prelude::*, TransformSystem};
 
 /// Adds the `big_space` camera controller
 #[derive(Default)]
-pub struct CameraControllerPlugin(());
-impl Plugin for CameraControllerPlugin {
+pub struct BigSpaceCameraControllerPlugin;
+impl Plugin for BigSpaceCameraControllerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraInput>().add_systems(
             PostUpdate,

@@ -123,14 +123,14 @@ required-features = ["i128", "camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
-name = "error_child"
-path = "examples/error_child.rs"
-required-features = ["camera", "debug"]
+name = "error"
+path = "examples/error.rs"
 doc-scrape-examples = false
 
 [[example]]
-name = "error"
-path = "examples/error.rs"
+name = "error_child"
+path = "examples/error_child.rs"
+required-features = ["camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
@@ -142,7 +142,7 @@ doc-scrape-examples = false
 [[example]]
 name = "minimal"
 path = "examples/minimal.rs"
-required-features = ["camera"]
+required-features = ["camera", "debug"]
 doc-scrape-examples = false
 
 # TODO: Uncomment once bevy_hanabi is updated

@@ -1,5 +1,6 @@
 //! Tools for validating high-precision transform hierarchies
 
+use bevy_app::{App, Plugin, PostUpdate};
 use bevy_ecs::prelude::*;
 use bevy_platform_support::{
     collections::{HashMap, HashSet},
@@ -12,6 +13,17 @@ use crate::{grid::Grid, BigSpace, FloatingOrigin, GridCell};
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
     children: Vec<Entity>,
+}
+
+/// Adds hierarchy validation features.
+pub struct BigSpaceValidationPlugin;
+impl Plugin for BigSpaceValidationPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            PostUpdate,
+            validate_hierarchy::<SpatialHierarchyRoot>.after(TransformSystem::TransformPropagate),
+        );
+    }
 }
 
 #[derive(Default, Resource)]

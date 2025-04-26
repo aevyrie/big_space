@@ -19,8 +19,8 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default().validate(),
-            CameraControllerPlugin::default(),
+            BigSpacePlugin::default().with_validation(),
+            BigSpaceCameraControllerPlugin::default(),
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(AmbientLight {

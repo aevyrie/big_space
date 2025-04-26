@@ -2,6 +2,20 @@
 
 ## UNRELEASED
 
+### Updated: Bevy 0.16
+
+Due to changes in bevy, this plugin once again requires you to disable bevy's built-in transform system:
+
+```rs
+DefaultPlugins.build().disable::<TransformPlugin>(),
+```
+
+### Changed: Plugin naming consistency
+
+- `CameraControllerPlugin` -> `BigSpaceCameraControllerPlugin`
+- `TimingStatsPlugin` -> `BigSpaceTimingStatsPlugin`
+- `FloatingOriginDebugPlugin` -> `BigSpaceDebugPlugin`
+
 ### New: `no_std` Support
 
 Thanks to `bushrat011899`'s efforts upstream and in this crate, it is now possible to use the plugin without the rust standard library. This is particularly useful when targeting embedded or console targets.
