@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::hash::{BuildHasher, Hash, Hasher};
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_math::IVec3;
 use bevy_platform_support::{hash::FixedHasher, time::Instant};
 use bevy_reflect::Reflect;
@@ -92,7 +92,7 @@ impl GridHash {
     /// this module. This allows us to optimize change detection using [`ChangedGridHashes`].
     #[inline]
     pub(super) fn new(parent: &ChildOf, cell: &GridCell) -> Self {
-        Self::from_parent(parent.get(), cell)
+        Self::from_parent(parent.parent(), cell)
     }
 
     #[inline]
