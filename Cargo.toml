@@ -33,7 +33,6 @@ bevy_render = { version = "0.15.0", default-features = false, optional = true }
 bevy_input = { version = "0.15.0", default-features = false, optional = true }
 bevy_time = { version = "0.15.0", default-features = false, optional = true }
 
-
 [dev-dependencies]
 big_space = { path = "", features = ["debug", "camera"] }
 bevy = { version = "0.15.0", default-features = false, features = [
@@ -104,4 +103,9 @@ doc-scrape-examples = false
 [[example]]
 name = "split_screen"
 path = "examples/split_screen.rs"
+doc-scrape-examples = false
+
+[[example]]
+name = "dynamic_spawn"
+path = "examples/dynamic_spawn.rs"
 doc-scrape-examples = false

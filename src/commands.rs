@@ -56,6 +56,21 @@ pub struct GridCommands<'a, P: GridPrecision> {
 }
 
 impl<'a, P: GridPrecision> GridCommands<'a, P> {
+    /// Dynamic construct a new grid command.
+    pub fn new(
+        entity: Entity,
+        commands: Commands<'a, 'a>,
+        grid: Grid<P>,
+        children: SmallVec<[Entity; 8]>,
+    ) -> Self {
+        Self {
+            entity,
+            commands,
+            grid,
+            children,
+        }
+    }
+
     /// Get a reference to the current grid.
     pub fn grid(&mut self) -> &Grid<P> {
         &self.grid
