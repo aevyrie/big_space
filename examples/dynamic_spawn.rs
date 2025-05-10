@@ -1,11 +1,11 @@
 //! Example of dynamic spawn by big space.
 use bevy::prelude::*;
-use bevy_math::{vec3, DVec3};
+use bevy_math::{dvec3, DVec3};
 use big_space::prelude::*;
 use turborand::{rng::Rng, TurboRand};
 
 // Spawn the camera and mesh really, stupidly, far from the origin .
-const BIG_DISTANCE: f64 = 1_000_000_000_000_000_000.0;
+const BIG_DISTANCE: f64 = 1_000_000_000_000_000.0;
 
 fn main() {
     App::new()
@@ -16,13 +16,13 @@ fn main() {
             CameraControllerPlugin::default(),    // Compatible controller
         ))
         .add_systems(Startup, setup_scene)
-        .add_systems(PostUpdate, dynamic_spawn_in_root)
+        .add_systems(PostUpdate, dynamic_spawn_grid_in_root)
+        .add_systems(PostUpdate, dynamic_spawn_spatial_in_root)
         .run();
 }
 
 fn setup_scene(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
@@ -46,18 +46,9 @@ fn setup_scene(
 
         // Spawn a sphere mesh with high precision.
         root_grid.spawn_spatial((
-            Mesh3d(meshes.add(Sphere::default())),
+            Mesh3d(meshes.add(Sphere::new(500.0))),
             MeshMaterial3d(materials.add(Color::WHITE)),
             Transform::from_translation(cell_offset),
-            grid_cell,
-        ));
-
-        // Spawning low-precision entities (without a GridCell) as children of high-precision
-        // entities (with a GridCell), is also supported. We demonstrate this here by loading in a
-        // GLTF scene, which will be added as a child of this entity using low precision Transforms.
-        root_grid.spawn_spatial((
-            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
-            Transform::from_translation(cell_offset - 10.0),
             grid_cell,
         ));
 
@@ -65,45 +56,73 @@ fn setup_scene(
         // camera will never see floating point precision rendering artifacts.
         root_grid.spawn_spatial((
             Camera3d::default(),
-            Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
+            Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 3000.0)),
             grid_cell,
             FloatingOrigin,
             CameraController::default(),
         ));
     });
 
-    commands.spawn(Text::new(format!("Press `P` to dynamic spawn sphere.")));
+    commands.spawn(Text::new(format!(
+        "Press `P` to dynamic spawn new grid. \nPress `O` to dynamic spawn new grid cell."
+    )));
 }
 
-fn dynamic_spawn_in_root(
-    mut commands: Commands,
-    mut root: Query<(Entity, &Grid), With<BigSpace>>,
+fn dynamic_spawn_grid_in_root(
+    commands: Commands,
+    root: Query<(Entity, &Grid), With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     key: Res<ButtonInput<KeyCode>>,
 ) {
+    // spawn grid
     if key.just_pressed(KeyCode::KeyP) {
-        let (entity, grid) = root.get_single().unwrap();
-        let entity_commands = commands.entity(entity);
-        let mut root_grid = GridCommands::new(
-            entity_commands.id(),
-            commands,
-            grid.clone(),
-            Default::default(),
-        );
+        let (entity, grid) = root.single().unwrap();
+        let mut root_grid = GridCommands::new(entity, commands, grid.clone());
         let rng = Rng::new();
-        let offset = vec3(
-            (rng.f32() - 0.5) * 10.0,
-            (rng.f32() - 0.5) * 10.0,
-            (rng.f32() - 0.5) * 10.0,
+        let offset = dvec3(
+            (rng.f64() - 0.5) * 4000.0,
+            (rng.f64() - 0.5) * 4000.0,
+            (rng.f64() - 0.5) * 4000.0,
         );
         let (grid_cell, cell_offset) = root_grid
             .grid()
-            .translation_to_grid(DVec3::splat(BIG_DISTANCE));
+            .translation_to_grid(DVec3::splat(BIG_DISTANCE) + offset);
+        root_grid.with_grid_default(|child_grid| {
+            child_grid.insert((
+                Mesh3d(meshes.add(Sphere::new(500.0))),
+                MeshMaterial3d(materials.add(Color::WHITE)),
+                Transform::from_translation(cell_offset),
+                grid_cell,
+            ));
+        });
+    }
+}
+
+fn dynamic_spawn_spatial_in_root(
+    commands: Commands,
+    root: Query<(Entity, &Grid), With<BigSpace>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    key: Res<ButtonInput<KeyCode>>,
+) {
+    // spawn spatial
+    if key.just_pressed(KeyCode::KeyO) {
+        let (entity, grid) = root.single().unwrap();
+        let mut root_grid = GridCommands::new(entity, commands, grid.clone());
+        let rng = Rng::new();
+        let offset = dvec3(
+            (rng.f64() - 0.5) * 2000.0,
+            (rng.f64() - 0.5) * 2000.0,
+            (rng.f64() - 0.5) * 2000.0,
+        );
+        let (grid_cell, cell_offset) = root_grid
+            .grid()
+            .translation_to_grid(DVec3::splat(BIG_DISTANCE) + offset);
         root_grid.spawn_spatial((
-            Mesh3d(meshes.add(Sphere::default())),
-            MeshMaterial3d(materials.add(Color::WHITE)),
-            Transform::from_translation(cell_offset + offset),
+            Mesh3d(meshes.add(Sphere::new(300.0))),
+            MeshMaterial3d(materials.add(Color::linear_rgb(1.0, 1.0, 0.0))),
+            Transform::from_translation(cell_offset),
             grid_cell,
         ));
     }
