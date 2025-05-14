@@ -85,7 +85,7 @@
 //!   can exist in the high precision hierarchy. This allows you to load in GLTFs or other
 //!   low-precision entity hierarchies with no added effort or cost.
 //!
-//! While using the [`BigSpacePlugin`], the position of entities is now defined with the [`Grid`],
+//! While using the [`BigSpaceDefaultPlugins`], the position of entities is now defined with the [`Grid`],
 //! [`GridCell`], and [`Transform`] components. The `Grid` is a large integer grid of cells;
 //! entities are located within this grid as children using the `GridCell` component. Finally, the
 //! `Transform` is used to position the entity relative to the center of its `GridCell`. If an
@@ -137,9 +137,9 @@
 //! # Usage
 //!
 //! To start using this plugin, you will first need to choose how big your world should be! Do you
-//! need an i8, or an i128? See [`GridPrecision`] for more details and documentation.
+//! need an i8, or an i128? See [`precision`] for more details and documentation.
 //!
-//! 1. Add the [`BigSpacePlugin`] to your `App`
+//! 1. Add the [`BigSpaceDefaultPlugins`] to your `App`
 //! 2. Spawn a [`BigSpace`] with [`spawn_big_space`](BigSpaceCommands::spawn_big_space), and add
 //!    entities to it.
 //! 3. Add the [`FloatingOrigin`] to your active camera in the [`BigSpace`].
@@ -243,14 +243,12 @@ pub mod prelude {
         partition::{GridPartition, GridPartitionId, GridPartitionMap, GridPartitionPlugin},
         GridHashMapSystem, GridHashPlugin,
     };
-    pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
+    pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
 
     #[cfg(feature = "camera")]
-    pub use camera::{BigSpaceCameraControllerPlugin, CameraController};
-    #[cfg(feature = "debug")]
-    pub use debug::BigSpaceDebugPlugin;
+    pub use camera::BigSpaceCameraController;
 }
 
 /// Contains the [`GridPrecision`] integer index type, which defines how much precision is available

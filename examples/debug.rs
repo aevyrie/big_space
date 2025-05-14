@@ -8,7 +8,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default().with_debug(),
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, (movement, rotation))

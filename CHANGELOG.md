@@ -10,11 +10,49 @@ Due to changes in bevy, this plugin once again requires you to disable bevy's bu
 DefaultPlugins.build().disable::<TransformPlugin>(),
 ```
 
-### Changed: Plugin naming consistency
+### Changed: `BigSpaceDefaultPlugins` plugin group
 
+Instead of adding common plugins individually, they have been grouped into the `BigSpaceDefaultPlugins` plugin group, similar to the `DefaultPlugins` plugin group in Bevy.
+
+For example, the hierarchy validation plugin is enabled whenever debug assertions are enabled but can be manually enabled or disabled to override this behavior:
+
+```rs
+BigSpaceDefaultPlugins
+    .build()
+    .enable::<BigSpaceValidationPlugin>()
+```
+
+Plugins that are behind feature flags are automatically enabled when their corresponding feature is enabled. For example, you no longer need to manually add the camera controller plugin, you only need to enable the feature and add `BigSpaceDefaultPlugins` to your app.
+
+This replaces `BigSpacePlugin`.
+
+The existing plugin structure has been organized into more fine grained plugins, with the addition of the `BigSpaceMinimalPlugins` composed of `BigSpaceCorePlugin` and `BigSpacePropagationPlugin`. These are particularly useful for tests, benchmarks, and serverside applications. Future serverside physics will likely only use the `BigSpaceCorePlugin` to handle grid cell recentering, and not do any propagation which is only needed for rendering.
+
+### Changed: Naming consistency
+
+To avoid common name collisions and improve searchability, names have been standardized:
+
+- `FloatingOriginSystem` -> `BigSpaceSystems`
 - `CameraControllerPlugin` -> `BigSpaceCameraControllerPlugin`
+    - `CameraController` -> `BigSpaceCameraController`
+    - `CameraInput` -> `BigSpaceCameraInput`
 - `TimingStatsPlugin` -> `BigSpaceTimingStatsPlugin`
 - `FloatingOriginDebugPlugin` -> `BigSpaceDebugPlugin`
+- `BigSpaceValidationPlugin` (new)
+- `BigSpaceDefaultPlugins` (new)
+- `BigSpaceMinimalPlugins` (new)
+- `BigSpaceCorePlugin` (new)
+- `BigSpacePropagationPlugin` (new)
+
+### Changed: Default plugin filters
+
+Plugins that accept an optional query filter no longer require specifying the default empty filter tuple turbofish `::<()>`:
+
+- `GridHashPlugin::<()>::default()` -> `GridHashPlugin::default()`
+- `GridPartitionPlugin::<()>::default()` -> `GridPartitionPlugin::default()`
+
+To construct a plugin with a custom filter, use the `new()` method:
+`GridHashPlugin::<With<Player>>::new()`
 
 ### New: `no_std` Support
 

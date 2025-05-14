@@ -430,7 +430,7 @@ impl LocalFloatingOrigin {
     /// rendering precision. The high precision coordinates ([`GridCell`] and [`Transform`]) are the
     /// source of truth and never mutated.
     pub fn compute_all(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         mut grids: GridsMut,
         mut grid_stack: Local<Vec<Entity>>,
         mut scratch_buffer: Local<Vec<Entity>>,
@@ -452,7 +452,7 @@ impl LocalFloatingOrigin {
             .filter_map(|origin| cells.get(origin).ok())
         {
             let Some(mut this_grid) = grids.parent_grid_entity(origin_entity) else {
-                tracing::error!("The floating origin is not in a valid grid. The floating origin entity must be a child of an entity with the `Grid` component.");
+                bevy_log::error!("The floating origin is not in a valid grid. The floating origin entity must be a child of an entity with the `Grid` component.");
                 continue;
             };
 
@@ -508,24 +508,26 @@ impl LocalFloatingOrigin {
                 }
             }
 
-            tracing::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.");
+            bevy_log::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.");
         }
 
-        stats.local_origin_propagation += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.local_origin_propagation += start.elapsed();
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use bevy::{ecs::system::SystemState, math::DVec3, prelude::*};
-
     use super::*;
+    use crate::plugin::BigSpaceMinimalPlugins;
+    use bevy::{ecs::system::SystemState, math::DVec3, prelude::*};
 
     /// Test that the grid getters do what they say they do.
     #[test]
     fn grid_hierarchy_getters() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::default());
+        app.add_plugins(BigSpaceMinimalPlugins);
 
         let grid_bundle = (Transform::default(), GridCell::default(), Grid::default());
 
@@ -570,7 +572,7 @@ mod tests {
     #[test]
     fn child_propagation() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::default());
+        app.add_plugins(BigSpaceMinimalPlugins);
 
         let root_grid = Grid {
             local_floating_origin: LocalFloatingOrigin::new(
@@ -630,7 +632,7 @@ mod tests {
     #[test]
     fn parent_propagation() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::default());
+        app.add_plugins(BigSpaceMinimalPlugins);
 
         let grid_bundle = (Transform::default(), GridCell::default(), Grid::default());
         let root = app.world_mut().spawn(grid_bundle.clone()).id();
@@ -687,7 +689,7 @@ mod tests {
     #[test]
     fn origin_transform() {
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::default());
+        app.add_plugins(BigSpaceMinimalPlugins);
 
         let root = app
             .world_mut()

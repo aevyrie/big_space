@@ -81,7 +81,7 @@ impl GridCell {
     /// If an entity's transform translation becomes larger than the limit specified in its
     /// [`Grid`], it will be relocated to the nearest grid cell to reduce the size of the transform.
     pub fn recenter_large_transforms(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
         mut changed_transform: Query<(&mut Self, &mut Transform, &ChildOf), Changed<Transform>>,
     ) {
@@ -106,7 +106,9 @@ impl GridCell {
                     transform.translation = translation;
                 }
             });
-        stats.grid_recentering += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.grid_recentering += start.elapsed();
+        }
     }
 }
 

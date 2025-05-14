@@ -11,8 +11,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            BigSpaceCameraControllerPlugin::default(), // Compatible controller
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -64,7 +63,7 @@ fn setup_scene(
             Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
             grid_cell,
             FloatingOrigin,
-            CameraController::default(),
+            BigSpaceCameraController::default(),
         ));
     });
 }

@@ -3,6 +3,7 @@ extern crate alloc;
 
 use alloc::collections::VecDeque;
 
+use bevy::core_pipeline::Skybox;
 use bevy::{
     color::palettes,
     core_pipeline::bloom::Bloom,
@@ -13,29 +14,35 @@ use bevy::{
     transform::TransformSystem,
 };
 use big_space::prelude::*;
+use big_space::validation::BigSpaceValidationPlugin;
 use turborand::{rng::Rng, TurboRand};
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default().with_validation(),
-            BigSpaceCameraControllerPlugin::default(),
+            BigSpaceDefaultPlugins
+                .build()
+                .enable::<BigSpaceValidationPlugin>(),
+            bevy_egui::EguiPlugin {
+                enable_multipass_for_primary_context: true,
+            },
+            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         ))
-        .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
             brightness: 200.0,
             ..Default::default()
         })
         .add_systems(Startup, spawn_solar_system)
+        .add_systems(Update, configure_skybox_image)
         .add_systems(
             PostUpdate,
             (
                 rotate,
                 lighting
                     .in_set(TransformSystem::TransformPropagate)
-                    .after(FloatingOriginSystem::PropagateLowPrecision),
+                    .after(BigSpaceSystems::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
                     .after(big_space::camera::default_camera_inputs)
@@ -82,7 +89,7 @@ fn lighting(
 }
 
 fn springy_ship(
-    cam_input: Res<big_space::camera::CameraInput>,
+    cam_input: Res<big_space::camera::BigSpaceCameraInput>,
     mut ship: Query<&mut Transform, With<Spaceship>>,
     mut desired_dir: Local<(Vec3, Quat)>,
     mut smoothed_rot: Local<VecDeque<Vec3>>,
@@ -152,7 +159,7 @@ fn spawn_solar_system(
                 Mesh3d(sun_mesh_handle),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: Color::WHITE,
-                    emissive: LinearRgba::rgb(1000., 1000., 1000.),
+                    emissive: LinearRgba::rgb(10000., 10000., 10000.),
                     ..default()
                 })),
                 NotShadowCaster,
@@ -221,38 +228,47 @@ fn spawn_solar_system(
 
                 let cam_pos = DVec3::X * (EARTH_RADIUS_M + 1.0);
                 let (cam_cell, cam_pos) = earth.grid().translation_to_grid(cam_pos);
-                earth.with_grid_default(|camera| {
-                    camera.insert((
+                earth.with_grid_default(|floating_origin| {
+                    floating_origin.insert((
                         FloatingOrigin,
                         Transform::from_translation(cam_pos).looking_to(Vec3::NEG_Z, Vec3::X),
-                        CameraController::default() // Built-in camera controller
+                        BigSpaceCameraController::default() // Built-in camera controller
                             .with_speed_bounds([0.1, 10e35])
                             .with_smoothness(0.98, 0.98)
                             .with_speed(1.0),
                         cam_cell,
                     ));
 
-                    camera.spawn_spatial((
+                    floating_origin.spawn_spatial((
                         Camera3d::default(),
                         Transform::from_xyz(0.0, 4.0, 22.0),
                         Camera {
                             hdr: true,
+                            clear_color: ClearColorConfig::None,
                             ..default()
                         },
                         Exposure::SUNLIGHT,
-                        Bloom::NATURAL,
+                        Bloom::ANAMORPHIC,
                         bevy::core_pipeline::post_process::ChromaticAberration {
                             intensity: 0.01,
                             ..Default::default()
                         },
-                        bevy::core_pipeline::motion_blur::MotionBlur::default(),
+                        bevy::core_pipeline::motion_blur::MotionBlur {
+                            shutter_angle: 1.0,
+                            samples: 8,
+                        },
+                        Msaa::Off,
                     ));
 
-                    camera.with_child((
-                        Spaceship,
-                        SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
-                        Transform::from_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
-                    ));
+                    floating_origin.with_spatial(|ship_scene| {
+                        ship_scene.insert((
+                            Spaceship,
+                            SceneRoot(
+                                asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
+                            ),
+                            Transform::from_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
+                        ));
+                    });
                 });
             });
         });
@@ -280,17 +296,19 @@ fn spawn_solar_system(
 
 fn cursor_grab_system(
     mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
-    mut cam: ResMut<big_space::camera::CameraInput>,
+    mut cam: ResMut<big_space::camera::BigSpaceCameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
+    mut triggered: Local<bool>,
 ) -> Result<()> {
     let mut window = windows.single_mut()?;
 
-    if btn.just_pressed(MouseButton::Right) {
+    if btn.just_pressed(MouseButton::Right) || !*triggered {
         window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
         window.cursor_options.visible = false;
         // window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
+        *triggered = true;
     }
 
     if key.just_pressed(KeyCode::Escape) {
@@ -301,4 +319,47 @@ fn cursor_grab_system(
     }
 
     Ok(())
+}
+
+#[derive(Resource)]
+struct Cubemap(Handle<Image>, bool);
+
+fn configure_skybox_image(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    cubemap: Option<ResMut<Cubemap>>,
+    cameras: Query<Entity, With<Camera>>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    let mut cubemap = match cubemap {
+        None => {
+            commands.insert_resource(Cubemap(asset_server.load("images/cubemap.png"), false));
+            return;
+        }
+        Some(cubemap) => cubemap,
+    };
+
+    if cubemap.1 {
+        return;
+    }
+
+    if asset_server.load_state(&cubemap.0).is_loaded() {
+        let image = images.get_mut(&cubemap.0).unwrap();
+        // NOTE: PNGs do not have any metadata that could indicate they contain a cubemap texture,
+        // so they appear as one texture. The following code reconfigures the texture as necessary.
+        if image.texture_descriptor.array_layer_count() == 1 {
+            image.reinterpret_stacked_2d_as_array(image.height() / image.width());
+            image.texture_view_descriptor =
+                Some(bevy_render::render_resource::TextureViewDescriptor {
+                    dimension: Some(bevy_render::render_resource::TextureViewDimension::Cube),
+                    ..default()
+                });
+        }
+        let camera = cameras.single().unwrap();
+        commands.entity(camera).insert(Skybox {
+            image: cubemap.0.clone(),
+            ..Default::default()
+        });
+        cubemap.1 = true;
+    }
 }

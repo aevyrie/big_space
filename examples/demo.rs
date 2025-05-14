@@ -6,18 +6,13 @@ use bevy::{
     transform::TransformSystem,
     window::{CursorGrabMode, PrimaryWindow},
 };
-use big_space::{
-    camera::{CameraController, CameraInput},
-    prelude::*,
-    world_query::GridTransformReadOnly,
-};
+use big_space::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            BigSpaceCameraControllerPlugin::default(),
+            BigSpaceDefaultPlugins,
         ))
         .insert_resource(ClearColor(Color::BLACK))
         .add_systems(Startup, (setup, ui_setup))
@@ -43,7 +38,7 @@ fn setup(
             }),
             Transform::from_xyz(0.0, 0.0, 8.0).looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
             FloatingOrigin, // Important: marks the floating origin entity for rendering.
-            CameraController::default() // Built-in camera controller
+            BigSpaceCameraController::default() // Built-in camera controller
                 .with_speed_bounds([10e-18, 10e35])
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),
@@ -123,7 +118,7 @@ fn ui_setup(mut commands: Commands) {
 }
 
 fn highlight_nearest_sphere(
-    cameras: Query<&CameraController>,
+    cameras: Query<&BigSpaceCameraController>,
     objects: Query<&GlobalTransform>,
     mut gizmos: Gizmos,
 ) -> Result {
@@ -153,7 +148,7 @@ fn ui_text_system(
     grids: Grids,
     time: Res<Time>,
     origin: Query<(Entity, GridTransformReadOnly), With<FloatingOrigin>>,
-    camera: Query<&CameraController>,
+    camera: Query<&BigSpaceCameraController>,
     objects: Query<&Transform, With<Mesh3d>>,
 ) -> Result {
     let (origin_entity, origin_pos) = origin.single()?;
@@ -261,7 +256,7 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
 
 fn cursor_grab_system(
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
-    mut cam: ResMut<CameraInput>,
+    mut cam: ResMut<big_space::camera::BigSpaceCameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
 ) -> Result {

@@ -19,7 +19,7 @@ impl Grid {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`Grid`] the entity
     /// belongs to.
     pub fn propagate_high_precision(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
         mut entities: ParamSet<(
             Query<(
@@ -85,12 +85,14 @@ impl Grid {
                     grid.global_transform(&GridCell::default(), &Transform::IDENTITY);
             });
 
-        stats.high_precision_propagation += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.high_precision_propagation += start.elapsed();
+        }
     }
 
     /// Marks entities with [`LowPrecisionRoot`]. Handles adding and removing the component.
     pub fn tag_low_precision_roots(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         mut commands: Commands,
         valid_parent: Query<(), (With<GridCell>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
@@ -133,14 +135,16 @@ impl Grid {
                 commands.entity(entity).remove::<LowPrecisionRoot>();
             }
         }
-        stats.low_precision_root_tagging += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.low_precision_root_tagging += start.elapsed();
+        }
     }
 
     /// Update the [`GlobalTransform`] of entities with a [`Transform`], without a [`GridCell`], and
     /// that are children of an entity with a [`GlobalTransform`]. This will recursively propagate
     /// entities that only have low-precision [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         root_parents: Query<
             Ref<GlobalTransform>,
             (
@@ -206,7 +210,9 @@ impl Grid {
             }
         });
 
-        stats.low_precision_propagation += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.low_precision_propagation += start.elapsed();
+        }
     }
 
     /// Recursively propagates the transforms for `entity` and all of its descendants.
@@ -291,6 +297,7 @@ impl Grid {
 
 #[cfg(test)]
 mod tests {
+    use crate::plugin::BigSpaceMinimalPlugins;
     use crate::prelude::*;
     use bevy::prelude::*;
 
@@ -300,9 +307,8 @@ mod tests {
         struct Test;
 
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::default()).add_systems(
-            Startup,
-            |mut commands: Commands| {
+        app.add_plugins(BigSpaceMinimalPlugins)
+            .add_systems(Startup, |mut commands: Commands| {
                 commands.spawn_big_space_default(|root| {
                     root.spawn_spatial(FloatingOrigin);
                     root.spawn_spatial((
@@ -317,8 +323,7 @@ mod tests {
                         ));
                     });
                 });
-            },
-        );
+            });
 
         app.update();
 

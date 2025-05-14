@@ -25,6 +25,16 @@ pub struct GridHashPlugin<F = ()>(PhantomData<F>)
 where
     F: GridHashMapFilter;
 
+impl<F> GridHashPlugin<F>
+where
+    F: GridHashMapFilter,
+{
+    /// Create a new instance of [`GridHashPlugin`].
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
 impl<F> Plugin for GridHashPlugin<F>
 where
     F: GridHashMapFilter,
@@ -38,7 +48,7 @@ where
                 (
                     GridHash::update::<F>
                         .in_set(GridHashMapSystem::UpdateHash)
-                        .after(FloatingOriginSystem::RecenterLargeTransforms),
+                        .after(BigSpaceSystems::RecenterLargeTransforms),
                     GridHashMap::<F>::update
                         .in_set(GridHashMapSystem::UpdateMap)
                         .after(GridHashMapSystem::UpdateHash),
@@ -47,7 +57,7 @@ where
     }
 }
 
-impl<F: GridHashMapFilter> Default for GridHashPlugin<F> {
+impl Default for GridHashPlugin<()> {
     fn default() -> Self {
         Self(PhantomData)
     }
@@ -111,6 +121,7 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 //   hash ever recomputed? Is it removed? Is the spatial map updated?
 #[cfg(test)]
 mod tests {
+    use crate::plugin::BigSpaceMinimalPlugins;
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
     use bevy_platform::{collections::HashSet, sync::OnceLock};
 
@@ -128,7 +139,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<()>::default())
+        app.add_plugins(GridHashPlugin::default())
             .add_systems(Update, setup)
             .update();
 
@@ -183,7 +194,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<()>::default())
+        app.add_plugins(GridHashPlugin::default())
             .add_systems(Update, setup);
 
         app.update();
@@ -260,7 +271,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<()>::default())
+        app.add_plugins(GridHashPlugin::default())
             .add_systems(Startup, setup);
 
         app.update();
@@ -310,9 +321,9 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins((
-            GridHashPlugin::<()>::default(),
-            GridHashPlugin::<With<Player>>::default(),
-            GridHashPlugin::<Without<Player>>::default(),
+            GridHashPlugin::default(),
+            GridHashPlugin::<With<Player>>::new(),
+            GridHashPlugin::<Without<Player>>::new(),
         ))
         .add_systems(Startup, setup)
         .update();
@@ -365,7 +376,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins((BigSpacePlugin::default(), GridHashPlugin::<()>::default()))
+        app.add_plugins((BigSpaceMinimalPlugins, GridHashPlugin::default()))
             .add_systems(Startup, setup);
 
         app.update();

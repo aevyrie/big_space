@@ -4,7 +4,7 @@ use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     prelude::*,
 };
-use bevy_ecs::{entity::EntityHasher, relationship::Relationship};
+use bevy_ecs::entity::EntityHasher;
 use bevy_math::DVec3;
 use big_space::prelude::*;
 use core::hash::Hasher;
@@ -16,17 +16,18 @@ const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
 const MOVEMENT_SPEED: f32 = 5.0;
-const PERCENT_STATIC: f32 = 0.99;
+const PERCENT_STATIC: f32 = 1.0;
 
 fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            GridHashPlugin::<()>::default(),
-            GridPartitionPlugin::<()>::default(),
-            BigSpaceCameraControllerPlugin::default(),
+            BigSpaceDefaultPlugins,
+            GridHashPlugin::default(),
+            GridPartitionPlugin::default(),
         ))
+        .add_plugins(bevy::remote::RemotePlugin::default()) // Core remote protocol
+        .add_plugins(bevy::remote::http::RemoteHttpPlugin::default()) // Enable HTTP transport
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(
             PostUpdate,
@@ -173,13 +174,13 @@ fn move_player(
     }
 
     let t = time.elapsed_secs() * 0.01;
-    let (mut transform, mut cell, parent, hash) = player.single_mut()?;
+    let (mut transform, mut cell, child_of, hash) = player.single_mut()?;
     let absolute_pos = HALF_WIDTH
         * CELL_WIDTH
         * 0.8
         * Vec3::new((5.0 * t).sin(), (7.0 * t).cos(), (20.0 * t).sin());
     (*cell, transform.translation) = grids
-        .get(parent.get())?
+        .get(child_of.parent())?
         .imprecise_translation_to_grid(absolute_pos);
 
     neighbors.clear();
@@ -263,7 +264,7 @@ fn spawn(mut commands: Commands) {
             },
             Tonemapping::AcesFitted,
             Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
-            CameraController::default()
+            BigSpaceCameraController::default()
                 .with_smoothness(0.98, 0.93)
                 .with_slowing(false)
                 .with_speed(15.0),

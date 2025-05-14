@@ -24,7 +24,7 @@ impl Plugin for BigSpaceTimingStatsPlugin {
             .register_type::<SmoothedStat<GridHashStats>>()
             .add_systems(
                 PostUpdate,
-                (GridHashStats::reset, PropagationStats::reset).in_set(FloatingOriginSystem::Init),
+                (GridHashStats::reset, PropagationStats::reset).in_set(BigSpaceSystems::Init),
             )
             .add_systems(
                 PostUpdate,

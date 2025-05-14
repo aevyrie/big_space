@@ -8,8 +8,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            BigSpaceCameraControllerPlugin::default(),
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -44,7 +43,7 @@ fn setup_scene(
             Camera3d::default(),
             Transform::from_xyz(0.0, 0.0, 10.0),
             FloatingOrigin,
-            CameraController::default()
+            BigSpaceCameraController::default()
                 .with_speed(10.)
                 .with_smoothness(0.99, 0.95),
         ));

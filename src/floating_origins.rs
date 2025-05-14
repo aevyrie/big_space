@@ -82,7 +82,7 @@ impl BigSpace {
                 let space_origins = spaces_set.entry(root).or_default();
                 *space_origins += 1;
                 if *space_origins > 1 {
-                    tracing::error!(
+                    bevy_log::error!(
                         "BigSpace {root:#?} has multiple floating origins. There must be exactly one. Resetting this big space and disabling the floating origin to avoid unexpected propagation behavior.",
                     );
                     space.floating_origin = None;
@@ -98,7 +98,7 @@ impl BigSpace {
             .filter(|(_k, v)| **v == 0)
             .map(|(k, _v)| k)
         {
-            tracing::error!("BigSpace {space:#} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",);
+            bevy_log::error!("BigSpace {space:#} has no floating origins. There must be exactly one. Transform propagation will not work until there is a FloatingOrigin in the hierarchy.",);
         }
     }
 }

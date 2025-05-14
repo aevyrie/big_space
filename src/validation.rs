@@ -113,7 +113,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                             inspect.push('\n');
                         });
 
-                    tracing::error!("
+                    bevy_log::error!("
 -------------------------------------------
 big_space hierarchy validation error report
 -------------------------------------------
@@ -146,14 +146,14 @@ If possible, use commands.spawn_big_space(), which prevents these errors, instea
 /// kinds of nodes its children can be. This can be used recursively to validate an entire entity
 /// hierarchy by starting from the root.
 pub trait ValidHierarchyNode: sealed::CloneHierarchy + Send + Sync {
-    /// Add filters to a query to check if entities match this type of node
-    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>);
-    /// The types of nodes that can be children of this node.
-    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>>;
     /// A unique identifier of this type
     fn name(&self) -> &'static str {
         core::any::type_name::<Self>()
     }
+    /// Add filters to a query to check if entities match this type of node
+    fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>);
+    /// The types of nodes that can be children of this node.
+    fn allowed_child_nodes(&self) -> Vec<Box<dyn ValidHierarchyNode>>;
 }
 
 mod sealed {
