@@ -9,6 +9,9 @@ repository = "https://github.com/aevyrie/big_space"
 documentation = "https://docs.rs/crate/big_space/latest"
 exclude = ["assets"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["std"]
 debug = ["std", "bevy_gizmos", "bevy_color"]
@@ -80,7 +83,6 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "tonemapping_luts",
     "multi_threaded",
     "png",
-    "default",
 ] }
 noise = "0.9"
 turborand = "0.10"
