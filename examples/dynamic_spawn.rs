@@ -70,60 +70,64 @@ fn setup_scene(
 
 fn dynamic_spawn_grid_in_root(
     commands: Commands,
-    root: Query<(Entity, &Grid), With<BigSpace>>,
+    grids: Query<&Grid>,
+    root: Query<Entity, With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     key: Res<ButtonInput<KeyCode>>,
 ) {
     // spawn grid
     if key.just_pressed(KeyCode::KeyP) {
-        let (entity, grid) = root.single().unwrap();
-        let mut root_grid = GridCommands::new(entity, commands, grid.clone());
-        let rng = Rng::new();
-        let offset = dvec3(
-            (rng.f64() - 0.5) * 4000.0,
-            (rng.f64() - 0.5) * 4000.0,
-            (rng.f64() - 0.5) * 4000.0,
-        );
-        let (grid_cell, cell_offset) = root_grid
-            .grid()
-            .translation_to_grid(DVec3::splat(BIG_DISTANCE) + offset);
-        root_grid.with_grid_default(|child_grid| {
-            child_grid.insert((
-                Mesh3d(meshes.add(Sphere::new(500.0))),
-                MeshMaterial3d(materials.add(Color::WHITE)),
-                Transform::from_translation(cell_offset),
-                grid_cell,
-            ));
+        let root_entity = root.single().unwrap();
+        root_entity.spawn_grid_commands(commands, grids, |root_grid| {
+            let rng = Rng::new();
+            let offset = dvec3(
+                (rng.f64() - 0.5) * 4000.0,
+                (rng.f64() - 0.5) * 4000.0,
+                (rng.f64() - 0.5) * 4000.0,
+            );
+            let (grid_cell, cell_offset) = root_grid
+                .grid()
+                .translation_to_grid(DVec3::splat(BIG_DISTANCE) + offset);
+            root_grid.with_grid_default(|child_grid| {
+                child_grid.insert((
+                    Mesh3d(meshes.add(Sphere::new(500.0))),
+                    MeshMaterial3d(materials.add(Color::WHITE)),
+                    Transform::from_translation(cell_offset),
+                    grid_cell,
+                ));
+            });
         });
     }
 }
 
 fn dynamic_spawn_spatial_in_root(
     commands: Commands,
-    root: Query<(Entity, &Grid), With<BigSpace>>,
+    grids: Query<&Grid>,
+    root: Query<Entity, With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     key: Res<ButtonInput<KeyCode>>,
 ) {
     // spawn spatial
     if key.just_pressed(KeyCode::KeyO) {
-        let (entity, grid) = root.single().unwrap();
-        let mut root_grid = GridCommands::new(entity, commands, grid.clone());
-        let rng = Rng::new();
-        let offset = dvec3(
-            (rng.f64() - 0.5) * 2000.0,
-            (rng.f64() - 0.5) * 2000.0,
-            (rng.f64() - 0.5) * 2000.0,
-        );
-        let (grid_cell, cell_offset) = root_grid
-            .grid()
-            .translation_to_grid(DVec3::splat(BIG_DISTANCE) + offset);
-        root_grid.spawn_spatial((
-            Mesh3d(meshes.add(Sphere::new(300.0))),
-            MeshMaterial3d(materials.add(Color::linear_rgb(1.0, 1.0, 0.0))),
-            Transform::from_translation(cell_offset),
-            grid_cell,
-        ));
+        let root_entity = root.single().unwrap();
+        root_entity.spawn_grid_commands(commands, grids, |root_grid| {
+            let rng = Rng::new();
+            let offset = dvec3(
+                (rng.f64() - 0.5) * 2000.0,
+                (rng.f64() - 0.5) * 2000.0,
+                (rng.f64() - 0.5) * 2000.0,
+            );
+            let (grid_cell, cell_offset) = root_grid
+                .grid()
+                .translation_to_grid(DVec3::splat(BIG_DISTANCE) + offset);
+            root_grid.spawn_spatial((
+                Mesh3d(meshes.add(Sphere::new(300.0))),
+                MeshMaterial3d(materials.add(Color::linear_rgb(1.0, 1.0, 0.0))),
+                Transform::from_translation(cell_offset),
+                grid_cell,
+            ));
+        });
     }
 }

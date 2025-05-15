@@ -53,16 +53,6 @@ pub struct GridCommands<'a> {
 }
 
 impl<'a> GridCommands<'a> {
-    /// Dynamic construct a new grid command.
-    pub fn new(entity: Entity, commands: Commands<'a, 'a>, grid: Grid) -> Self {
-        Self {
-            entity,
-            commands,
-            grid,
-            children: Default::default(),
-        }
-    }
-
     /// Get a reference to the current grid.
     pub fn grid(&mut self) -> &Grid {
         &self.grid
@@ -242,5 +232,37 @@ impl<'a> SpatialEntityCommands<'a> {
     /// Access the underlying commands.
     pub fn commands(&mut self) -> &mut Commands<'a, 'a> {
         &mut self.commands
+    }
+}
+
+/// Adds `big_space` entity opertation to bevy's `Entity`.
+pub trait BigSpaceGridEntity {
+    ///  Dynamic spawn a [`GridCommands`] from an entity.
+    fn spawn_grid_commands(
+        &self,
+        commands: Commands<'_, '_>,
+        grids: Query<&Grid>,
+        builder: impl FnOnce(&mut GridCommands),
+    );
+}
+
+impl BigSpaceGridEntity for Entity {
+    fn spawn_grid_commands(
+        &self,
+        commands: Commands<'_, '_>,
+        grid_query: Query<&Grid>,
+        builder: impl FnOnce(&mut GridCommands),
+    ) {
+        if let Ok(grid) = grid_query.get(*self) {
+            let mut cmd = GridCommands {
+                entity: *self,
+                commands,
+                grid: grid.clone(),
+                children: Default::default(),
+            };
+            builder(&mut cmd);
+        } else {
+            tracing::error!("Entity {self} don't has a valid grid component.");
+        }
     }
 }
