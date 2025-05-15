@@ -11,9 +11,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            CameraControllerPlugin::default(),    // Compatible controller
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -25,16 +23,14 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // Using `spawn_big_space` helps you avoid mistakes when building hierarchies. Most notably,
-    // it will allow you to only write out the `GridPrecision` generic value (i64 in this case)
-    // once, without needing to repeat this generic when spawning `GridCell<i64>`s
+    // Using `spawn_big_space` helps you avoid mistakes when building hierarchies.
     //
     // A world can have multiple independent BigSpaces, with their own floating origins. This can
     // come in handy if you want to have two cameras very far from each other, rendering at the same
-    // time like split screen, or portals.
+    // time as split screen, or portals.
     commands.spawn_big_space_default(|root_grid| {
         // Because BIG_DISTANCE is so large, we want to avoid using bevy's f32 transforms alone and
-        // experience rounding errors. Instead, we use this helper to convert an f64 position into a
+        // experience rounding errors. Instead, we use this helper to convert f64 position into a
         // grid cell and f32 offset.
         let (grid_cell, cell_offset) = root_grid
             .grid()
@@ -67,7 +63,7 @@ fn setup_scene(
             Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
             grid_cell,
             FloatingOrigin,
-            CameraController::default(),
+            BigSpaceCameraController::default(),
         ));
     });
 }

@@ -1,9 +1,9 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_math::{DVec3, IVec3};
-use bevy_platform_support::time::Instant;
+use bevy_platform::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
@@ -58,7 +58,7 @@ impl GridCell {
 
     /// Returns a cell containing the minimum values for each element of self and rhs.
     ///
-    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ..].
+    /// In other words this computes [self.x.min(rhs.x), self.y.min(rhs.y), ...].
     pub fn min(&self, rhs: Self) -> Self {
         Self {
             x: self.x.min(rhs.x),
@@ -69,7 +69,7 @@ impl GridCell {
 
     /// Returns a cell containing the maximum values for each element of self and rhs.
     ///
-    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ..].
+    /// In other words this computes [self.x.max(rhs.x), self.y.max(rhs.y), ...].
     pub fn max(&self, rhs: Self) -> Self {
         Self {
             x: self.x.max(rhs.x),
@@ -81,7 +81,7 @@ impl GridCell {
     /// If an entity's transform translation becomes larger than the limit specified in its
     /// [`Grid`], it will be relocated to the nearest grid cell to reduce the size of the transform.
     pub fn recenter_large_transforms(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
         mut changed_transform: Query<(&mut Self, &mut Transform, &ChildOf), Changed<Transform>>,
     ) {
@@ -89,7 +89,7 @@ impl GridCell {
         changed_transform
             .par_iter_mut()
             .for_each(|(mut grid_pos, mut transform, parent)| {
-                let Ok(grid) = grids.get(parent.get()) else {
+                let Ok(grid) = grids.get(parent.parent()) else {
                     return;
                 };
                 if transform
@@ -106,7 +106,9 @@ impl GridCell {
                     transform.translation = translation;
                 }
             });
-        stats.grid_recentering += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.grid_recentering += start.elapsed();
+        }
     }
 }
 

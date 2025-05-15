@@ -7,9 +7,9 @@
 //! milky way galaxy.
 
 use bevy::prelude::*;
+use bevy_log::info;
 use bevy_math::DVec3;
 use big_space::prelude::*;
-use tracing::info;
 
 const UNIVERSE_DIA: f64 = 8.8e26; // Diameter of the observable universe
 const PROTON_DIA: f32 = 1.68e-15; // Diameter of a proton
@@ -18,9 +18,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            CameraControllerPlugin::default(),    // Compatible controller
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, (bounce_atoms, toggle_cam_pos))
@@ -76,10 +74,10 @@ fn setup_scene(
             Transform::from_xyz(0.0, 0.0, PROTON_DIA * 2.0),
             grid_cell,
             FloatingOrigin,
-            CameraController::default(),
+            BigSpaceCameraController::default(),
         ));
 
-        // A space ship
+        // A spaceship
         root_grid.spawn_spatial((
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)

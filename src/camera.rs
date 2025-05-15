@@ -5,8 +5,7 @@ use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
-use bevy_platform_support::collections::HashSet;
-use bevy_platform_support::prelude::*;
+use bevy_platform::{collections::HashSet, prelude::*};
 use bevy_reflect::prelude::*;
 use bevy_render::{
     primitives::Aabb,
@@ -15,28 +14,32 @@ use bevy_render::{
 use bevy_time::prelude::*;
 use bevy_transform::{prelude::*, TransformSystem};
 
-/// Adds the `big_space` camera controller
-#[derive(Default)]
-pub struct CameraControllerPlugin(());
-impl Plugin for CameraControllerPlugin {
+/// Runs the [`big_space`](crate) [`BigSpaceCameraController`].
+pub struct BigSpaceCameraControllerPlugin;
+impl Plugin for BigSpaceCameraControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CameraInput>().add_systems(
-            PostUpdate,
-            (
-                default_camera_inputs
-                    .before(camera_controller)
-                    .run_if(|input: Res<CameraInput>| !input.defaults_disabled),
-                nearest_objects_in_grid.before(camera_controller),
-                camera_controller.before(TransformSystem::TransformPropagate),
-            ),
-        );
+        app.register_type::<BigSpaceCameraController>()
+            .register_type::<BigSpaceCameraInput>()
+            .init_resource::<BigSpaceCameraInput>()
+            .add_systems(
+                PostUpdate,
+                (
+                    default_camera_inputs
+                        .before(camera_controller)
+                        .run_if(|input: Res<BigSpaceCameraInput>| !input.defaults_disabled),
+                    nearest_objects_in_grid.before(camera_controller),
+                    camera_controller.before(TransformSystem::TransformPropagate),
+                ),
+            );
     }
 }
 
-/// Per-camera settings for the `big_space` floating origin camera controller.
+/// A simple fly-cam camera controller.
+///
+/// Add to a camera to enable the built-in [`big_space`](crate) camera controller.
 #[derive(Clone, Debug, Reflect, Component)]
 #[reflect(Component)]
-pub struct CameraController {
+pub struct BigSpaceCameraController {
     /// Smoothness of translation, from `0.0` to `1.0`.
     pub smoothness: f64,
     /// Rotational smoothness, from `0.0` to `1.0`.
@@ -58,7 +61,7 @@ pub struct CameraController {
     vel_rotation: DQuat,
 }
 
-impl CameraController {
+impl BigSpaceCameraController {
     /// Sets the `smoothness` parameter of the controller, and returns the modified result.
     pub fn with_smoothness(mut self, translation: f64, rotation: f64) -> Self {
         self.smoothness = translation;
@@ -113,7 +116,7 @@ impl CameraController {
     }
 }
 
-impl Default for CameraController {
+impl Default for BigSpaceCameraController {
     fn default() -> Self {
         Self {
             smoothness: 0.85,
@@ -131,11 +134,12 @@ impl Default for CameraController {
     }
 }
 
-/// `ButtonInput` state used to command camera motion. Reset every time the values are read to update
-/// the camera. Allows you to map any input to camera motions. Uses aircraft principle axes
-/// conventions.
+/// `ButtonInput` state used to command [`BigSpaceCameraController`] motion. Reset every time the values
+/// are read to update the camera. Allows you to map any input to camera motions. Uses aircraft
+/// principle axes conventions.
 #[derive(Clone, Debug, Default, Reflect, Resource)]
-pub struct CameraInput {
+#[reflect(Resource)]
+pub struct BigSpaceCameraInput {
     /// When disabled, the camera input system is not run.
     pub defaults_disabled: bool,
     /// Z-negative
@@ -154,10 +158,10 @@ pub struct CameraInput {
     pub boost: bool,
 }
 
-impl CameraInput {
-    /// Reset the controller back to zero to ready fro the next grid.
+impl BigSpaceCameraInput {
+    /// Reset the controller back to zero to ready for the next grid.
     pub fn reset(&mut self) {
-        *self = CameraInput {
+        *self = BigSpaceCameraInput {
             defaults_disabled: self.defaults_disabled,
             ..Default::default()
         };
@@ -166,7 +170,7 @@ impl CameraInput {
     /// Returns the desired velocity transform.
     pub fn target_velocity(
         &self,
-        controller: &CameraController,
+        controller: &BigSpaceCameraController,
         speed: f64,
         dt: f64,
     ) -> (DVec3, DQuat) {
@@ -187,7 +191,7 @@ impl CameraInput {
 pub fn default_camera_inputs(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut mouse_move: EventReader<MouseMotion>,
-    mut cam: ResMut<CameraInput>,
+    mut cam: ResMut<BigSpaceCameraInput>,
 ) {
     keyboard.pressed(KeyCode::KeyW).then(|| cam.forward -= 1.0);
     keyboard.pressed(KeyCode::KeyS).then(|| cam.forward += 1.0);
@@ -220,7 +224,7 @@ pub fn nearest_objects_in_grid(
     )>,
     mut camera: Query<(
         Entity,
-        &mut CameraController,
+        &mut BigSpaceCameraController,
         &GlobalTransform,
         Option<&RenderLayers>,
     )>,
@@ -257,12 +261,17 @@ pub fn nearest_objects_in_grid(
     camera.nearest_object = nearest_object;
 }
 
-/// Uses [`CameraInput`] state to update the camera position.
+/// Uses [`BigSpaceCameraInput`] state to update the camera position.
 pub fn camera_controller(
     time: Res<Time>,
     grids: Grids,
-    mut input: ResMut<CameraInput>,
-    mut camera: Query<(Entity, &mut GridCell, &mut Transform, &mut CameraController)>,
+    mut input: ResMut<BigSpaceCameraInput>,
+    mut camera: Query<(
+        Entity,
+        &mut GridCell,
+        &mut Transform,
+        &mut BigSpaceCameraController,
+    )>,
 ) {
     for (camera, mut cell, mut transform, mut controller) in camera.iter_mut() {
         let Some(grid) = grids.parent_grid(camera) else {

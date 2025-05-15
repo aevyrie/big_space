@@ -3,6 +3,7 @@
 #![allow(missing_docs)]
 
 use bevy::prelude::*;
+use big_space::plugin::BigSpaceMinimalPlugins;
 use big_space::prelude::*;
 use core::{iter::repeat_with, ops::Neg};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -60,8 +61,8 @@ fn deep_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        GridHashPlugin::<()>::default(),
-        BigSpacePlugin::default(),
+        BigSpaceMinimalPlugins,
+        GridHashPlugin::default(),
     ))
     .add_systems(Startup, setup)
     .add_systems(Update, translate)
@@ -99,8 +100,8 @@ fn wide_hierarchy(c: &mut Criterion) {
     let mut app = App::new();
     app.add_plugins((
         MinimalPlugins,
-        GridHashPlugin::<()>::default(),
-        BigSpacePlugin::default(),
+        BigSpaceMinimalPlugins,
+        GridHashPlugin::default(),
     ))
     .add_systems(Startup, setup)
     .add_systems(Update, translate)
@@ -149,7 +150,7 @@ fn spatial_hashing(c: &mut Criterion) {
     }
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::<()>::default())
+    app.add_plugins(GridHashPlugin::default())
         .add_systems(Startup, setup)
         .update();
 
@@ -221,7 +222,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::<()>::default())
+    app.add_plugins(GridHashPlugin::default())
         .add_systems(Startup, setup_uniform::<5>)
         .update();
 
@@ -250,7 +251,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::<()>::default())
+    app.add_plugins(GridHashPlugin::default())
         .add_systems(Startup, setup_uniform::<50>)
         .update();
 
@@ -321,7 +322,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<()>::default(),));
+    app.add_plugins((GridHashPlugin::default(),));
     group.bench_function("No Filter Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -333,7 +334,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<With<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<With<Player>>::new(),));
     group.bench_function("With Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -345,7 +346,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<Without<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::<Without<Player>>::new(),));
     group.bench_function("Without Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -357,9 +358,9 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<()>::default(),))
-        .add_plugins((GridHashPlugin::<With<Player>>::default(),))
-        .add_plugins((GridHashPlugin::<Without<Player>>::default(),));
+    app.add_plugins((GridHashPlugin::default(),))
+        .add_plugins((GridHashPlugin::<With<Player>>::new(),))
+        .add_plugins((GridHashPlugin::<Without<Player>>::new(),));
     group.bench_function("All Plugins", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -372,7 +373,6 @@ fn vs_bevy(c: &mut Criterion) {
     let mut group = c.benchmark_group("transform_prop");
 
     use bevy::prelude::*;
-    use BigSpacePlugin;
 
     const N_ENTITIES: usize = 1_000_000;
 
@@ -407,7 +407,7 @@ fn vs_bevy(c: &mut Criterion) {
     });
 
     let mut app = App::new();
-    app.add_plugins((MinimalPlugins, BigSpacePlugin::default()))
+    app.add_plugins((MinimalPlugins, BigSpaceMinimalPlugins))
         .add_systems(Startup, setup_big)
         .update();
 
@@ -436,7 +436,7 @@ fn vs_bevy(c: &mut Criterion) {
     });
 
     let mut app = App::new();
-    app.add_plugins((MinimalPlugins, BigSpacePlugin::default()))
+    app.add_plugins((MinimalPlugins, BigSpaceMinimalPlugins))
         .add_systems(Startup, setup_big)
         .add_systems(Update, translate)
         .update();

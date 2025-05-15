@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::{prelude::*, query::QueryFilter};
-use bevy_platform_support::prelude::*;
+use bevy_platform::prelude::*;
 
 pub mod component;
 pub mod map;
@@ -25,6 +25,16 @@ pub struct GridHashPlugin<F = ()>(PhantomData<F>)
 where
     F: GridHashMapFilter;
 
+impl<F> GridHashPlugin<F>
+where
+    F: GridHashMapFilter,
+{
+    /// Create a new instance of [`GridHashPlugin`].
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
 impl<F> Plugin for GridHashPlugin<F>
 where
     F: GridHashMapFilter,
@@ -38,7 +48,7 @@ where
                 (
                     GridHash::update::<F>
                         .in_set(GridHashMapSystem::UpdateHash)
-                        .after(FloatingOriginSystem::RecenterLargeTransforms),
+                        .after(BigSpaceSystems::RecenterLargeTransforms),
                     GridHashMap::<F>::update
                         .in_set(GridHashMapSystem::UpdateMap)
                         .after(GridHashMapSystem::UpdateHash),
@@ -47,7 +57,7 @@ where
     }
 }
 
-impl<F: GridHashMapFilter> Default for GridHashPlugin<F> {
+impl Default for GridHashPlugin<()> {
     fn default() -> Self {
         Self(PhantomData)
     }
@@ -68,7 +78,7 @@ pub enum GridHashMapSystem {
 /// hashing.The trait is automatically implemented for all compatible types, like [`With`] or
 /// [`Without`].
 ///
-/// By default, this is `()`, but it can be overidden when adding the [`GridHashPlugin`] and
+/// By default, this is `()`, but it can be overridden when adding the [`GridHashPlugin`] and
 /// [`GridHashMap`]. For example, if you use `With<Players>` as your filter, only `Player`s would be
 /// considered when building spatial hash maps. This is useful when you only care about querying
 /// certain entities, and want to avoid the plugin doing bookkeeping work for entities you don't
@@ -111,8 +121,9 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 //   hash ever recomputed? Is it removed? Is the spatial map updated?
 #[cfg(test)]
 mod tests {
+    use crate::plugin::BigSpaceMinimalPlugins;
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_platform_support::{collections::HashSet, sync::OnceLock};
+    use bevy_platform::{collections::HashSet, sync::OnceLock};
 
     #[test]
     fn entity_despawn() {
@@ -128,7 +139,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<()>::default())
+        app.add_plugins(GridHashPlugin::default())
             .add_systems(Update, setup)
             .update();
 
@@ -183,7 +194,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<()>::default())
+        app.add_plugins(GridHashPlugin::default())
             .add_systems(Update, setup);
 
         app.update();
@@ -260,7 +271,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::<()>::default())
+        app.add_plugins(GridHashPlugin::default())
             .add_systems(Startup, setup);
 
         app.update();
@@ -310,9 +321,9 @@ mod tests {
 
         let mut app = App::new();
         app.add_plugins((
-            GridHashPlugin::<()>::default(),
-            GridHashPlugin::<With<Player>>::default(),
-            GridHashPlugin::<Without<Player>>::default(),
+            GridHashPlugin::default(),
+            GridHashPlugin::<With<Player>>::new(),
+            GridHashPlugin::<Without<Player>>::new(),
         ))
         .add_systems(Startup, setup)
         .update();
@@ -365,7 +376,7 @@ mod tests {
         };
 
         let mut app = App::new();
-        app.add_plugins((BigSpacePlugin::default(), GridHashPlugin::<()>::default()))
+        app.add_plugins((BigSpaceMinimalPlugins, GridHashPlugin::default()))
             .add_systems(Startup, setup);
 
         app.update();

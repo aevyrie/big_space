@@ -6,9 +6,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            CameraControllerPlugin::default(),
-            FloatingOriginDebugPlugin::default(),
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup_scene)
         .run();
@@ -85,7 +83,7 @@ fn setup_scene(
                 ..default()
             }),
             FloatingOrigin,
-            CameraController::default() // Built-in camera controller
+            BigSpaceCameraController::default() // Built-in camera controller
                 .with_speed_bounds([10e-18, 10e35])
                 .with_smoothness(0.9, 0.8)
                 .with_speed(1.0),

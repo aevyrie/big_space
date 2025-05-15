@@ -1,7 +1,7 @@
 //! Logic for propagating transforms through the hierarchy of grids.
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 
@@ -19,7 +19,7 @@ impl Grid {
     /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`Grid`] the entity
     /// belongs to.
     pub fn propagate_high_precision(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
         mut entities: ParamSet<(
             Query<(
@@ -31,7 +31,7 @@ impl Grid {
             Query<(&Grid, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
-        let start = bevy_platform_support::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
 
         // Performance note: I've also tried to iterate over each grid's children at once, to avoid
         // the grid and parent lookup, but that made things worse because it prevented dumb
@@ -42,7 +42,7 @@ impl Grid {
             .p0()
             .par_iter_mut()
             .for_each(|(cell, transform, parent, mut global_transform)| {
-                if let Ok(grid) = grids.get(parent.get()) {
+                if let Ok(grid) = grids.get(parent.parent()) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
                     // moved and the floating origin's local origin in that grid hasn't changed.
                     //
@@ -85,12 +85,14 @@ impl Grid {
                     grid.global_transform(&GridCell::default(), &Transform::IDENTITY);
             });
 
-        stats.high_precision_propagation += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.high_precision_propagation += start.elapsed();
+        }
     }
 
     /// Marks entities with [`LowPrecisionRoot`]. Handles adding and removing the component.
     pub fn tag_low_precision_roots(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         mut commands: Commands,
         valid_parent: Query<(), (With<GridCell>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
@@ -117,9 +119,9 @@ impl Grid {
         >,
         has_possibly_invalid_parent: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
     ) {
-        let start = bevy_platform_support::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
         for (entity, parent) in unmarked.iter() {
-            if valid_parent.contains(parent.get()) {
+            if valid_parent.contains(parent.parent()) {
                 commands.entity(entity).insert(LowPrecisionRoot);
             }
         }
@@ -129,18 +131,20 @@ impl Grid {
         }
 
         for (entity, parent) in has_possibly_invalid_parent.iter() {
-            if !valid_parent.contains(parent.get()) {
+            if !valid_parent.contains(parent.parent()) {
                 commands.entity(entity).remove::<LowPrecisionRoot>();
             }
         }
-        stats.low_precision_root_tagging += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.low_precision_root_tagging += start.elapsed();
+        }
     }
 
     /// Update the [`GlobalTransform`] of entities with a [`Transform`], without a [`GridCell`], and
     /// that are children of an entity with a [`GlobalTransform`]. This will recursively propagate
     /// entities that only have low-precision [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
-        mut stats: ResMut<crate::timing::PropagationStats>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         root_parents: Query<
             Ref<GlobalTransform>,
             (
@@ -168,7 +172,7 @@ impl Grid {
             ),
         >,
     ) {
-        let start = bevy_platform_support::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
         let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
             // High precision global transforms are change-detected, and are only updated if that
             // entity has moved relative to the floating origin's grid cell.
@@ -201,12 +205,14 @@ impl Grid {
         };
 
         roots.par_iter().for_each(|(low_precision_root, parent)| {
-            if let Ok(parent_transform) = root_parents.get(parent.get()) {
+            if let Ok(parent_transform) = root_parents.get(parent.parent()) {
                 update_transforms(low_precision_root, parent_transform);
             }
         });
 
-        stats.low_precision_propagation += start.elapsed();
+        if let Some(stats) = stats.as_mut() {
+            stats.low_precision_propagation += start.elapsed();
+        }
     }
 
     /// Recursively propagates the transforms for `entity` and all of its descendants.
@@ -254,29 +260,6 @@ impl Grid {
                 //   - The top level iteration parallelizes on the roots of the hierarchy.
                 //   - The caller ensures that each child has one and only one unique parent
                 //     throughout the entire hierarchy.
-                //
-                // For example, consider the following malformed hierarchy:
-                //
-                //     A
-                //   /   \
-                //  B     C
-                //   \   /
-                //     D
-                //
-                // D has two parents, B and C. If the propagation passes through C, but the ChildOf
-                // component on D points to B, the above check will panic as the origin parent does
-                // match the recorded parent.
-                //
-                // Also consider the following case, where A and B are roots:
-                //
-                //  A       B
-                //   \     /
-                //    C   D
-                //     \ /
-                //      E
-                //
-                // Even if these A and B start two separate tasks running in parallel, one of them
-                // will panic before attempting to mutably access E.
                 (unsafe { transform_query.get_unchecked(entity) }) else {
                 return;
             };
@@ -291,7 +274,7 @@ impl Grid {
         let Some(children) = children else { return };
         for (child, child_of) in parent_query.iter_many(children) {
             assert_eq!(
-                child_of.parent, entity,
+                child_of.parent(), entity,
                 "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
             );
             // SAFETY: The caller guarantees that `transform_query` will not be fetched for any
@@ -314,6 +297,7 @@ impl Grid {
 
 #[cfg(test)]
 mod tests {
+    use crate::plugin::BigSpaceMinimalPlugins;
     use crate::prelude::*;
     use bevy::prelude::*;
 
@@ -323,9 +307,8 @@ mod tests {
         struct Test;
 
         let mut app = App::new();
-        app.add_plugins(BigSpacePlugin::default()).add_systems(
-            Startup,
-            |mut commands: Commands| {
+        app.add_plugins(BigSpaceMinimalPlugins)
+            .add_systems(Startup, |mut commands: Commands| {
                 commands.spawn_big_space_default(|root| {
                     root.spawn_spatial(FloatingOrigin);
                     root.spawn_spatial((
@@ -340,8 +323,7 @@ mod tests {
                         ));
                     });
                 });
-            },
-        );
+            });
 
         app.update();
 

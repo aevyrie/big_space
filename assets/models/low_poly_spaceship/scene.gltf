@@ -310,7 +310,7 @@
       "emissiveFactor": [
         0.0,
         0.161466,
-        1.0
+        50.0
       ],
       "name": "Material.004"
     }
