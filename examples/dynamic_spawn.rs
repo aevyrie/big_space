@@ -11,9 +11,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(), // Draws cell AABBs and grids
-            CameraControllerPlugin::default(),    // Compatible controller
+            BigSpaceDefaultPlugins.build(),
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(PostUpdate, dynamic_spawn_grid_in_root)
@@ -59,7 +57,7 @@ fn setup_scene(
             Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 3000.0)),
             grid_cell,
             FloatingOrigin,
-            CameraController::default(),
+            BigSpaceCameraController::default(),
         ));
     });
 

@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use bevy_ecs::{prelude::*, relationship::RelatedSpawnerCommands};
+use bevy_log::tracing;
 use bevy_transform::prelude::*;
 use smallvec::SmallVec;
 
