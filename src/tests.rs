@@ -1,10 +1,11 @@
+use crate::plugin::BigSpaceMinimalPlugins;
 use crate::prelude::*;
 use bevy::prelude::*;
 
 #[test]
 fn changing_floating_origin_updates_global_transform() {
     let mut app = App::new();
-    app.add_plugins(BigSpacePlugin::default());
+    app.add_plugins(BigSpaceMinimalPlugins);
 
     let first = app
         .world_mut()
@@ -45,7 +46,7 @@ fn changing_floating_origin_updates_global_transform() {
 #[test]
 fn child_global_transforms_are_updated_when_floating_origin_changes() {
     let mut app = App::new();
-    app.add_plugins(BigSpacePlugin::default());
+    app.add_plugins(BigSpaceMinimalPlugins);
 
     let first = app
         .world_mut()

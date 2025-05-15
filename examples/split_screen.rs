@@ -16,9 +16,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpacePlugin::default(),
-            FloatingOriginDebugPlugin::default(),
-            CameraControllerPlugin::default(),
+            BigSpaceDefaultPlugins,
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, set_camera_viewports)
@@ -60,7 +58,7 @@ fn setup(
             Camera3d::default(),
             Transform::from_xyz(1_000_000.0 - 10.0, 100_005.0, 0.0)
                 .looking_to(Vec3::NEG_X, Vec3::Y),
-            CameraController::default().with_smoothness(0.8, 0.8),
+            BigSpaceCameraController::default().with_smoothness(0.8, 0.8),
             RenderLayers::layer(2),
             LeftCamera,
             FloatingOrigin,

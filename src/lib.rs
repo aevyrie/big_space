@@ -85,7 +85,7 @@
 //!   can exist in the high precision hierarchy. This allows you to load in GLTFs or other
 //!   low-precision entity hierarchies with no added effort or cost.
 //!
-//! While using the [`BigSpacePlugin`], the position of entities is now defined with the [`Grid`],
+//! While using the [`BigSpaceDefaultPlugins`], the position of entities is now defined with the [`Grid`],
 //! [`GridCell`], and [`Transform`] components. The `Grid` is a large integer grid of cells;
 //! entities are located within this grid as children using the `GridCell` component. Finally, the
 //! `Transform` is used to position the entity relative to the center of its `GridCell`. If an
@@ -137,9 +137,9 @@
 //! # Usage
 //!
 //! To start using this plugin, you will first need to choose how big your world should be! Do you
-//! need an i8, or an i128? See [`GridPrecision`] for more details and documentation.
+//! need an i8, or an i128? See [`precision`] for more details and documentation.
 //!
-//! 1. Add the [`BigSpacePlugin`] to your `App`
+//! 1. Add the [`BigSpaceDefaultPlugins`] to your `App`
 //! 2. Spawn a [`BigSpace`] with [`spawn_big_space`](BigSpaceCommands::spawn_big_space), and add
 //!    entities to it.
 //! 3. Add the [`FloatingOrigin`] to your active camera in the [`BigSpace`].
@@ -208,6 +208,7 @@ use prelude::*;
 
 pub(crate) mod portable_par;
 
+pub mod bevy_compat;
 pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
@@ -242,14 +243,12 @@ pub mod prelude {
         partition::{GridPartition, GridPartitionId, GridPartitionMap, GridPartitionPlugin},
         GridHashMapSystem, GridHashPlugin,
     };
-    pub use plugin::{BigSpacePlugin, FloatingOriginSystem};
+    pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;
     pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
 
     #[cfg(feature = "camera")]
-    pub use camera::{CameraController, CameraControllerPlugin};
-    #[cfg(feature = "debug")]
-    pub use debug::FloatingOriginDebugPlugin;
+    pub use camera::BigSpaceCameraController;
 }
 
 /// Contains the [`GridPrecision`] integer index type, which defines how much precision is available
@@ -269,7 +268,7 @@ pub mod prelude {
 /// - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
 /// - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
 ///
-/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in a worst case
+/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
 /// precision of 0.5mm in any of these cases.
 ///
 /// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,

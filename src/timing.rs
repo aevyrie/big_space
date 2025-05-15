@@ -10,9 +10,9 @@ use bevy_reflect::prelude::*;
 use bevy_transform::TransformSystem;
 
 /// Summarizes plugin performance timings
-pub struct TimingStatsPlugin;
+pub struct BigSpaceTimingStatsPlugin;
 
-impl Plugin for TimingStatsPlugin {
+impl Plugin for BigSpaceTimingStatsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PropagationStats>()
             .register_type::<PropagationStats>()
@@ -24,7 +24,7 @@ impl Plugin for TimingStatsPlugin {
             .register_type::<SmoothedStat<GridHashStats>>()
             .add_systems(
                 PostUpdate,
-                (GridHashStats::reset, PropagationStats::reset).in_set(FloatingOriginSystem::Init),
+                (GridHashStats::reset, PropagationStats::reset).in_set(BigSpaceSystems::Init),
             )
             .add_systems(
                 PostUpdate,
