@@ -242,7 +242,7 @@ pub trait BigSpaceGridEntity {
     fn spawn_grid_commands(
         &self,
         commands: Commands<'_, '_>,
-        grids: Query<&Grid>,
+        grids: Grids,
         builder: impl FnOnce(&mut GridCommands),
     );
 }
@@ -251,19 +251,16 @@ impl BigSpaceGridEntity for Entity {
     fn spawn_grid_commands(
         &self,
         commands: Commands<'_, '_>,
-        grid_query: Query<&Grid>,
+        grids: Grids,
         builder: impl FnOnce(&mut GridCommands),
     ) {
-        if let Ok(grid) = grid_query.get(*self) {
-            let mut cmd = GridCommands {
-                entity: *self,
-                commands,
-                grid: grid.clone(),
-                children: Default::default(),
-            };
-            builder(&mut cmd);
-        } else {
-            tracing::error!("Entity {self} don't has a valid grid component.");
-        }
+        let grid = grids.get(*self);
+        let mut cmd = GridCommands {
+            entity: *self,
+            commands,
+            grid: grid.clone(),
+            children: Default::default(),
+        };
+        builder(&mut cmd);
     }
 }

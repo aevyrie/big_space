@@ -68,7 +68,7 @@ fn setup_scene(
 
 fn dynamic_spawn_grid_in_root(
     commands: Commands,
-    grids: Query<&Grid>,
+    grids: Grids,
     root: Query<Entity, With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -101,7 +101,7 @@ fn dynamic_spawn_grid_in_root(
 
 fn dynamic_spawn_spatial_in_root(
     commands: Commands,
-    grids: Query<&Grid>,
+    grids: Grids,
     root: Query<Entity, With<BigSpace>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
