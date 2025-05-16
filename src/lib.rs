@@ -230,7 +230,7 @@ mod tests;
 pub mod prelude {
     use crate::*;
     pub use bundles::{BigGridBundle, BigSpaceRootBundle, BigSpatialBundle};
-    pub use commands::{BigSpaceCommands, GridCommands, SpatialEntityCommands};
+    pub use commands::{BigSpaceCommands, BigSpaceGridEntity, GridCommands, SpatialEntityCommands};
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
         cell::GridCell,

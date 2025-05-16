@@ -234,3 +234,32 @@ impl<'a> SpatialEntityCommands<'a> {
         &mut self.commands
     }
 }
+
+/// Adds `big_space` entity opertation to bevy's `Entity`.
+pub trait BigSpaceGridEntity {
+    ///  Dynamic spawn a [`GridCommands`] from an entity.
+    fn spawn_grid_commands(
+        &self,
+        commands: Commands<'_, '_>,
+        grids: Grids,
+        builder: impl FnOnce(&mut GridCommands),
+    );
+}
+
+impl BigSpaceGridEntity for Entity {
+    fn spawn_grid_commands(
+        &self,
+        commands: Commands<'_, '_>,
+        grids: Grids,
+        builder: impl FnOnce(&mut GridCommands),
+    ) {
+        let grid = grids.get(*self);
+        let mut cmd = GridCommands {
+            entity: *self,
+            commands,
+            grid: grid.clone(),
+            children: Default::default(),
+        };
+        builder(&mut cmd);
+    }
+}

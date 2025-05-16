@@ -188,3 +188,9 @@ name = "split_screen"
 path = "examples/split_screen.rs"
 required-features = ["camera", "debug"]
 doc-scrape-examples = false
+
+[[example]]
+name = "dynamic_spawn"
+path = "examples/dynamic_spawn.rs"
+required-features = ["camera", "debug"]
+doc-scrape-examples = false
