@@ -61,9 +61,10 @@ fn setup_scene(
         ));
     });
 
-    commands.spawn(Text::new(format!(
+    commands.spawn(Text::new(
         "Press `P` to dynamic spawn new grid. \nPress `O` to dynamic spawn new grid cell."
-    )));
+            .to_string(),
+    ));
 }
 
 fn dynamic_spawn_grid_in_root(
