@@ -1,7 +1,7 @@
 //! Logic for propagating transforms through the hierarchy of grids.
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 

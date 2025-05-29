@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::hash::{BuildHasher, Hash, Hasher};
 
 use crate::prelude::*;
-use bevy_ecs::{prelude::*, relationship::Relationship};
+use bevy_ecs::prelude::*;
 use bevy_math::IVec3;
 use bevy_platform_support::{hash::FixedHasher, time::Instant};
 use bevy_reflect::Reflect;
