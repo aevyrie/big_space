@@ -42,7 +42,7 @@ impl Grid {
             .p0()
             .par_iter_mut()
             .for_each(|(cell, transform, parent, mut global_transform)| {
-                if let Ok(grid) = grids.get(parent.get()) {
+                if let Ok(grid) = grids.get(parent.parent()) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
                     // moved and the floating origin's local origin in that grid hasn't changed.
                     //
@@ -119,7 +119,7 @@ impl Grid {
     ) {
         let start = bevy_platform_support::time::Instant::now();
         for (entity, parent) in unmarked.iter() {
-            if valid_parent.contains(parent.get()) {
+            if valid_parent.contains(parent.parent()) {
                 commands.entity(entity).insert(LowPrecisionRoot);
             }
         }
@@ -129,7 +129,7 @@ impl Grid {
         }
 
         for (entity, parent) in has_possibly_invalid_parent.iter() {
-            if !valid_parent.contains(parent.get()) {
+            if !valid_parent.contains(parent.parent()) {
                 commands.entity(entity).remove::<LowPrecisionRoot>();
             }
         }
@@ -201,7 +201,7 @@ impl Grid {
         };
 
         roots.par_iter().for_each(|(low_precision_root, parent)| {
-            if let Ok(parent_transform) = root_parents.get(parent.get()) {
+            if let Ok(parent_transform) = root_parents.get(parent.parent()) {
                 update_transforms(low_precision_root, parent_transform);
             }
         });
@@ -291,7 +291,7 @@ impl Grid {
         let Some(children) = children else { return };
         for (child, child_of) in parent_query.iter_many(children) {
             assert_eq!(
-                child_of.parent, entity,
+                child_of.parent(), entity,
                 "Malformed hierarchy. This probably means that your hierarchy has been improperly maintained, or contains a cycle"
             );
             // SAFETY: The caller guarantees that `transform_query` will not be fetched for any

@@ -92,7 +92,7 @@ impl GridHash {
     /// this module. This allows us to optimize change detection using [`ChangedGridHashes`].
     #[inline]
     pub(super) fn new(parent: &ChildOf, cell: &GridCell) -> Self {
-        Self::from_parent(parent.get(), cell)
+        Self::from_parent(parent.parent(), cell)
     }
 
     #[inline]

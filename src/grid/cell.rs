@@ -89,7 +89,7 @@ impl GridCell {
         changed_transform
             .par_iter_mut()
             .for_each(|(mut grid_pos, mut transform, parent)| {
-                let Ok(grid) = grids.get(parent.get()) else {
+                let Ok(grid) = grids.get(parent.parent()) else {
                     return;
                 };
                 if transform
