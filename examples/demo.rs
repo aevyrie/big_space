@@ -147,7 +147,7 @@ fn ui_text_system(
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     grids: Grids,
     time: Res<Time>,
-    origin: Query<(Entity, GridTransformReadOnly), With<FloatingOrigin>>,
+    origin: Query<(Entity, CellTransformReadOnly), With<FloatingOrigin>>,
     camera: Query<&BigSpaceCameraController>,
     objects: Query<&Transform, With<Mesh3d>>,
 ) -> Result {

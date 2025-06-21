@@ -24,9 +24,9 @@ impl PluginGroup for BigSpaceMinimalPlugins {
 /// All plugins needed for the core functionality of [`big_space`](crate).
 ///
 /// By default,
-/// - [`BigSpaceValidationPlugin`] is enabled in debug, and disabled in release.
-/// - [`BigSpaceDebugPlugin`] is enabled if the `debug` feature is enabled.
-/// - [`BigSpaceCameraControllerPlugin`] is enabled if the `camera` feature is enabled.
+/// - `BigSpaceValidationPlugin` is enabled in debug, and disabled in release.
+/// - `BigSpaceDebugPlugin` is enabled if the `debug` feature is enabled.
+/// - `BigSpaceCameraControllerPlugin` is enabled if the `camera` feature is enabled.
 ///
 /// Hierarchy validation is not behind a feature flag because it does not add dependencies.
 pub struct BigSpaceDefaultPlugins;

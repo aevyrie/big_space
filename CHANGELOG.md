@@ -2,6 +2,8 @@
 
 ## UNRELEASED
 
+Bevy 0.16, `no_std`, removed precision generics, switch to plugin groups, naming consistency pass.
+
 ### Updated: Bevy 0.16
 
 Due to changes in bevy, this plugin once again requires you to disable bevy's built-in transform system:
@@ -9,6 +11,14 @@ Due to changes in bevy, this plugin once again requires you to disable bevy's bu
 ```rs
 DefaultPlugins.build().disable::<TransformPlugin>(),
 ```
+
+### Removed: `GridPrecision` generics
+
+The precision of grids is now a feature flag instead of a generic, and `GridPrecision` is now an integer type instead of a trait.
+
+Having multiple precisions in the same app has been a persistent footgun, and is flexibility that no one uses or needs. This change has simplified the API by removing significant amounts of line noise caused by `::<P>`. For example `GridCell<P>` is now simply `GridCell`.
+
+The integer precision used for grids is now selected from a set of features: `i8`, `i16`, `i32`, `i64`. and `128`. If no feature is specified, `big_space` will default to `i64`. If multiple precision features are specified, the highest will be used.
 
 ### Changed: `BigSpaceDefaultPlugins` plugin group
 
@@ -22,7 +32,7 @@ BigSpaceDefaultPlugins
     .enable::<BigSpaceValidationPlugin>()
 ```
 
-Plugins that are behind feature flags are automatically enabled when their corresponding feature is enabled. For example, you no longer need to manually add the camera controller plugin, you only need to enable the feature and add `BigSpaceDefaultPlugins` to your app.
+Plugins that are behind feature flags are automatically enabled when their corresponding feature is enabled; you no longer need to manually add the camera controller plugin, you only need to enable the feature and add `BigSpaceDefaultPlugins` to your app.
 
 This replaces `BigSpacePlugin`.
 
@@ -44,6 +54,12 @@ To avoid common name collisions and improve searchability, names have been stand
 - `BigSpaceCorePlugin` (new)
 - `BigSpacePropagationPlugin` (new)
 
+Based on user feedback, the world query types have also been renamed:
+
+- `GridTransform` -> `CellTransform`
+- `GridTransformOwned` -> `CellTransformOwned`
+- `GridTransformReadOnly` -> `CellTransformReadOnly`
+
 ### Changed: Default plugin filters
 
 Plugins that accept an optional query filter no longer require specifying the default empty filter tuple turbofish `::<()>`:
@@ -57,6 +73,10 @@ To construct a plugin with a custom filter, use the `new()` method:
 ### New: `no_std` Support
 
 Thanks to `bushrat011899`'s efforts upstream and in this crate, it is now possible to use the plugin without the rust standard library. This is particularly useful when targeting embedded or console targets.
+
+### Optimized: Partition Bounds
+
+Partition bounds are now computed and cached when the partition is updated instead of on the fly. Adding a cell to the partition is an O(1) update to the partition bounds, and a removal is O(n). Previously, every bound query was O(n).
 
 ## v0.9.0 - 2024-12-23
 
