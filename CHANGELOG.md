@@ -1,6 +1,6 @@
 # Changelog
 
-## UNRELEASED
+## v0.10.0 - 2025-06-21
 
 Bevy 0.16, `no_std`, removed precision generics, switch to plugin groups, naming consistency pass.
 
@@ -18,7 +18,7 @@ The precision of grids is now a feature flag instead of a generic, and `GridPrec
 
 Having multiple precisions in the same app has been a persistent footgun, and is flexibility that no one uses or needs. This change has simplified the API by removing significant amounts of line noise caused by `::<P>`. For example `GridCell<P>` is now simply `GridCell`.
 
-The integer precision used for grids is now selected from a set of features: `i8`, `i16`, `i32`, `i64`. and `128`. If no feature is specified, `big_space` will default to `i64`. If multiple precision features are specified, the highest will be used.
+The integer precision used for grids is now selected from a set of features: `i8`, `i16`, `i32`, `i64`. and `i128`. If no feature is specified, `big_space` will default to `i64`. If multiple precision features are specified, the highest will be used.
 
 ### Changed: `BigSpaceDefaultPlugins` plugin group
 
