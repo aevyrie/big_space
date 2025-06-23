@@ -1,17 +1,22 @@
 //! A [`rapier3d`] implementation of [`BigPhysicsBackend`].
 
 use crate::physics::*;
+use alloc::boxed::Box;
 
 #[cfg(feature = "serde-serialize")]
 use serde::*;
 
-#[cfg_attr(feature = "serde-serialize", derive(Serialize, Deserialize))]
+/// A [`rapier3d`] implementation of [`BigPhysicsBackend`].
+#[cfg_attr(
+    feature = "serde-serialize",
+    derive(Serialize, Deserialize),
+    serde(default)
+)]
 pub struct RapierContext {
     entity_map: EntityHashMap<(RigidBodyHandle, ColliderHandle)>,
     gravity: Vector<f32>,
     integration_parameters: IntegrationParameters,
     islands: IslandManager,
-    broad_phase: Box<dyn BroadPhase>,
     narrow_phase: NarrowPhase,
     bodies: RigidBodySet,
     colliders: ColliderSet,
@@ -19,8 +24,13 @@ pub struct RapierContext {
     multibody_joints: MultibodyJointSet,
     ccd_solver: CCDSolver,
     query_pipeline: Option<QueryPipeline>,
+    #[cfg_attr(feature = "serde-serialize", serde(skip))]
+    broad_phase: Box<dyn BroadPhase>,
+    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     hooks: Box<dyn PhysicsHooks>,
+    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     events: Box<dyn EventHandler>,
+    #[cfg_attr(feature = "serde-serialize", serde(skip))]
     pipeline: PhysicsPipeline,
 }
 
@@ -112,7 +122,7 @@ impl BigPhysicsBackend for RapierContext {
                     mass,
                     AngVector::new(pmi.x, pmi.y, pmi.z),
                     principal_inertia_local_frame.into(),
-                ))
+                ));
             }
         };
 
@@ -161,7 +171,7 @@ impl BigPhysicsBackend for RapierContext {
                 collider.set_shape(shape);
 
                 // Inertia
-                update_mass(collider)
+                update_mass(collider);
             }
         }
     }

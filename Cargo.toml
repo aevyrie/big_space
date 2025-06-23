@@ -17,7 +17,7 @@ default = ["std"]
 debug = ["std", "bevy_gizmos", "bevy_color"]
 camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
 physics = ["rapier3d", "nalgebra", "downcast-rs"]
-serde-serialize = ["serde"]
+serde-serialize = ["serde", "rapier3d/serde-serialize"]
 i8 = []
 i16 = []
 i32 = []
@@ -98,7 +98,6 @@ turborand = "0.10"
 criterion = "0.5"
 bevy-inspector-egui = "0.31.0"
 bevy_egui = "0.34.1"
-bevy_hanabi = "0.16"
 
 [lints.clippy]
 doc_markdown = "warn"

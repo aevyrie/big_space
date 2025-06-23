@@ -3,7 +3,7 @@
 use alloc::collections::VecDeque;
 use core::marker::PhantomData;
 
-use super::HashFilter;
+use super::GridHashMapFilter;
 use crate::prelude::*;
 use bevy_ecs::{entity::EntityHash, prelude::*};
 use bevy_platform::{
@@ -37,7 +37,7 @@ impl GridHashEntry {
     /// Iterate over this cell and its non-empty adjacent neighbors.
     ///
     /// See [`GridHashMap::nearby`].
-    pub fn nearby<'a, F: HashFilter>(
+    pub fn nearby<'a, F: GridHashMapFilter>(
         &'a self,
         map: &'a GridHashMap<F>,
     ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
@@ -79,7 +79,7 @@ impl<'a> SpatialEntryToEntities<'a> for Neighbor<'a> {
 #[derive(Resource, Clone)]
 pub struct GridHashMap<F = ()>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     /// The primary hash map for looking up entities by their [`GridHash`].
     map: InnerGridHashMap,
@@ -92,7 +92,7 @@ where
 
 impl<F> core::fmt::Debug for GridHashMap<F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GridHashMap")
@@ -104,7 +104,7 @@ where
 
 impl<F> Default for GridHashMap<F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     fn default() -> Self {
         Self {
@@ -117,7 +117,7 @@ where
 
 impl<F> GridHashMap<F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     /// Get information about all entities located at this [`GridHash`], as well as its
     /// neighbors.
@@ -247,10 +247,10 @@ where
 /// Private Systems
 impl<F> GridHashMap<F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     /// Update the [`GridHashMap`] with entities that have changed [`GridHash`]es, and meet the
-    /// optional [`HashFilter`].
+    /// optional [`GridHashMapFilter`].
     pub(super) fn update(
         mut spatial_map: ResMut<Self>,
         mut changed_hashes: ResMut<super::ChangedGridHashes<F>>,
@@ -289,7 +289,7 @@ where
 /// Private Methods
 impl<F> GridHashMap<F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     /// Insert an entity into the [`GridHashMap`], updating any existing entries.
     #[inline]
@@ -441,7 +441,7 @@ impl InnerGridHashMap {
 /// An iterator over the neighbors of a cell, breadth-first.
 pub struct ContiguousNeighborsIter<'a, F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     initial_hash: Option<GridHash>,
     spatial_map: &'a GridHashMap<F>,
@@ -454,7 +454,7 @@ pub struct Neighbor<'a>(pub GridHash, pub &'a GridHashEntry);
 
 impl<'a, F> Iterator for ContiguousNeighborsIter<'a, F>
 where
-    F: HashFilter,
+    F: GridHashMapFilter,
 {
     type Item = Neighbor<'a>;
 

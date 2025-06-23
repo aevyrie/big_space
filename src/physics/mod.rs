@@ -1,30 +1,40 @@
 //! Physics support for `big_space`.
 
+use crate::hash::GridHashPlugin;
+use crate::prelude::GridPartitionPlugin;
+use alloc::boxed::Box;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::prelude::*;
 use bevy_math::{primitives, Quat, Vec3};
+use bevy_reflect::Reflect;
 use bevy_transform::TransformSystem::TransformPropagate;
 use downcast_rs::{impl_downcast, Downcast};
 use rapier3d::prelude::*;
 
 pub mod rapier;
 
+/// Adds physics support to `big_space`.
 pub struct BigPhysicsPlugin;
 
 impl Plugin for BigPhysicsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PostUpdate,
-            (
-                Self::assign_entities_to_contexts,
-                Self::read_kinematic_velocities,
-                Self::simulate,
-                Self::write_ecs,
-            )
-                .chain()
-                .before(TransformPropagate),
-        );
+        app.register_type::<BigRigidBody>()
+            .add_plugins((
+                GridHashPlugin::<With<BigRigidBody>>::new(),
+                GridPartitionPlugin::<With<BigRigidBody>>::new(),
+            ))
+            .add_systems(
+                PostUpdate,
+                (
+                    Self::assign_entities_to_contexts,
+                    Self::read_kinematic_velocities,
+                    Self::simulate,
+                    Self::write_ecs,
+                )
+                    .chain()
+                    .before(TransformPropagate),
+            );
     }
 }
 
@@ -48,9 +58,11 @@ impl BigPhysicsPlugin {
     fn write_ecs() {}
 }
 
+/// The physics backend driving the simulation for this [`Grid`].
 #[derive(Component)]
 pub struct BigPhysics {
-    context: Box<dyn BigPhysicsBackend>,
+    /// Any backend implementing the [`BigPhysicsBackend`] trait.
+    pub context: Box<dyn BigPhysicsBackend>,
 }
 
 /// The interface of a `big_space` physics backend that can be implemented for any physics engine.
@@ -90,7 +102,7 @@ pub trait BigPhysicsBackend: Downcast + Send + Sync {
 impl_downcast!(BigPhysicsBackend);
 
 /// A `big_space` physics entity.
-#[derive(Component, Debug, PartialEq, Clone)]
+#[derive(Component, Reflect, Debug, PartialEq, Clone)]
 pub struct BigRigidBody {
     behavior: Behavior,
     shape: Shape,
@@ -98,6 +110,7 @@ pub struct BigRigidBody {
 }
 
 impl BigRigidBody {
+    /// Create a new fixed rigid body that can push other physics objects but cannot be moved.
     pub fn new_fixed(shape: Shape, inertia: Inertia) -> Self {
         Self {
             behavior: Behavior::Fixed,
@@ -106,6 +119,7 @@ impl BigRigidBody {
         }
     }
 
+    /// Create a new dynamic rigid body that can push and be pushed by other physics objects.
     pub fn new_dynamic(shape: Shape, inertia: Inertia) -> Self {
         Self {
             behavior: Behavior::Dynamic(ReadVelocity::ZERO),
@@ -114,6 +128,7 @@ impl BigRigidBody {
         }
     }
 
+    /// Create a new kinematic rigid body that can be manually moved and push other objects.
     pub fn new_kinematic(shape: Shape, inertia: Inertia) -> Self {
         Self {
             behavior: Behavior::Kinematic(WriteVelocity::ZERO),
@@ -131,6 +146,7 @@ impl BigRigidBody {
         }
     }
 
+    /// Get a read-only reference to the velocity.
     pub fn velocity(&self) -> ReadVelocity {
         self.behavior.velocity()
     }
@@ -143,7 +159,7 @@ impl BigRigidBody {
 ///
 /// This type is used along with [`WriteVelocity`] to clearly communicate and enforce whether a
 /// velocity acquired from the physics engine can be written to.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Reflect, Debug, PartialEq, Clone, Copy)]
 pub struct ReadVelocity {
     linear: Vec3,
     angular: Quat,
@@ -162,13 +178,16 @@ impl ReadVelocity {
 ///
 /// This type is used along with [`ReadVelocity`] to clearly communicate and enforce whether a
 /// velocity acquired from the physics engine can be written to.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Reflect, Debug, PartialEq, Clone, Copy)]
 pub struct WriteVelocity {
+    /// The linear velocity in the local frame.
     pub linear: Vec3,
+    /// The angular velocity in the local frame.
     pub angular: Quat,
 }
 
 impl WriteVelocity {
+    /// Motionless.
     pub const ZERO: Self = WriteVelocity {
         linear: Vec3::ZERO,
         angular: Quat::IDENTITY,
@@ -177,7 +196,7 @@ impl WriteVelocity {
 
 /// The inertial properties of a rigid body, describing how heavy it is and how that mass is
 /// distributed.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Reflect, Debug, PartialEq, Clone, Copy)]
 pub enum Inertia {
     /// Compute the inertial properties of the body by assuming it has a uniform density with the
     /// associated [`Shape`] and supplied total `mass`.
@@ -200,7 +219,7 @@ pub enum Inertia {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Reflect, Debug, PartialEq, Clone, Copy)]
 pub enum Shape {
     Cuboid(primitives::Cuboid),
     Sphere(primitives::Sphere),
@@ -208,7 +227,7 @@ pub enum Shape {
 }
 
 /// Configure how the object behaves in the physics simulation.
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Reflect, Debug, PartialEq, Clone, Copy)]
 pub enum Behavior {
     /// An immovable object.
     Fixed,
@@ -219,6 +238,7 @@ pub enum Behavior {
 }
 
 impl Behavior {
+    /// Get a read-only reference to the velocity.
     pub fn velocity(&self) -> ReadVelocity {
         match self {
             Behavior::Fixed => ReadVelocity::ZERO,
@@ -230,14 +250,17 @@ impl Behavior {
         }
     }
 
+    /// Return true if this is a fixed object.
     pub fn is_fixed(&self) -> bool {
         matches!(self, Behavior::Fixed)
     }
 
+    /// Return true if this is a dynamic object.
     pub fn is_dynamic(&self) -> bool {
         matches!(self, Behavior::Dynamic(_))
     }
 
+    /// Return true if this is a kinematic object.
     pub fn is_kinematic(&self) -> bool {
         matches!(self, Behavior::Kinematic(_))
     }

@@ -4,25 +4,25 @@
 
 //! A floating origin plugin that uses integer grids to extend bevy's [`Transform`] component with
 //! up to 128 bits of added precision. The plugin propagates and computes [`GlobalTransform`]s
-//! relative to floating origins, making the most of 32 bit rendering precision by reducing error
+//! relative to floating origins, making the most of 32-bit rendering precision by reducing error
 //! near the camera.
 //!
 //! <img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" style="padding:2% 15%">
 //!
 //! ## Quick Reference
 //!
-//! - [`BigSpace`] : The root of a high precision entity hierarchy.
-//! - [`FloatingOrigin`] : Position of the 32 bit rendering origin.
-//! - [`Grid`] : Defines the size of a grid for its child cells.
-//! - [`GridCell`] : Cell index of an entity within its parent's grid.
-//! - [`GridPrecision`] : Integer precision of a grid.
+//! - [`BigSpace`]: The root of a high-precision entity hierarchy.
+//! - [`FloatingOrigin`]: Position of the 32-bit rendering origin.
+//! - [`Grid`]: Defines the size of a grid for its child cells.
+//! - [`GridCell`]: Cell index of an entity within its parent's grid.
+//! - [`GridPrecision`]: Integer precision of a grid.
 //!
 //! #### Spatial Hashing
 //!
-//! - [`GridHash`] : The spatial hash of an entity's grid cell.
-//! - [`GridHashMap`] : A map for entity, grid cell, and neighbor lookups.
-//! - [`GridPartition`] : Group of adjacent grid cells.
-//! - [`GridPartitionMap`] : A map for finding independent partitions of entities.
+//! - [`GridHash`]: The spatial hash of an entity's grid cell.
+//! - [`GridHashMap`]: A map for entity, grid cell, and neighbor lookups.
+//! - [`GridPartition`]: Group of adjacent grid cells.
+//! - [`GridPartitionMap`]: A map for finding independent partitions of entities.
 //!
 //! Jump to [Usage](crate#usage) to get started.
 //!
@@ -99,7 +99,7 @@
 //! giving you up to 160 bits of precision of translation.
 //!
 //! `Grid`s can be nested, like `Transform`s. This allows you to define moving grids, which can make
-//! certain use cases much simpler. For example, if you have a planet rotating, and orbiting around
+//! certain use cases much simpler. For example, if you have a planet rotating and orbiting around
 //! its star, it would be very annoying if you had to compute this orbit and rotation for all
 //! objects on the surface in high precision. Instead, you can place the planet and all objects on
 //! its surface in the same grid. The motion of the planet will be inherited by all children in that
@@ -118,7 +118,7 @@
 //!
 //! All of the above applies to the entity marked with the [`FloatingOrigin`] component. The
 //! floating origin can be any high-precision entity in a `BigSpace`, it doesn't need to be a
-//! camera. The only thing special about the entity marked as the floating origin, is that it is
+//! camera. The only thing special about the entity marked as the floating origin is that it is
 //! used to compute the [`GlobalTransform`] of all other entities in that `BigSpace`. To an outside
 //! observer, every high-precision entity within a `BigSpace` is confined to a box the size of a
 //! grid cell - like a game of *Asteroids*. Only once you render the `BigSpace` from the point of
@@ -131,8 +131,8 @@
 //! artifacts will always be too far away to be seen, no matter where the camera moves. Because this
 //! only affects the `GlobalTransform` and not the `Transform`, this also means that entities will
 //! never permanently lose precision just because they were far from the origin at some point. The
-//! lossy calculation only occurs when computing the `GlobalTransform` of entities, the high
-//! precision `GridCell` and `Transform` are not affected.
+//! lossy calculation only occurs when computing the `GlobalTransform` of entities, the
+//! high-precision `GridCell` and `Transform` are not affected.
 //!
 //! # Usage
 //!
@@ -177,7 +177,7 @@
 //! ## Absolute Position
 //!
 //! If you are updating the position of an entity with absolute positions, and the position exceeds
-//! the bounds of the entity's grid cell, the floating origin plugin will recenter that entity into
+//! the bounds of the entity's grid cell, the floating origin plugin will re-center that entity into
 //! its new cell. Every time you update that entity, you will be fighting with the plugin as it
 //! constantly recenters your entity. This can especially cause problems with camera controllers
 //! which may not expect the large discontinuity in position as an entity moves between cells.
@@ -186,7 +186,7 @@
 //! because single precision is limited, and the larger the position coordinates get, the less
 //! precision you have.
 //!
-//! However, if you have something that must not accumulate error, like the orbit of a planet, you
+//! However, if you have something that must not accumulate error like the orbit of a planet, you
 //! can instead do the orbital calculation (position as a function of time) to compute the absolute
 //! position of the planet with high precision, then directly compute the [`GridCell`] and
 //! [`Transform`] of that entity using [`Grid::translation_to_grid`].
@@ -201,9 +201,8 @@
 
 extern crate alloc;
 
-#[cfg(doc)]
+// Handy to re-export privately so we can `use crate::*;`
 use bevy_transform::prelude::*;
-#[cfg(doc)]
 use prelude::*;
 
 pub(crate) mod portable_par;
@@ -265,16 +264,16 @@ pub mod prelude {
 /// you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter, these correspond
 /// to a total usable volume of a cube with the following edge lengths:
 ///
-/// - `i8`: 2,560 km = 74% of the diameter of the Moon
-/// - `i16`: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
+/// - `i8`: 2,560 km = 74% the diameter of the Moon
+/// - `i16`: 655,350 km = 85% the diameter of the Moon's orbit around Earth
 /// - `i32`: 0.0045 light years = ~4 times the width of the solar system
 /// - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
 /// - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
 ///
-/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
-/// precision of 0.5mm in any of these cases.
+/// Where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
+/// precision of 0.5 mm in any of these cases.
 ///
-/// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,
+/// This can also be used for small scales. With a cell's edge length of `1e-11`, and using `i128`,
 /// there is enough precision to render objects the size of protons anywhere in the observable
 /// universe.
 pub mod precision {
