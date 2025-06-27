@@ -245,7 +245,7 @@ pub mod prelude {
     };
     pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;
-    pub use world_query::{GridTransform, GridTransformOwned, GridTransformReadOnly};
+    pub use world_query::{CellTransform, CellTransformOwned, CellTransformReadOnly};
 
     #[cfg(feature = "camera")]
     pub use camera::BigSpaceCameraController;

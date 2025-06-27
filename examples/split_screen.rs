@@ -160,9 +160,9 @@ fn setup(
 
 #[allow(clippy::type_complexity)]
 fn update_cameras(
-    left: Query<GridTransformReadOnly, With<LeftCamera>>,
+    left: Query<CellTransformReadOnly, With<LeftCamera>>,
     mut left_rep: Query<
-        GridTransform,
+        CellTransform,
         (
             With<LeftCameraReplicated>,
             Without<RightCameraReplicated>,
@@ -170,9 +170,9 @@ fn update_cameras(
             Without<RightCamera>,
         ),
     >,
-    right: Query<GridTransformReadOnly, With<RightCamera>>,
+    right: Query<CellTransformReadOnly, With<RightCamera>>,
     mut right_rep: Query<
-        GridTransform,
+        CellTransform,
         (
             With<RightCameraReplicated>,
             Without<LeftCameraReplicated>,
