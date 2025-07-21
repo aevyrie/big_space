@@ -1,7 +1,7 @@
 //! Minimal example of spawning meshes and a floating origin camera.
 
+use bevy::math::DVec3;
 use bevy::prelude::*;
-use bevy_math::DVec3;
 use big_space::prelude::*;
 
 // Spawn the camera and mesh really, stupidly, far from the origin .

@@ -1,6 +1,6 @@
 //! Example of dynamic spawn by big space.
+use bevy::math::{dvec3, DVec3};
 use bevy::prelude::*;
-use bevy_math::{dvec3, DVec3};
 use big_space::prelude::*;
 use turborand::{rng::Rng, TurboRand};
 

@@ -7,7 +7,7 @@ use core::ops::DerefMut;
 /// A no_std-compatible version of bevy's `Parallel`.
 #[derive(Default)]
 pub struct PortableParallel<T: Send>(
-    #[cfg(feature = "std")] bevy_utils::Parallel<T>,
+    #[cfg(feature = "std")] bevy::utils::Parallel<T>,
     #[cfg(not(feature = "std"))] bevy_platform::sync::RwLock<Option<T>>,
 );
 

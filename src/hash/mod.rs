@@ -3,9 +3,9 @@
 use core::marker::PhantomData;
 
 use crate::prelude::*;
-use bevy_app::prelude::*;
-use bevy_ecs::{prelude::*, query::QueryFilter};
-use bevy_platform::prelude::*;
+use bevy::app::prelude::*;
+use bevy::ecs::{prelude::*, query::QueryFilter};
+use bevy::platform::prelude::*;
 
 pub mod component;
 pub mod map;
@@ -123,7 +123,7 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 mod tests {
     use crate::plugin::BigSpaceMinimalPlugins;
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_platform::{collections::HashSet, sync::OnceLock};
+    use bevy::platform::{collections::HashSet, sync::OnceLock};
 
     #[test]
     fn entity_despawn() {

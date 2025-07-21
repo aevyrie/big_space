@@ -1,11 +1,13 @@
 //! Demonstrates the included optional spatial hashing and partitioning of grid cells.
 
+use bevy::ecs::entity::EntityHasher;
+use bevy::math::DVec3;
+use bevy::render::view::Hdr;
+use bevy::window::CursorOptions;
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     prelude::*,
 };
-use bevy_ecs::entity::EntityHasher;
-use bevy_math::DVec3;
 use big_space::prelude::*;
 use core::hash::Hasher;
 use noise::{NoiseFn, Simplex};
@@ -32,7 +34,7 @@ fn main() {
         .add_systems(
             PostUpdate,
             (
-                move_player.after(TransformSystem::TransformPropagate),
+                move_player.after(TransformSystems::Propagate),
                 draw_partitions.after(GridHashMapSystem::UpdatePartition),
             ),
         )
@@ -154,7 +156,7 @@ fn move_player(
     let n_entities = non_player.iter().len();
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
-            material.set_if_neq(material_presets.default.clone_weak().into());
+            material.set_if_neq(material_presets.default.clone().into());
         }
     }
 
@@ -188,7 +190,7 @@ fn move_player(
     hash_grid.flood(hash, None).entities().for_each(|entity| {
         neighbors.push(entity);
         if let Ok(mut material) = materials.get_mut(entity) {
-            material.set_if_neq(material_presets.flood.clone_weak().into());
+            material.set_if_neq(material_presets.flood.clone().into());
         }
     });
 
@@ -200,7 +202,7 @@ fn move_player(
         .for_each(|entity| {
             neighbors.push(entity);
             if let Ok(mut material) = materials.get_mut(entity) {
-                material.set_if_neq(material_presets.highlight.clone_weak().into());
+                material.set_if_neq(material_presets.highlight.clone().into());
             }
         });
 
@@ -258,10 +260,8 @@ fn spawn(mut commands: Commands) {
         root.spawn_spatial((
             FloatingOrigin,
             Camera3d::default(),
-            Camera {
-                hdr: true,
-                ..Default::default()
-            },
+            Camera::default(),
+            Hdr,
             Tonemapping::AcesFitted,
             Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
             BigSpaceCameraController::default()
@@ -306,14 +306,14 @@ fn spawn_spheres(
                 FastGridHash::from(hash),
                 hash,
                 NonPlayer,
-                Mesh3d(material_presets.sphere.clone_weak()),
-                MeshMaterial3d(material_presets.default.clone_weak()),
-                bevy_render::view::VisibilityRange {
+                Mesh3d(material_presets.sphere.clone()),
+                MeshMaterial3d(material_presets.default.clone()),
+                bevy::render::view::VisibilityRange {
                     start_margin: 1.0..5.0,
                     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
                     use_aabb: false,
                 },
-                bevy_render::view::NoFrustumCulling,
+                bevy::render::view::NoFrustumCulling,
             ));
         }
     });
@@ -354,7 +354,7 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..default()
             },
             BorderRadius::all(Val::Px(8.0)),
-            BorderColor(Color::linear_rgba(0.03, 0.03, 0.03, 0.95)),
+            BorderColor::all(Color::linear_rgba(0.03, 0.03, 0.03, 0.95)),
             BackgroundColor(Color::linear_rgba(0.012, 0.012, 0.012, 0.95)),
         ))
         .with_children(|parent| {
@@ -372,16 +372,16 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn cursor_grab(
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+    mut windows: Query<Mut<CursorOptions>, With<bevy::window::PrimaryWindow>>,
 ) -> Result {
-    let mut primary_window = windows.single_mut()?;
+    let mut cursor_options = windows.single_mut()?;
     if mouse.just_pressed(MouseButton::Left) {
-        primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
-        primary_window.cursor_options.visible = false;
+        cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+        cursor_options.visible = false;
     }
     if keyboard.just_pressed(KeyCode::Escape) {
-        primary_window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
-        primary_window.cursor_options.visible = true;
+        cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+        cursor_options.visible = true;
     }
     Ok(())
 }

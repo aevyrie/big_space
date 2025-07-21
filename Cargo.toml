@@ -14,76 +14,23 @@ all-features = true
 
 [features]
 default = ["std"]
-debug = ["std", "bevy_gizmos", "bevy_color"]
-camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
+debug = ["std"]
+camera = ["std"]
 i8 = []
 i16 = []
 i32 = []
 i64 = []
 i128 = []
-
-std = [
-    "bevy_app/std",
-    "bevy_ecs/std",
-    "bevy_math/std",
-    "bevy_reflect/std",
-    "bevy_tasks/std",
-    "bevy_transform/std",
-    "bevy_utils/std",
-    "bevy_platform/std",
-    "bevy_color?/std",
-    "bevy_input?/std",
-    "bevy_time?/std",
-]
-libm = ["bevy_math/libm", "dep:libm"]
+std = []
+libm = ["dep:libm"]
 
 [dependencies]
 smallvec = { version = "1.13.2", default-features = false } # Already used by bevy in commands
-bevy_app = { version = "0.16.0", default-features = false, features = [
-    "bevy_reflect",
-] }
-bevy_ecs = { version = "0.16.0", default-features = false }
-bevy_log = { version = "0.16.0", default-features = false }
-bevy_math = { version = "0.16.0", default-features = false }
-bevy_reflect = { version = "0.16.0", default-features = false, features = [
-    "glam",
-] }
-bevy_tasks = { version = "0.16.0", default-features = false }
-bevy_transform = { version = "0.16.0", default-features = false, features = [
-    "bevy-support",
-    "bevy_reflect",
-] }
-bevy_utils = { version = "0.16.0", default-features = false }
-bevy_platform = { version = "0.16.0", default-features = false, features = [
-    "alloc",
-] }
-# Optional
-bevy_color = { version = "0.16.0", default-features = false, optional = true }
-bevy_gizmos = { version = "0.16.0", default-features = false, optional = true }
-bevy_render = { version = "0.16.0", default-features = false, optional = true }
-bevy_input = { version = "0.16.0", default-features = false, optional = true }
-bevy_time = { version = "0.16.0", default-features = false, optional = true }
+bevy = { path = "../bevy" }
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-bevy = { version = "0.16.0", default-features = false, features = [
-    "bevy_scene",
-    "bevy_asset",
-    "bevy_color",
-    "bevy_gltf",
-    "bevy_remote",
-    "bevy_winit",
-    "default_font",
-    "bevy_ui",
-    "bevy_pbr",
-    "bevy_gizmos",
-    "animation",
-    "bevy_window",
-    "x11",
-    "tonemapping_luts",
-    "multi_threaded",
-    "png",
-] }
+bevy = { path = "../bevy", features = ["bevy_remote"] }
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.5"
@@ -101,14 +48,11 @@ semicolon_if_nothing_returned = "warn"
 type_complexity = "allow"
 undocumented_unsafe_blocks = "warn"
 unwrap_or_default = "warn"
-
 ptr_as_ptr = "warn"
 ptr_cast_constness = "warn"
 ref_as_ptr = "warn"
-
 # see: https://github.com/bevyengine/bevy/pull/15375#issuecomment-2366966219
 too_long_first_doc_paragraph = "allow"
-
 std_instead_of_core = "warn"
 std_instead_of_alloc = "warn"
 alloc_instead_of_core = "warn"

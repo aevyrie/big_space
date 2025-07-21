@@ -4,10 +4,10 @@ use alloc::collections::VecDeque;
 use core::{iter::Sum, ops::Div, time::Duration};
 
 use crate::prelude::*;
-use bevy_app::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_reflect::prelude::*;
-use bevy_transform::TransformSystem;
+use bevy::app::prelude::*;
+use bevy::ecs::prelude::*;
+use bevy::reflect::prelude::*;
+use bevy::transform::TransformSystems;
 
 /// Summarizes plugin performance timings
 pub struct BigSpaceTimingStatsPlugin;
@@ -30,7 +30,7 @@ impl Plugin for BigSpaceTimingStatsPlugin {
                 PostUpdate,
                 (update_totals, update_averages)
                     .chain()
-                    .after(TransformSystem::TransformPropagate),
+                    .after(TransformSystems::Propagate),
             );
     }
 }

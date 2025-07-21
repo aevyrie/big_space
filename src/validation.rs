@@ -1,12 +1,12 @@
 //! Tools for validating high-precision transform hierarchies
 
-use bevy_app::{App, Plugin, PostUpdate};
-use bevy_ecs::prelude::*;
-use bevy_platform::{
+use bevy::app::{App, Plugin, PostUpdate};
+use bevy::ecs::prelude::*;
+use bevy::platform::{
     collections::{HashMap, HashSet},
     prelude::*,
 };
-use bevy_transform::prelude::*;
+use bevy::transform::prelude::*;
 
 use crate::{grid::Grid, BigSpace, FloatingOrigin, GridCell};
 
@@ -21,7 +21,7 @@ impl Plugin for BigSpaceValidationPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            validate_hierarchy::<SpatialHierarchyRoot>.after(TransformSystem::TransformPropagate),
+            validate_hierarchy::<SpatialHierarchyRoot>.after(TransformSystems::Propagate),
         );
     }
 }
@@ -109,11 +109,11 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         .flatten()
                         .for_each(|info| {
                             inspect.push_str("  - ");
-                            inspect.push_str(info.name());
+                            inspect.push_str(&info.name().as_string());
                             inspect.push('\n');
                         });
 
-                    bevy_log::error!("
+                    bevy::log::error!("
 -------------------------------------------
 big_space hierarchy validation error report
 -------------------------------------------
@@ -158,7 +158,7 @@ pub trait ValidHierarchyNode: sealed::CloneHierarchy + Send + Sync {
 
 mod sealed {
     use super::ValidHierarchyNode;
-    use bevy_platform::prelude::*;
+    use bevy::platform::prelude::*;
 
     pub trait CloneHierarchy {
         fn clone_box(&self) -> Box<dyn ValidHierarchyNode>;

@@ -1,13 +1,13 @@
 //! Contains tools for debugging the floating origin.
 
 use crate::prelude::*;
-use bevy_app::prelude::*;
-use bevy_color::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_gizmos::prelude::*;
-use bevy_math::prelude::*;
-use bevy_reflect::Reflect;
-use bevy_transform::prelude::*;
+use bevy::app::prelude::*;
+use bevy::color::prelude::*;
+use bevy::ecs::prelude::*;
+use bevy::gizmos::prelude::*;
+use bevy::math::prelude::*;
+use bevy::reflect::Reflect;
+use bevy::transform::prelude::*;
 
 /// This plugin will render the bounds of occupied grid cells.
 pub struct BigSpaceDebugPlugin;
@@ -19,7 +19,7 @@ impl Plugin for BigSpaceDebugPlugin {
                 PostUpdate,
                 (update_debug_bounds, update_grid_axes)
                     .chain()
-                    .after(TransformSystem::TransformPropagate),
+                    .after(TransformSystems::Propagate),
             );
     }
 }

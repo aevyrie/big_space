@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use core::hash::{BuildHasher, Hash, Hasher};
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_math::IVec3;
-use bevy_platform::{hash::FixedHasher, time::Instant};
-use bevy_reflect::Reflect;
+use bevy::ecs::prelude::*;
+use bevy::math::IVec3;
+use bevy::platform::{hash::FixedHasher, time::Instant};
+use bevy::reflect::Reflect;
 
 use super::{ChangedGridHashes, GridHashMapFilter};
 

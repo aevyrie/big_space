@@ -1,11 +1,11 @@
 //! Contains the grid cell implementation
 
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_math::{DVec3, IVec3};
-use bevy_platform::time::Instant;
-use bevy_reflect::prelude::*;
-use bevy_transform::prelude::*;
+use bevy::ecs::prelude::*;
+use bevy::math::{DVec3, IVec3};
+use bevy::platform::time::Instant;
+use bevy::reflect::prelude::*;
+use bevy::transform::prelude::*;
 
 /// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
 /// this component is a transformation from the center of this cell.

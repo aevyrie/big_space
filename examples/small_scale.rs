@@ -6,9 +6,9 @@
 //! In this example, we will be spawning spheres the size of protons, across the width of the
 //! milky way galaxy.
 
+use bevy::log::info;
+use bevy::math::DVec3;
 use bevy::prelude::*;
-use bevy_log::info;
-use bevy_math::DVec3;
 use big_space::prelude::*;
 
 const UNIVERSE_DIA: f64 = 8.8e26; // Diameter of the observable universe
