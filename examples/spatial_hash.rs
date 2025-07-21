@@ -2,7 +2,6 @@
 
 use bevy::ecs::entity::EntityHasher;
 use bevy::math::DVec3;
-use bevy::render::view::Hdr;
 use bevy::window::CursorOptions;
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
@@ -34,7 +33,7 @@ fn main() {
         .add_systems(
             PostUpdate,
             (
-                move_player.after(TransformSystems::Propagate),
+                move_player.after(TransformSystem::TransformPropagate),
                 draw_partitions.after(GridHashMapSystem::UpdatePartition),
             ),
         )
@@ -260,8 +259,10 @@ fn spawn(mut commands: Commands) {
         root.spawn_spatial((
             FloatingOrigin,
             Camera3d::default(),
-            Camera::default(),
-            Hdr,
+            Camera {
+                hdr: true,
+                ..Default::default()
+            },
             Tonemapping::AcesFitted,
             Transform::from_xyz(0.0, 0.0, HALF_WIDTH * CELL_WIDTH * 2.0),
             BigSpaceCameraController::default()
@@ -354,7 +355,7 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..default()
             },
             BorderRadius::all(Val::Px(8.0)),
-            BorderColor::all(Color::linear_rgba(0.03, 0.03, 0.03, 0.95)),
+            BorderColor(Color::linear_rgba(0.03, 0.03, 0.03, 0.95)),
             BackgroundColor(Color::linear_rgba(0.012, 0.012, 0.012, 0.95)),
         ))
         .with_children(|parent| {
@@ -372,16 +373,16 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn cursor_grab(
     keyboard: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
-    mut windows: Query<Mut<CursorOptions>, With<bevy::window::PrimaryWindow>>,
+    mut windows: Query<Mut<Window>, With<bevy::window::PrimaryWindow>>,
 ) -> Result {
-    let mut cursor_options = windows.single_mut()?;
+    let mut window = windows.single_mut()?;
     if mouse.just_pressed(MouseButton::Left) {
-        cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
-        cursor_options.visible = false;
+        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+        window.cursor_options.visible = false;
     }
     if keyboard.just_pressed(KeyCode::Escape) {
-        cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
-        cursor_options.visible = true;
+        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+        window.cursor_options.visible = true;
     }
     Ok(())
 }

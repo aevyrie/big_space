@@ -8,7 +8,7 @@ use bevy::{
     color::palettes,
     prelude::*,
     render::{camera::Viewport, view::RenderLayers},
-    transform::TransformSystems,
+    transform::TransformSystem,
 };
 use big_space::prelude::*;
 
@@ -24,7 +24,7 @@ fn main() {
             PostUpdate,
             update_cameras
                 .after(big_space::camera::camera_controller)
-                .before(TransformSystems::Propagate),
+                .before(TransformSystem::TransformPropagate),
         )
         .run();
 }

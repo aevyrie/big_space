@@ -21,7 +21,7 @@ impl Plugin for BigSpaceValidationPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            validate_hierarchy::<SpatialHierarchyRoot>.after(TransformSystems::Propagate),
+            validate_hierarchy::<SpatialHierarchyRoot>.after(TransformSystem::TransformPropagate),
         );
     }
 }
@@ -109,7 +109,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         .flatten()
                         .for_each(|info| {
                             inspect.push_str("  - ");
-                            inspect.push_str(&info.name().as_string());
+                            inspect.push_str(info.name());
                             inspect.push('\n');
                         });
 

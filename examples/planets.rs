@@ -4,8 +4,6 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 use bevy::core_pipeline::Skybox;
-use bevy::render::view::Hdr;
-use bevy::window::CursorOptions;
 use bevy::{
     color::palettes,
     core_pipeline::bloom::Bloom,
@@ -13,7 +11,7 @@ use bevy::{
     pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
     prelude::*,
     render::camera::Exposure,
-    transform::TransformSystems,
+    transform::TransformSystem,
 };
 use big_space::prelude::*;
 use big_space::validation::BigSpaceValidationPlugin;
@@ -43,7 +41,7 @@ fn main() {
             (
                 rotate,
                 lighting
-                    .in_set(TransformSystems::Propagate)
+                    .in_set(TransformSystem::TransformPropagate)
                     .after(BigSpaceSystems::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
@@ -245,10 +243,10 @@ fn spawn_solar_system(
                         Camera3d::default(),
                         Transform::from_xyz(0.0, 4.0, 22.0),
                         Camera {
+                            hdr: true,
                             clear_color: ClearColorConfig::None,
                             ..default()
                         },
-                        Hdr,
                         Exposure::SUNLIGHT,
                         Bloom::ANAMORPHIC,
                         bevy::core_pipeline::post_process::ChromaticAberration {
@@ -297,25 +295,25 @@ fn spawn_solar_system(
 }
 
 fn cursor_grab_system(
-    mut cursor_options: Query<Mut<CursorOptions>, With<bevy::window::PrimaryWindow>>,
+    mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
     mut cam: ResMut<big_space::camera::BigSpaceCameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
     mut triggered: Local<bool>,
 ) -> Result<()> {
-    let mut cursor_option = cursor_options.single_mut()?;
+    let mut window = windows.single_mut()?;
 
     if btn.just_pressed(MouseButton::Right) || !*triggered {
-        cursor_option.grab_mode = bevy::window::CursorGrabMode::Locked;
-        cursor_option.visible = false;
+        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+        window.cursor_options.visible = false;
         // window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
         *triggered = true;
     }
 
     if key.just_pressed(KeyCode::Escape) {
-        cursor_option.grab_mode = bevy::window::CursorGrabMode::None;
-        cursor_option.visible = true;
+        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+        window.cursor_options.visible = true;
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }

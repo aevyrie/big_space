@@ -12,7 +12,7 @@ use bevy::render::{
     view::{InheritedVisibility, RenderLayers},
 };
 use bevy::time::prelude::*;
-use bevy::transform::{prelude::*, TransformSystems};
+use bevy::transform::{prelude::*, TransformSystem};
 
 /// Runs the [`big_space`](crate) [`BigSpaceCameraController`].
 pub struct BigSpaceCameraControllerPlugin;
@@ -28,7 +28,7 @@ impl Plugin for BigSpaceCameraControllerPlugin {
                         .before(camera_controller)
                         .run_if(|input: Res<BigSpaceCameraInput>| !input.defaults_disabled),
                     nearest_objects_in_grid.before(camera_controller),
-                    camera_controller.before(TransformSystems::Propagate),
+                    camera_controller.before(TransformSystem::TransformPropagate),
                 ),
             );
     }

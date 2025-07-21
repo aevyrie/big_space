@@ -19,7 +19,7 @@ impl Plugin for BigSpaceDebugPlugin {
                 PostUpdate,
                 (update_debug_bounds, update_grid_axes)
                     .chain()
-                    .after(TransformSystems::Propagate),
+                    .after(TransformSystem::TransformPropagate),
             );
     }
 }

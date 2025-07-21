@@ -7,7 +7,7 @@ use crate::prelude::*;
 use bevy::app::prelude::*;
 use bevy::ecs::prelude::*;
 use bevy::reflect::prelude::*;
-use bevy::transform::TransformSystems;
+use bevy::transform::TransformSystem;
 
 /// Summarizes plugin performance timings
 pub struct BigSpaceTimingStatsPlugin;
@@ -30,7 +30,7 @@ impl Plugin for BigSpaceTimingStatsPlugin {
                 PostUpdate,
                 (update_totals, update_averages)
                     .chain()
-                    .after(TransformSystems::Propagate),
+                    .after(TransformSystem::TransformPropagate),
             );
     }
 }
