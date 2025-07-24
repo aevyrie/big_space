@@ -10,10 +10,13 @@ use bevy_transform::prelude::*;
 #[derive(Bundle, Default)]
 pub struct BigSpatialBundle {
     /// The visibility of the entity.
+    #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
     /// The inherited visibility of the entity.
+    #[cfg(feature = "bevy_render")]
     pub inherited: bevy_render::view::InheritedVisibility,
     /// The view visibility of the entity.
+    #[cfg(feature = "bevy_render")]
     pub view: bevy_render::view::ViewVisibility,
     /// The transform of the entity.
     pub transform: Transform,
@@ -30,6 +33,7 @@ pub struct BigSpatialBundle {
 #[derive(Bundle, Default)]
 pub struct BigGridBundle {
     /// The visibility of the entity.
+    #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
     /// The transform of the entity.
     pub transform: Transform,
@@ -45,6 +49,7 @@ pub struct BigGridBundle {
 #[derive(Bundle, Default)]
 pub struct BigSpaceRootBundle {
     /// The visibility of the entity.
+    #[cfg(feature = "bevy_render")]
     pub visibility: bevy_render::view::Visibility,
     /// The root grid
     pub grid: Grid,

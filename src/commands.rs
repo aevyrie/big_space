@@ -81,6 +81,7 @@ impl<'a> GridCommands<'a> {
     pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands {
         let entity = self
             .spawn((
+                #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
                 Transform::default(),
                 GridCell::default(),
@@ -133,6 +134,7 @@ impl<'a> GridCommands<'a> {
     pub fn spawn_grid(&mut self, new_grid: Grid, bundle: impl Bundle) -> GridCommands {
         let entity = self
             .spawn((
+                #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
                 Transform::default(),
                 GridCell::default(),
