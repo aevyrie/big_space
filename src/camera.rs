@@ -1,18 +1,18 @@
 //! Provides a camera controller compatible with the floating origin plugin.
 
 use crate::prelude::*;
-use bevy::app::prelude::*;
-use bevy::ecs::prelude::*;
-use bevy::input::{mouse::MouseMotion, prelude::*};
-use bevy::math::{prelude::*, DQuat, DVec3};
-use bevy::platform::{collections::HashSet, prelude::*};
-use bevy::reflect::prelude::*;
-use bevy::render::{
+use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_input::{mouse::MouseMotion, prelude::*};
+use bevy_math::{prelude::*, DQuat, DVec3};
+use bevy_platform::{collections::HashSet, prelude::*};
+use bevy_reflect::prelude::*;
+use bevy_render::{
     primitives::Aabb,
     view::{InheritedVisibility, RenderLayers},
 };
-use bevy::time::prelude::*;
-use bevy::transform::{prelude::*, TransformSystem};
+use bevy_time::prelude::*;
+use bevy_transform::{prelude::*, TransformSystem};
 
 /// Runs the [`big_space`](crate) [`BigSpaceCameraController`].
 pub struct BigSpaceCameraControllerPlugin;

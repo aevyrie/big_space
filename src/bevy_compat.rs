@@ -2,8 +2,8 @@
 //! [`BigSpace`](crate::BigSpace), needed when bevy's built in transform propagation is disabled.
 
 use alloc::vec::Vec;
-use bevy::ecs::{change_detection::Ref, prelude::*};
-use bevy::transform::prelude::*;
+use bevy_ecs::{change_detection::Ref, prelude::*};
+use bevy_transform::prelude::*;
 
 /// Copied from bevy. This is the simpler propagation implementation that doesn't use dirty tree
 /// marking. This is needed because dirty tree marking doesn't start from the root, and will end up

@@ -2,10 +2,10 @@
 //! together, like entities on a planet, rotating about the planet's axis, and, orbiting a star.
 
 use crate::prelude::*;
-use bevy::ecs::prelude::*;
-use bevy::math::{prelude::*, Affine3A, DAffine3, DVec3};
-use bevy::reflect::prelude::*;
-use bevy::transform::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_math::{prelude::*, Affine3A, DAffine3, DVec3};
+use bevy_reflect::prelude::*;
+use bevy_transform::prelude::*;
 
 use local_origin::LocalFloatingOrigin;
 

@@ -2,15 +2,15 @@
 
 use core::{hash::Hash, marker::PhantomData, ops::Deref};
 
-use bevy::app::prelude::*;
-use bevy::ecs::prelude::*;
-use bevy::platform::prelude::*;
-use bevy::platform::{
+use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_platform::prelude::*;
+use bevy_platform::{
     collections::{HashMap, HashSet},
     hash::PassHash,
     time::Instant,
 };
-use bevy::tasks::{ComputeTaskPool, ParallelSliceMut};
+use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 
 use super::{GridCell, GridHash, GridHashMap, GridHashMapFilter, GridHashMapSystem};
 
@@ -291,7 +291,7 @@ where
             ComputeTaskPool::get(),
             None,
             |_, affected_cells| {
-                let _task_span = bevy::log::info_span!("parallel partition split").entered();
+                let _task_span = bevy_log::info_span!("parallel partition split").entered();
                 affected_cells
                     .iter_mut()
                     .filter_map(|(id, adjacent_hashes)| {
@@ -361,8 +361,8 @@ struct SplitResult {
 mod private {
     use super::{GridCell, GridHash};
     use crate::precision::GridPrecision;
-    use bevy::ecs::prelude::*;
-    use bevy::platform::{collections::HashSet, hash::PassHash, prelude::*};
+    use bevy_ecs::prelude::*;
+    use bevy_platform::{collections::HashSet, hash::PassHash, prelude::*};
 
     /// A group of nearby [`GridCell`]s on an island disconnected from all other [`GridCell`]s.
     #[derive(Debug)]

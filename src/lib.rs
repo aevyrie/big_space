@@ -202,7 +202,7 @@
 extern crate alloc;
 
 #[allow(unused_imports)] // For docs
-use bevy::transform::prelude::*;
+use bevy_transform::prelude::*;
 #[allow(unused_imports)] // For docs
 use prelude::*;
 

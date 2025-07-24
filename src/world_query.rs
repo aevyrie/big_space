@@ -2,9 +2,9 @@
 //! with a [`Transform`].
 
 use crate::prelude::*;
-use bevy::ecs::query::QueryData;
-use bevy::math::{prelude::*, DVec3};
-use bevy::transform::prelude::*;
+use bevy_ecs::query::QueryData;
+use bevy_math::{prelude::*, DVec3};
+use bevy_transform::prelude::*;
 
 #[derive(QueryData)]
 #[query_data(mutable)]

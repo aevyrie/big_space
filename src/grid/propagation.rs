@@ -1,9 +1,9 @@
 //! Logic for propagating transforms through the hierarchy of grids.
 
 use crate::prelude::*;
-use bevy::ecs::prelude::*;
-use bevy::reflect::Reflect;
-use bevy::transform::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
+use bevy_transform::prelude::*;
 
 /// Marks entities in the big space hierarchy that are themselves roots of a low-precision subtree.
 /// While finding these entities is slow, we only have to do it during hierarchy or archetype
@@ -31,7 +31,7 @@ impl Grid {
             Query<(&Grid, &mut GlobalTransform), With<BigSpace>>,
         )>,
     ) {
-        let start = bevy::platform::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
 
         // Performance note: I've also tried to iterate over each grid's children at once, to avoid
         // the grid and parent lookup, but that made things worse because it prevented dumb
@@ -119,7 +119,7 @@ impl Grid {
         >,
         has_possibly_invalid_parent: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
     ) {
-        let start = bevy::platform::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
         for (entity, parent) in unmarked.iter() {
             if valid_parent.contains(parent.parent()) {
                 commands.entity(entity).insert(LowPrecisionRoot);
@@ -172,7 +172,7 @@ impl Grid {
             ),
         >,
     ) {
-        let start = bevy::platform::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
         let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
             // High precision global transforms are change-detected, and are only updated if that
             // entity has moved relative to the floating origin's grid cell.

@@ -1,8 +1,8 @@
 //! Component bundles for `big_space`.
 
 use crate::prelude::*;
-use bevy::ecs::prelude::*;
-use bevy::transform::prelude::*;
+use bevy_ecs::prelude::*;
+use bevy_transform::prelude::*;
 
 /// Minimal bundle needed to position an entity in floating origin space.
 ///
@@ -10,11 +10,11 @@ use bevy::transform::prelude::*;
 #[derive(Bundle, Default)]
 pub struct BigSpatialBundle {
     /// The visibility of the entity.
-    pub visibility: bevy::render::view::Visibility,
+    pub visibility: bevy_render::view::Visibility,
     /// The inherited visibility of the entity.
-    pub inherited: bevy::render::view::InheritedVisibility,
+    pub inherited: bevy_render::view::InheritedVisibility,
     /// The view visibility of the entity.
-    pub view: bevy::render::view::ViewVisibility,
+    pub view: bevy_render::view::ViewVisibility,
     /// The transform of the entity.
     pub transform: Transform,
     /// The global transform of the entity.
@@ -30,7 +30,7 @@ pub struct BigSpatialBundle {
 #[derive(Bundle, Default)]
 pub struct BigGridBundle {
     /// The visibility of the entity.
-    pub visibility: bevy::render::view::Visibility,
+    pub visibility: bevy_render::view::Visibility,
     /// The transform of the entity.
     pub transform: Transform,
     /// The global transform of the entity for rendering, computed relative to the floating origin.
@@ -45,7 +45,7 @@ pub struct BigGridBundle {
 #[derive(Bundle, Default)]
 pub struct BigSpaceRootBundle {
     /// The visibility of the entity.
-    pub visibility: bevy::render::view::Visibility,
+    pub visibility: bevy_render::view::Visibility,
     /// The root grid
     pub grid: Grid,
     /// The rendered position of the root grid relative to the floating origin.

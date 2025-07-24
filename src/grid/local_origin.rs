@@ -3,7 +3,7 @@
 //! [`LocalFloatingOrigin`].
 
 use crate::prelude::*;
-use bevy::ecs::{
+use bevy_ecs::{
     prelude::*,
     relationship::Relationship,
     system::{
@@ -11,9 +11,9 @@ use bevy::ecs::{
         SystemParam,
     },
 };
-use bevy::math::{prelude::*, DAffine3, DQuat};
-use bevy::platform::prelude::*;
-use bevy::transform::prelude::*;
+use bevy_math::{prelude::*, DAffine3, DQuat};
+use bevy_platform::prelude::*;
+use bevy_transform::prelude::*;
 
 pub use inner::LocalFloatingOrigin;
 
@@ -22,8 +22,8 @@ use super::Grid;
 /// A module kept private to enforce use of setters and getters within the parent module.
 mod inner {
     use crate::prelude::*;
-    use bevy::math::{prelude::*, DAffine3, DMat3, DQuat};
-    use bevy::reflect::prelude::*;
+    use bevy_math::{prelude::*, DAffine3, DMat3, DQuat};
+    use bevy_reflect::prelude::*;
 
     /// An isometry that describes the location of the floating origin's grid cell's origin, in the
     /// local grid.
@@ -438,7 +438,7 @@ impl LocalFloatingOrigin {
         roots: Query<(Entity, &BigSpace)>,
         parents: Query<&ChildOf>,
     ) {
-        let start = bevy::platform::time::Instant::now();
+        let start = bevy_platform::time::Instant::now();
 
         /// The maximum grid tree depth, defensively prevents infinite looping in case there is a
         /// degenerate hierarchy. It might take a while, but at least it's not forever?
@@ -452,7 +452,7 @@ impl LocalFloatingOrigin {
             .filter_map(|origin| cells.get(origin).ok())
         {
             let Some(mut this_grid) = grids.parent_grid_entity(origin_entity) else {
-                bevy::log::error!("The floating origin is not in a valid grid. The floating origin entity must be a child of an entity with the `Grid` component.");
+                bevy_log::error!("The floating origin is not in a valid grid. The floating origin entity must be a child of an entity with the `Grid` component.");
                 continue;
             };
 
@@ -508,7 +508,7 @@ impl LocalFloatingOrigin {
                 }
             }
 
-            bevy::log::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.");
+            bevy_log::error!("Reached the maximum grid depth ({MAX_REFERENCE_FRAME_DEPTH}), and exited early to prevent an infinite loop. This might be caused by a degenerate hierarchy.");
         }
 
         if let Some(stats) = stats.as_mut() {

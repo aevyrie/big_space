@@ -3,9 +3,9 @@
 use core::marker::PhantomData;
 
 use crate::prelude::*;
-use bevy::app::prelude::*;
-use bevy::ecs::{prelude::*, query::QueryFilter};
-use bevy::platform::prelude::*;
+use bevy_app::prelude::*;
+use bevy_ecs::{prelude::*, query::QueryFilter};
+use bevy_platform::prelude::*;
 
 pub mod component;
 pub mod map;

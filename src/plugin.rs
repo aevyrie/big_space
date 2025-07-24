@@ -1,8 +1,8 @@
 //! The bevy plugin for `big_space`.
 
 use crate::*;
-use bevy::app::{prelude::*, PluginGroupBuilder};
-use bevy::ecs::prelude::*;
+use bevy_app::{prelude::*, PluginGroupBuilder};
+use bevy_ecs::prelude::*;
 
 pub use crate::{timing::BigSpaceTimingStatsPlugin, validation::BigSpaceValidationPlugin};
 #[cfg(feature = "camera")]
@@ -138,7 +138,7 @@ impl Plugin for BigSpacePropagationPlugin {
             PostStartup,
             (
                 bevy_compat::propagate_parent_transforms,
-                bevy::transform::systems::sync_simple_transforms,
+                bevy_transform::systems::sync_simple_transforms,
             )
                 .in_set(TransformSystem::TransformPropagate),
         )
@@ -146,7 +146,7 @@ impl Plugin for BigSpacePropagationPlugin {
             PostUpdate,
             (
                 bevy_compat::propagate_parent_transforms,
-                bevy::transform::systems::sync_simple_transforms,
+                bevy_transform::systems::sync_simple_transforms,
             )
                 .in_set(TransformSystem::TransformPropagate),
         );
