@@ -2,7 +2,7 @@
 
 use crate::physics::*;
 use alloc::boxed::Box;
-
+use bevy_log::error;
 #[cfg(feature = "serde-serialize")]
 use serde::*;
 
@@ -199,73 +199,78 @@ impl BigPhysicsBackend for RapierContext {
     }
 }
 
-// fn move_entity(
-//     entity: Entity,
-//     from_body: RigidBodyHandle,
-//     from_collider: ColliderHandle,
-//     from: &mut RapierContext,
-//     into: &mut RapierContext,
-// ) {
-//     if let Some((from_collider, from_body)) = from
-//         .colliders
-//         .remove(from_collider, &mut from.islands, &mut from.bodies, false)
-//         .zip(from.bodies.remove(
-//             from_body,
-//             &mut from.islands,
-//             &mut from.colliders,
-//             &mut from.impulse_joints,
-//             &mut from.multibody_joints,
-//             false,
-//         ))
-//     {
-//         let into_body = into.bodies.insert(RigidBody::from(from_body));
-//         let into_collider = into.colliders.insert_with_parent(
-//             Collider:: from(from_collider),
-//             into_body,
-//             &mut into.bodies,
-//         );
-//         into.entity_map.insert(entity, (into_body, into_collider));
-//     }
-// }
+fn move_entity(
+    entity: Entity,
+    from_body: RigidBodyHandle,
+    from_collider: ColliderHandle,
+    from: &mut RapierContext,
+    into: &mut RapierContext,
+) {
+    if let Some((from_collider, from_body)) = from
+        .colliders
+        .remove(from_collider, &mut from.islands, &mut from.bodies, false)
+        .zip(from.bodies.remove(
+            from_body,
+            &mut from.islands,
+            &mut from.colliders,
+            &mut from.impulse_joints,
+            &mut from.multibody_joints,
+            false,
+        ))
+    {
+        let into_body = into.bodies.insert(RigidBody::from(from_body));
+        let into_collider = into.colliders.insert_with_parent(
+            Collider::from(from_collider),
+            into_body,
+            &mut into.bodies,
+        );
+        into.entity_map.insert(entity, (into_body, into_collider));
+    }
+}
 
-// fn migrate_single(&mut self, entity: Entity, other: &mut BigPhysics, other_to_self: Vec3) {
-//     let Some(other) = other.context.downcast_mut::<Self>() else {
-//         error!(
-//             "Cannot migrate an entity from {} into a different type of physics context.",
-//             std::any::type_name::<Self>()
-//         );
-//         return;
-//     };
+fn migrate_single(
+    ctx: &mut RapierContext,
+    entity: Entity,
+    other: &mut BigPhysics,
+    other_to_self: Vec3,
+) {
+    let Some(other) = other.context.downcast_mut::<RapierContext>() else {
+        error!(
+            "Cannot migrate an entity from {} into a different type of physics context.",
+            core::any::type_name::<RapierContext>()
+        );
+        return;
+    };
 
-//     let Some((body, collider)) = other.entity_map.remove(&entity) else {
-//         return;
-//     };
+    let Some((body, collider)) = other.entity_map.remove(&entity) else {
+        return;
+    };
 
-//     // Move the body into the destination coordinate space.
-//     if let Some(body) = self.bodies.get_mut(body) {
-//         let mut iso = *body.position();
-//         iso.translation.vector += Vector::from(other_to_self);
-//         body.set_position(iso, false);
-//     } else {
-//         return;
-//     }
+    // Move the body into the destination coordinate space.
+    if let Some(body) = ctx.bodies.get_mut(body) {
+        let mut iso = *body.position();
+        iso.translation.vector += Vector::from(other_to_self);
+        body.set_position(iso, false);
+    } else {
+        return;
+    }
 
-//     move_entity(entity, body, collider, self, other);
-// }
+    move_entity(entity, body, collider, ctx, other);
+}
 
-// fn consume(&mut self, mut other: BigPhysics, other_to_self: Vec3) {
-//     let Some(other) = other.context.downcast_mut::<Self>() else {
-//         error!(
-//             "Cannot merge a {} physics context into a different type of physics context.",
-//             std::any::type_name::<Self>()
-//         );
-//         return;
-//     };
-//     // Move the origin so the other bodies are in the destination coordinate system.
-//     other.move_origin(other_to_self);
-//     // Move all pre-translated entities into the destination physics context
-//     let entities_to_move = std::mem::take(&mut other.entity_map);
-//     for (entity, (body, collider)) in entities_to_move {
-//         move_entity(entity, body, collider, self, other);
-//     }
-// }
+fn consume(&mut self, mut other: BigPhysics, other_to_self: Vec3) {
+    let Some(other) = other.context.downcast_mut::<Self>() else {
+        error!(
+            "Cannot merge a {} physics context into a different type of physics context.",
+            std::any::type_name::<Self>()
+        );
+        return;
+    };
+    // Move the origin so the other bodies are in the destination coordinate system.
+    other.move_origin(other_to_self);
+    // Move all pre-translated entities into the destination physics context
+    let entities_to_move = std::mem::take(&mut other.entity_map);
+    for (entity, (body, collider)) in entities_to_move {
+        move_entity(entity, body, collider, self, other);
+    }
+}

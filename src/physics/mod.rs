@@ -1,13 +1,13 @@
 //! Physics support for `big_space`.
 
 use crate::hash::GridHashPlugin;
-use crate::prelude::GridPartitionPlugin;
+use crate::prelude::{GridPartitionMap, GridPartitionPlugin};
 use alloc::boxed::Box;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::prelude::*;
 use bevy_math::{primitives, Quat, Vec3};
-use bevy_reflect::Reflect;
+use bevy_reflect::{FromReflect, PartialReflect, Reflect};
 use bevy_transform::TransformSystem::TransformPropagate;
 use downcast_rs::{impl_downcast, Downcast};
 use rapier3d::prelude::*;
@@ -17,12 +17,14 @@ pub mod rapier;
 /// Adds physics support to `big_space`.
 pub struct BigPhysicsPlugin;
 
+type Filter = With<BigRigidBody>;
+
 impl Plugin for BigPhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<BigRigidBody>()
             .add_plugins((
-                GridHashPlugin::<With<BigRigidBody>>::new(),
-                GridPartitionPlugin::<With<BigRigidBody>>::new(),
+                GridHashPlugin::<Filter>::new(),
+                GridPartitionPlugin::<Filter>::new(),
             ))
             .add_systems(
                 PostUpdate,
@@ -41,8 +43,8 @@ impl Plugin for BigPhysicsPlugin {
 impl BigPhysicsPlugin {
     /// Insert and remove entities from physics contexts as they move between partitions, spawn, and
     /// despawn.
-    fn assign_entities_to_contexts() {
-        // Run the partition and spatial hashing plugins with a `With<BigPhysics>` filter
+    fn assign_entities_to_contexts(partitions: Res<GridPartitionMap<Filter>>) {
+        partitions.
         // Each partition is assigned a physics entity
         // Get the list of added and removed grid cells for each partition
         //      Look up all entities in the added and removed cells, and add/remove them
@@ -67,13 +69,13 @@ pub struct BigPhysics {
 
 /// The interface of a `big_space` physics backend that can be implemented for any physics engine.
 ///
-/// Implement this trait on a standalone physics context to synchronize the physics simulation with
+/// Implement this trait for a standalone physics context to synchronize the physics simulation with
 /// entities positioned in a `big_space`, and use it in a `BigPhysics` component.
 pub trait BigPhysicsBackend: Downcast + Send + Sync {
     /// Move the origin of the physics simulation.
     ///
-    /// This happens any time the plugin determines the origin of the simulation and the entities in
-    /// that simulation are far enough apart to cause precision issues.
+    /// This happens when the plugin determines the origin of the simulation is far enough from the
+    /// entities in that simulation to cause precision issues.
     ///
     /// ### Implementors
     ///
