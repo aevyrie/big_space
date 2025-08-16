@@ -206,7 +206,7 @@ where
         &self,
         seed: &GridHash,
         max_depth: Option<GridPrecision>,
-    ) -> impl Iterator<Item = Neighbor> {
+    ) -> impl Iterator<Item = Neighbor<'_>> {
         let starting_cell_cell = seed.cell();
         ContiguousNeighborsIter {
             initial_hash: Some(*seed),

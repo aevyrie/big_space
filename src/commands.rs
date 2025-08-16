@@ -15,7 +15,7 @@ pub trait BigSpaceCommands {
 
     /// Access the [`GridCommands`] of an entity by passing in the [`Entity`] and [`Grid`]. Note
     /// that the value of `grid` will be inserted in this entity when the command is applied.
-    fn grid(&mut self, entity: Entity, grid: Grid) -> GridCommands;
+    fn grid(&mut self, entity: Entity, grid: Grid) -> GridCommands<'_>;
 }
 
 impl BigSpaceCommands for Commands<'_, '_> {
@@ -34,7 +34,7 @@ impl BigSpaceCommands for Commands<'_, '_> {
         self.spawn_big_space(Grid::default(), child_builder);
     }
 
-    fn grid(&mut self, entity: Entity, grid: Grid) -> GridCommands {
+    fn grid(&mut self, entity: Entity, grid: Grid) -> GridCommands<'_> {
         GridCommands {
             entity,
             commands: self.reborrow(),
@@ -66,7 +66,7 @@ impl<'a> GridCommands<'a> {
 
     /// Spawn an entity in this grid.
     #[inline]
-    pub fn spawn(&mut self, bundle: impl Bundle) -> SpatialEntityCommands {
+    pub fn spawn(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<'_> {
         let entity = self.commands.spawn(bundle).id();
         self.children.push(entity);
         SpatialEntityCommands {
@@ -78,7 +78,7 @@ impl<'a> GridCommands<'a> {
     /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and insert the provided
     /// bundle.
     #[inline]
-    pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands {
+    pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<'_> {
         let entity = self
             .spawn((
                 #[cfg(feature = "bevy_render")]
@@ -131,7 +131,7 @@ impl<'a> GridCommands<'a> {
 
     /// Spawn a grid as a child of the current grid.
     #[inline]
-    pub fn spawn_grid(&mut self, new_grid: Grid, bundle: impl Bundle) -> GridCommands {
+    pub fn spawn_grid(&mut self, new_grid: Grid, bundle: impl Bundle) -> GridCommands<'_> {
         let entity = self
             .spawn((
                 #[cfg(feature = "bevy_render")]
@@ -152,7 +152,7 @@ impl<'a> GridCommands<'a> {
     }
 
     /// Spawn a grid as a child of the current grid.
-    pub fn spawn_grid_default(&mut self, bundle: impl Bundle) -> GridCommands {
+    pub fn spawn_grid_default(&mut self, bundle: impl Bundle) -> GridCommands<'_> {
         self.spawn_grid(Grid::default(), bundle)
     }
 
