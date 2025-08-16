@@ -76,13 +76,13 @@ impl Plugin for BigSpaceCorePlugin {
         app.register_type::<Transform>()
             .register_type::<GlobalTransform>()
             .register_type::<TransformTreeChanged>()
-            .register_type::<GridCell>()
+            .register_type::<CellCoord>()
             .register_type::<Grid>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
             .add_systems(
                 PostUpdate,
-                GridCell::recenter_large_transforms
+                CellCoord::recenter_large_transforms
                     .in_set(BigSpaceSystems::RecenterLargeTransforms),
             );
     }
@@ -95,7 +95,7 @@ impl Plugin for BigSpaceCorePlugin {
 }
 
 /// Adds transform propagation, computing `GlobalTransforms` from hierarchies of [`Transform`],
-/// [`GridCell`], [`Grid`], and [`BigSpace`]s.
+/// [`CellCoord`], [`Grid`], and [`BigSpace`]s.
 ///
 /// Disable Bevy's [`TransformPlugin`] while using this plugin.
 ///

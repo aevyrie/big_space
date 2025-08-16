@@ -1,32 +1,29 @@
-//! The [`GridHashMap`] that contains mappings between entities and their spatial hash.
+//! The [`CellLookup`] that contains mappings between entities and their spatial hash.
 
 use alloc::collections::VecDeque;
 use core::marker::PhantomData;
 
-use super::GridHashMapFilter;
+use super::SpatialHashFilter;
+use crate::hash::component::{CellHashMap, CellHashSet};
 use crate::prelude::*;
-use bevy_ecs::{entity::EntityHash, prelude::*};
-use bevy_platform::{
-    collections::{HashMap, HashSet},
-    hash::PassHash,
-    prelude::*,
-    time::Instant,
-};
+use bevy_ecs::entity::{EntityHashMap, EntityHashSet};
+use bevy_ecs::prelude::*;
+use bevy_platform::{collections::HashSet, prelude::*, time::Instant};
 
-/// An entry in a [`GridHashMap`], accessed with a [`GridHash`].
+/// An entry in a [`CellLookup`], accessed with a [`CellId`].
 #[derive(Clone, Debug)]
-pub struct GridHashEntry {
+pub struct CellLookupEntry {
     /// All the entities located in this grid cell.
-    pub entities: HashSet<Entity, EntityHash>,
+    pub entities: EntityHashSet,
     /// Precomputed hashes to direct neighbors.
     // TODO: computation cheap, heap slow. Can this be replaced with a u32 bitmask of occupied cells
     // (only need 26 bits), with the hashes computed based on the neighbor's relative position?
-    pub occupied_neighbors: Vec<GridHash>,
+    pub occupied_neighbors: Vec<CellId>,
 }
 
-impl GridHashEntry {
+impl CellLookupEntry {
     /// Find an occupied neighbor's index in the list.
-    fn neighbor_index(&self, hash: &GridHash) -> Option<usize> {
+    fn neighbor_index(&self, hash: &CellId) -> Option<usize> {
         self.occupied_neighbors
             .iter()
             .enumerate()
@@ -36,18 +33,18 @@ impl GridHashEntry {
 
     /// Iterate over this cell and its non-empty adjacent neighbors.
     ///
-    /// See [`GridHashMap::nearby`].
-    pub fn nearby<'a, F: GridHashMapFilter>(
+    /// See [`CellLookup::nearby`].
+    pub fn nearby<'a, F: SpatialHashFilter>(
         &'a self,
-        map: &'a GridHashMap<F>,
-    ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
+        map: &'a CellLookup<F>,
+    ) -> impl Iterator<Item = &'a CellLookupEntry> + 'a {
         map.nearby(self)
     }
 }
 
-/// Trait extension that adds `.entities()` to any iterator of [`GridHashEntry`]s.
+/// Trait extension that adds `.entities()` to any iterator of [`CellLookupEntry`]s.
 pub trait SpatialEntryToEntities<'a> {
-    /// Flatten an iterator of [`GridHashEntry`]s into an iterator of [`Entity`]s.
+    /// Flatten an iterator of [`CellLookupEntry`]s into an iterator of [`Entity`]s.
     fn entities(self) -> impl Iterator<Item = Entity> + 'a;
 }
 
@@ -61,7 +58,7 @@ where
     }
 }
 
-impl<'a> SpatialEntryToEntities<'a> for &'a GridHashEntry {
+impl<'a> SpatialEntryToEntities<'a> for &'a CellLookupEntry {
     #[inline]
     fn entities(self) -> impl Iterator<Item = Entity> + 'a {
         self.entities.iter().copied()
@@ -75,24 +72,24 @@ impl<'a> SpatialEntryToEntities<'a> for Neighbor<'a> {
     }
 }
 
-/// A global spatial hash map for quickly finding entities in a grid cell.
+/// A resource for quickly finding entities in a cell or finding an entity's neighbors.
 #[derive(Resource, Clone)]
-pub struct GridHashMap<F = ()>
+pub struct CellLookup<F = ()>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// The primary hash map for looking up entities by their [`GridHash`].
-    map: InnerGridHashMap,
+    /// The primary hash map for looking up entities by their [`CellId`].
+    map: InnerCellLookup,
     /// A reverse lookup to find the latest spatial hash associated with an entity that this map is
     /// aware of. This is needed to remove or move an entity when its cell changes, because once it
     /// changes in the ECS, we need to know its *previous* value when it was inserted in this map.
-    reverse_map: HashMap<Entity, GridHash, PassHash>,
+    reverse_map: EntityHashMap<CellId>,
     spooky: PhantomData<F>,
 }
 
-impl<F> core::fmt::Debug for GridHashMap<F>
+impl<F> core::fmt::Debug for CellLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GridHashMap")
@@ -102,9 +99,9 @@ where
     }
 }
 
-impl<F> Default for GridHashMap<F>
+impl<F> Default for CellLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
     fn default() -> Self {
         Self {
@@ -115,26 +112,26 @@ where
     }
 }
 
-impl<F> GridHashMap<F>
+impl<F> CellLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// Get information about all entities located at this [`GridHash`], as well as its
+    /// Get information about all entities located at this [`CellId`], as well as its
     /// neighbors.
     #[inline]
-    pub fn get(&self, hash: &GridHash) -> Option<&GridHashEntry> {
+    pub fn get(&self, hash: &CellId) -> Option<&CellLookupEntry> {
         self.map.inner.get(hash)
     }
 
-    /// Returns `true` if this [`GridHash`] is occupied.
+    /// Returns `true` if this [`CellId`] is occupied.
     #[inline]
-    pub fn contains(&self, hash: &GridHash) -> bool {
+    pub fn contains(&self, hash: &CellId) -> bool {
         self.map.inner.contains_key(hash)
     }
 
     /// An iterator visiting all spatial hash cells and their contents in arbitrary order.
     #[inline]
-    pub fn all_entries(&self) -> impl Iterator<Item = (&GridHash, &GridHashEntry)> {
+    pub fn all_entries(&self) -> impl Iterator<Item = (&CellId, &CellLookupEntry)> {
         self.map.inner.iter()
     }
 
@@ -144,15 +141,15 @@ where
     /// making it faster to look up neighboring entries when compared to computing all neighbor
     /// hashes and checking if they exist.
     ///
-    /// This function intentionally accepts [`GridHashEntry`] instead of [`GridHash`],
+    /// This function intentionally accepts [`CellLookupEntry`] instead of [`CellId`],
     /// because it is not a general radius test; it only works for occupied cells with a
-    /// [`GridHashEntry`]. This API makes the above optimization possible, while preventing
+    /// [`CellLookupEntry`]. This API makes the above optimization possible, while preventing
     /// misuse and foot guns.
     #[inline]
     pub fn nearby<'a>(
         &'a self,
-        entry: &'a GridHashEntry,
-    ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
+        entry: &'a CellLookupEntry,
+    ) -> impl Iterator<Item = &'a CellLookupEntry> + 'a {
         // Use `core::iter::once` to avoid returning a function-local variable.
         Iterator::chain(
             core::iter::once(entry),
@@ -163,7 +160,7 @@ where
         )
     }
 
-    /// Iterate over all [`GridHashEntry`]s within a cube with `center` and `radius`.
+    /// Iterate over all [`CellLookupEntry`]s within a cube with `center` and `radius`.
     ///
     /// ### Warning
     ///
@@ -173,25 +170,25 @@ where
     ///
     /// Additionally, unlike `nearby`, this function cannot rely on cached information about
     /// neighbors. If you are using this function when `hash` is an occupied cell and `radius` is
-    /// `1`, you should probably be using [`GridHashMap::nearby`] instead.
+    /// `1`, you should probably be using [`CellLookup::nearby`] instead.
     #[inline]
     pub fn within_cube<'a>(
         &'a self,
-        center: &'a GridHash,
+        center: &'a CellId,
         radius: u8,
-    ) -> impl Iterator<Item = &'a GridHashEntry> + 'a {
+    ) -> impl Iterator<Item = &'a CellLookupEntry> + 'a {
         // Use `core::iter::once` to avoid returning a function-local variable.
         Iterator::chain(core::iter::once(*center), center.adjacent(radius))
             .filter_map(|hash| self.get(&hash))
     }
 
     /// Iterate over all connected neighboring cells with a breadth-first "flood fill" traversal
-    /// starting at `seed`. Limits the extents of the breadth-first flood fill traversal with a
+    /// starting at `seed`. Limits the extent of the breadth-first flood fill traversal with a
     /// `max_depth`.
     ///
     /// ## Depth Limit
     ///
-    /// This will exit the breadth first traversal as soon as the depth is exceeded. While this
+    /// This will exit the breadth-first traversal as soon as the depth is exceeded. While this
     /// measurement is the same as the radius, it will not necessarily visit all cells within the
     /// radius - it will only visit cells within this radius *and* search depth.
     ///
@@ -204,10 +201,10 @@ where
     #[doc(alias = "bfs")]
     pub fn flood(
         &self,
-        seed: &GridHash,
+        seed: &CellId,
         max_depth: Option<GridPrecision>,
     ) -> impl Iterator<Item = Neighbor> {
-        let starting_cell_cell = seed.cell();
+        let starting_cell_cell = seed.coord();
         ContiguousNeighborsIter {
             initial_hash: Some(*seed),
             spatial_map: self,
@@ -218,7 +215,7 @@ where
             let Some(max_depth) = max_depth else {
                 return true;
             };
-            let dist = hash.cell() - starting_cell_cell;
+            let dist = hash.coord() - starting_cell_cell;
             dist.x <= max_depth && dist.y <= max_depth && dist.z <= max_depth
         })
     }
@@ -228,8 +225,8 @@ where
     /// These are cells that were previously empty, but now contain at least one entity.
     ///
     /// Useful for incrementally updating data structures that extend the functionality of
-    /// [`GridHashMap`]. Updated in [`GridHashMapSystem::UpdateMap`].
-    pub fn just_inserted(&self) -> &HashSet<GridHash, PassHash> {
+    /// [`CellLookup`]. Updated in [`SpatialHashSystem::UpdateCellLookup`].
+    pub fn newly_occupied(&self) -> &CellHashSet {
         &self.map.just_inserted
     }
 
@@ -238,24 +235,24 @@ where
     /// These are cells that were previously occupied, but now contain no entities.
     ///
     /// Useful for incrementally updating data structures that extend the functionality of
-    /// [`GridHashMap`]. Updated in [`GridHashMapSystem::UpdateMap`].
-    pub fn just_removed(&self) -> &HashSet<GridHash, PassHash> {
+    /// [`CellLookup`]. Updated in [`SpatialHashSystem::UpdateCellLookup`].
+    pub fn newly_emptied(&self) -> &CellHashSet {
         &self.map.just_removed
     }
 }
 
 /// Private Systems
-impl<F> GridHashMap<F>
+impl<F> CellLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// Update the [`GridHashMap`] with entities that have changed [`GridHash`]es, and meet the
-    /// optional [`GridHashMapFilter`].
+    /// Update the [`CellLookup`] with entities that have changed [`CellId`]es, and meet the
+    /// optional [`SpatialHashFilter`].
     pub(super) fn update(
         mut spatial_map: ResMut<Self>,
-        mut changed_hashes: ResMut<super::ChangedGridHashes<F>>,
-        all_hashes: Query<(Entity, &GridHash), F>,
-        mut removed: RemovedComponents<GridHash>,
+        changed_hashes: Res<super::ChangedCells<F>>,
+        all_hashes: Query<(Entity, &CellId), F>,
+        mut removed: RemovedComponents<CellId>,
         mut stats: Option<ResMut<crate::timing::GridHashStats>>,
     ) {
         let start = Instant::now();
@@ -274,8 +271,8 @@ where
         // See the docs on ChangedGridHash understand why we don't use query change detection.
         for (entity, spatial_hash) in changed_hashes
             .updated
-            .drain(..)
-            .filter_map(|entity| all_hashes.get(entity).ok())
+            .iter()
+            .filter_map(|entity| all_hashes.get(*entity).ok())
         {
             spatial_map.insert(entity, *spatial_hash);
         }
@@ -287,13 +284,13 @@ where
 }
 
 /// Private Methods
-impl<F> GridHashMap<F>
+impl<F> CellLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// Insert an entity into the [`GridHashMap`], updating any existing entries.
+    /// Insert an entity into the [`CellLookup`], updating any existing entries.
     #[inline]
-    fn insert(&mut self, entity: Entity, hash: GridHash) {
+    fn insert(&mut self, entity: Entity, hash: CellId) {
         // If this entity is already in the maps, we need to remove and update it.
         if let Some(old_hash) = self.reverse_map.get_mut(&entity) {
             if hash.eq(old_hash) {
@@ -308,7 +305,7 @@ where
         self.map.insert(entity, hash);
     }
 
-    /// Remove an entity from the [`GridHashMap`].
+    /// Remove an entity from the [`CellLookup`].
     #[inline]
     fn remove(&mut self, entity: Entity) {
         if let Some(old_hash) = self.reverse_map.remove(&entity) {
@@ -346,24 +343,24 @@ where
 //    Z-order in *another* collection (BTreeMap?) to improve locality for sequential lookups of
 //    spatial neighbors. Would ordering cause hitches with insertions?
 #[derive(Debug, Clone, Default)]
-struct InnerGridHashMap {
-    inner: HashMap<GridHash, GridHashEntry, PassHash>,
+struct InnerCellLookup {
+    inner: CellHashMap<CellLookupEntry>,
     /// Creating and freeing hash sets is expensive. To reduce time spent allocating and running
     /// destructors, we save any hash sets that would otherwise be thrown away. The next time we
     /// need to construct a new hash set of entities, we can grab one here.
     ///
     /// <https://en.wikipedia.org/wiki/Object_pool_pattern>.
-    hash_set_pool: Vec<HashSet<Entity, EntityHash>>,
-    neighbor_pool: Vec<Vec<GridHash>>,
+    hash_set_pool: Vec<EntityHashSet>,
+    neighbor_pool: Vec<Vec<CellId>>,
     /// Cells that were added because they were empty but now contain entities.
-    just_inserted: HashSet<GridHash, PassHash>,
+    just_inserted: CellHashSet,
     /// Cells that were removed because all entities vacated the cell.
-    just_removed: HashSet<GridHash, PassHash>,
+    just_removed: CellHashSet,
 }
 
-impl InnerGridHashMap {
+impl InnerCellLookup {
     #[inline]
-    fn insert(&mut self, entity: Entity, hash: GridHash) {
+    fn insert(&mut self, entity: Entity, hash: CellId) {
         if let Some(entry) = self.inner.get_mut(&hash) {
             entry.entities.insert(entity);
         } else {
@@ -374,7 +371,7 @@ impl InnerGridHashMap {
     }
 
     #[inline]
-    fn insert_entry(&mut self, hash: GridHash, entities: HashSet<Entity, EntityHash>) {
+    fn insert_entry(&mut self, hash: CellId, entities: EntityHashSet) {
         let mut occupied_neighbors = self.neighbor_pool.pop().unwrap_or_default();
         occupied_neighbors.extend(hash.adjacent(1).filter(|neighbor| {
             self.inner
@@ -388,7 +385,7 @@ impl InnerGridHashMap {
 
         self.inner.insert(
             hash,
-            GridHashEntry {
+            CellLookupEntry {
                 entities,
                 occupied_neighbors,
             },
@@ -402,7 +399,7 @@ impl InnerGridHashMap {
     }
 
     #[inline]
-    fn remove(&mut self, entity: Entity, old_hash: GridHash) {
+    fn remove(&mut self, entity: Entity, old_hash: CellId) {
         if let Some(entry) = self.inner.get_mut(&old_hash) {
             entry.entities.remove(&entity);
             if !entry.entities.is_empty() {
@@ -425,7 +422,7 @@ impl InnerGridHashMap {
                     neighbor.occupied_neighbors.remove(index);
                 });
 
-            // Add the allocated structs to their object pools, to reuse the allocations.
+            // Add the allocated structs to their object pools to reuse the allocations.
             self.hash_set_pool.push(removed_entry.entities);
             self.neighbor_pool.push(removed_entry.occupied_neighbors);
 
@@ -441,20 +438,20 @@ impl InnerGridHashMap {
 /// An iterator over the neighbors of a cell, breadth-first.
 pub struct ContiguousNeighborsIter<'a, F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    initial_hash: Option<GridHash>,
-    spatial_map: &'a GridHashMap<F>,
+    initial_hash: Option<CellId>,
+    spatial_map: &'a CellLookup<F>,
     stack: VecDeque<Neighbor<'a>>,
-    visited_cells: HashSet<GridHash>,
+    visited_cells: HashSet<CellId>,
 }
 
 /// Newtype used for adding useful extensions like `.entities()`.
-pub struct Neighbor<'a>(pub GridHash, pub &'a GridHashEntry);
+pub struct Neighbor<'a>(pub CellId, pub &'a CellLookupEntry);
 
 impl<'a, F> Iterator for ContiguousNeighborsIter<'a, F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
     type Item = Neighbor<'a>;
 

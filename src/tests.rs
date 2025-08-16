@@ -11,7 +11,7 @@ fn changing_floating_origin_updates_global_transform() {
         .world_mut()
         .spawn((
             Transform::from_translation(Vec3::new(150.0, 0.0, 0.0)),
-            GridCell::new(5, 0, 0),
+            CellCoord::new(5, 0, 0),
             FloatingOrigin,
         ))
         .id();
@@ -20,7 +20,7 @@ fn changing_floating_origin_updates_global_transform() {
         .world_mut()
         .spawn((
             Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)),
-            GridCell::new(0, -15, 0),
+            CellCoord::new(0, -15, 0),
         ))
         .id();
 
@@ -52,7 +52,7 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
         .world_mut()
         .spawn((
             Transform::from_translation(Vec3::new(150.0, 0.0, 0.0)),
-            GridCell::new(5, 0, 0),
+            CellCoord::new(5, 0, 0),
             FloatingOrigin,
         ))
         .id();
@@ -61,7 +61,7 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
         .world_mut()
         .spawn((
             Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)),
-            GridCell::new(0, -15, 0),
+            CellCoord::new(0, -15, 0),
         ))
         .with_child(Transform::from_translation(Vec3::new(0.0, 0.0, 300.0)))
         .id();

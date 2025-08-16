@@ -1,92 +1,94 @@
-//! Spatial hashing acceleration structure. See [`GridHashPlugin`].
+//! Spatial hashing acceleration structure. See [`CellHashingPlugin`].
 
 use core::marker::PhantomData;
 
 use crate::prelude::*;
 use bevy_app::prelude::*;
+use bevy_ecs::entity::EntityHashSet;
 use bevy_ecs::{prelude::*, query::QueryFilter};
-use bevy_platform::prelude::*;
 
 pub mod component;
 pub mod map;
 pub mod partition;
 
-/// Add spatial hashing acceleration to `big_space`, accessible through the [`GridHashMap`] resource,
-/// and [`GridHash`] components.
+/// Add spatial hashing acceleration to `big_space`, accessible through the [`CellLookup`] resource,
+/// and [`CellId`] components.
 ///
-/// You can optionally add a [`GridHashMapFilter`] to this plugin, to only run the spatial hashing on
+/// You can optionally add a [`SpatialHashFilter`] to this plugin, to only run the spatial hashing on
 /// entities that match the query filter. This is useful if you only want to, say, compute hashes
-/// and insert in the [`GridHashMap`] for `Player` entities.
+/// and insert in the [`CellLookup`] for `Player` entities.
 ///
 /// If you are adding multiple copies of this plugin with different filters, there are optimizations
 /// in place to avoid duplicating work. However, you should still take care to avoid excessively
 /// overlapping filters.
-pub struct GridHashPlugin<F = ()>(PhantomData<F>)
+pub struct CellHashingPlugin<F = ()>(PhantomData<F>)
 where
-    F: GridHashMapFilter;
+    F: SpatialHashFilter;
 
-impl<F> GridHashPlugin<F>
+impl<F> CellHashingPlugin<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// Create a new instance of [`GridHashPlugin`].
+    /// Create a new instance of [`CellHashingPlugin`].
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<F> Plugin for GridHashPlugin<F>
+impl<F> Plugin for CellHashingPlugin<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GridHashMap<F>>()
-            .init_resource::<ChangedGridHashes<F>>()
-            .register_type::<GridHash>()
+        app.init_resource::<CellLookup<F>>()
+            .init_resource::<ChangedCells<F>>()
+            .register_type::<CellId>()
             .add_systems(
                 PostUpdate,
                 (
-                    GridHash::update::<F>
-                        .in_set(GridHashMapSystem::UpdateHash)
+                    CellId::update::<F>
+                        .in_set(SpatialHashSystem::UpdateCellHashes)
                         .after(BigSpaceSystems::RecenterLargeTransforms),
-                    GridHashMap::<F>::update
-                        .in_set(GridHashMapSystem::UpdateMap)
-                        .after(GridHashMapSystem::UpdateHash),
+                    CellLookup::<F>::update
+                        .in_set(SpatialHashSystem::UpdateCellLookup)
+                        .after(SpatialHashSystem::UpdateCellHashes),
                 ),
             );
     }
 }
 
-impl Default for GridHashPlugin<()> {
+impl Default for CellHashingPlugin<()> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-/// System sets for [`GridHashPlugin`].
+/// System sets for [`CellHashingPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
-pub enum GridHashMapSystem {
-    /// [`GridHash`] updated.
-    UpdateHash,
-    /// [`GridHashMap`] updated.
-    UpdateMap,
-    /// [`GridPartitionMap`] updated.
-    UpdatePartition,
+pub enum SpatialHashSystem {
+    /// [`CellId`] and [`CellHash`] updated.
+    UpdateCellHashes,
+    /// [`CellLookup`] updated.
+    UpdateCellLookup,
+    /// [`PartitionLookup`] updated.
+    UpdatePartitionLookup,
 }
 
 /// Used as a [`QueryFilter`] to include or exclude certain types of entities from spatial
 /// hashing.The trait is automatically implemented for all compatible types, like [`With`] or
 /// [`Without`].
 ///
-/// By default, this is `()`, but it can be overridden when adding the [`GridHashPlugin`] and
-/// [`GridHashMap`]. For example, if you use `With<Players>` as your filter, only `Player`s would be
+/// By default, this is `()`, but it can be overridden when adding the [`CellHashingPlugin`] and
+/// [`CellLookup`]. For example, if you use `With<Players>` as your filter, only `Player`s would be
 /// considered when building spatial hash maps. This is useful when you only care about querying
-/// certain entities, and want to avoid the plugin doing bookkeeping work for entities you don't
+/// certain entities and want to avoid the plugin doing bookkeeping work for entities you don't
 /// care about.
-pub trait GridHashMapFilter: QueryFilter + Send + Sync + 'static {}
-impl<T: QueryFilter + Send + Sync + 'static> GridHashMapFilter for T {}
+pub trait SpatialHashFilter: QueryFilter + Send + Sync + 'static {}
+impl<T: QueryFilter + Send + Sync + 'static> SpatialHashFilter for T {}
 
-/// Used to manually track spatial hashes that have changed, for optimization purposes.
+/// Resource to manually track entities that have moved between cells, for optimization purposes.
+///
+/// Updated every frame in [`CellId::update`] in [`SpatialHashSystem::UpdateCellHashes`].
 ///
 /// We use a manual collection instead of a `Changed` query because a query that uses `Changed`
 /// still has to iterate over every single entity. By making a shortlist of changed entities
@@ -100,17 +102,23 @@ impl<T: QueryFilter + Send + Sync + 'static> GridHashMapFilter for T {}
 /// It may be possible to remove this if bevy gets archetype change detection, or observers that can
 /// react to a component being mutated. For now, this performs well enough.
 #[derive(Resource)]
-struct ChangedGridHashes<F: GridHashMapFilter> {
-    updated: Vec<Entity>,
+pub struct ChangedCells<F: SpatialHashFilter> {
+    updated: EntityHashSet,
     spooky: PhantomData<F>,
 }
 
-impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
+impl<F: SpatialHashFilter> Default for ChangedCells<F> {
     fn default() -> Self {
         Self {
-            updated: Vec::new(),
+            updated: Default::default(),
             spooky: PhantomData,
         }
+    }
+}
+
+impl<F: SpatialHashFilter> ChangedCells<F> {
+    pub fn iter(&self) -> impl Iterator<Item = &Entity> {
+        self.updated.iter()
     }
 }
 
@@ -123,7 +131,8 @@ impl<F: GridHashMapFilter> Default for ChangedGridHashes<F> {
 mod tests {
     use crate::plugin::BigSpaceMinimalPlugins;
     use crate::{hash::map::SpatialEntryToEntities, prelude::*};
-    use bevy_platform::{collections::HashSet, sync::OnceLock};
+    use bevy_ecs::entity::EntityHashSet;
+    use bevy_platform::sync::OnceLock;
 
     #[test]
     fn entity_despawn() {
@@ -133,29 +142,29 @@ mod tests {
 
         let setup = |mut commands: Commands| {
             commands.spawn_big_space_default(|root| {
-                let entity = root.spawn_spatial(GridCell::ZERO).id();
+                let entity = root.spawn_spatial(CellCoord::ZERO).id();
                 ENTITY.set(entity).ok();
             });
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::default())
+        app.add_plugins(CellHashingPlugin::default())
             .add_systems(Update, setup)
             .update();
 
         let hash = *app
             .world()
             .entity(*ENTITY.get().unwrap())
-            .get::<GridHash>()
+            .get::<CellId>()
             .unwrap();
 
-        assert!(app.world().resource::<GridHashMap>().get(&hash).is_some());
+        assert!(app.world().resource::<CellLookup>().get(&hash).is_some());
 
         app.world_mut().despawn(*ENTITY.get().unwrap());
 
         app.update();
 
-        assert!(app.world().resource::<GridHashMap>().get(&hash).is_none());
+        assert!(app.world().resource::<CellLookup>().get(&hash).is_none());
     }
 
     #[test]
@@ -178,28 +187,28 @@ mod tests {
 
         let setup = |mut commands: Commands| {
             commands.spawn_big_space_default(|root| {
-                let a = root.spawn_spatial(GridCell::new(0, 1, 2)).id();
-                let b = root.spawn_spatial(GridCell::new(0, 1, 2)).id();
-                let c = root.spawn_spatial(GridCell::new(5, 5, 5)).id();
+                let a = root.spawn_spatial(CellCoord::new(0, 1, 2)).id();
+                let b = root.spawn_spatial(CellCoord::new(0, 1, 2)).id();
+                let c = root.spawn_spatial(CellCoord::new(5, 5, 5)).id();
 
                 root.commands().insert_resource(ParentSet { a, b, c });
 
                 root.with_grid_default(|grid| {
-                    let x = grid.spawn_spatial(GridCell::new(0, 1, 2)).id();
-                    let y = grid.spawn_spatial(GridCell::new(0, 1, 2)).id();
-                    let z = grid.spawn_spatial(GridCell::new(5, 5, 5)).id();
+                    let x = grid.spawn_spatial(CellCoord::new(0, 1, 2)).id();
+                    let y = grid.spawn_spatial(CellCoord::new(0, 1, 2)).id();
+                    let z = grid.spawn_spatial(CellCoord::new(5, 5, 5)).id();
                     grid.commands().insert_resource(ChildSet { x, y, z });
                 });
             });
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::default())
+        app.add_plugins(CellHashingPlugin::default())
             .add_systems(Update, setup);
 
         app.update();
 
-        let mut spatial_hashes = app.world_mut().query::<&GridHash>();
+        let mut spatial_hashes = app.world_mut().query::<&CellId>();
 
         let parent = app.world().resource::<ParentSet>().clone();
         let child = app.world().resource::<ChildSet>().clone();
@@ -236,7 +245,7 @@ mod tests {
 
         let entities = &app
             .world()
-            .resource::<GridHashMap>()
+            .resource::<CellLookup>()
             .get(spatial_hashes.get(app.world(), parent.a).unwrap())
             .unwrap()
             .entities;
@@ -262,16 +271,16 @@ mod tests {
 
         let setup = |mut commands: Commands| {
             commands.spawn_big_space_default(|root| {
-                let a = root.spawn_spatial(GridCell::new(0, 0, 0)).id();
-                let b = root.spawn_spatial(GridCell::new(1, 1, 1)).id();
-                let c = root.spawn_spatial(GridCell::new(2, 2, 2)).id();
+                let a = root.spawn_spatial(CellCoord::new(0, 0, 0)).id();
+                let b = root.spawn_spatial(CellCoord::new(1, 1, 1)).id();
+                let c = root.spawn_spatial(CellCoord::new(2, 2, 2)).id();
 
                 root.commands().insert_resource(Entities { a, b, c });
             });
         };
 
         let mut app = App::new();
-        app.add_plugins(GridHashPlugin::default())
+        app.add_plugins(CellHashingPlugin::default())
             .add_systems(Startup, setup);
 
         app.update();
@@ -283,16 +292,16 @@ mod tests {
             .get(app.world(), entities.a)
             .unwrap();
 
-        let map = app.world().resource::<GridHashMap>();
-        let entry = map.get(&GridHash::new(parent, &GridCell::ZERO)).unwrap();
-        let neighbors: HashSet<Entity> = map.nearby(entry).entities().collect();
+        let map = app.world().resource::<CellLookup>();
+        let entry = map.get(&CellId::new(parent, &CellCoord::ZERO)).unwrap();
+        let neighbors: EntityHashSet = map.nearby(entry).entities().collect();
 
         assert!(neighbors.contains(&entities.a));
         assert!(neighbors.contains(&entities.b));
         assert!(!neighbors.contains(&entities.c));
 
-        let flooded: HashSet<Entity> = map
-            .flood(&GridHash::new(parent, &GridCell::ZERO), None)
+        let flooded: EntityHashSet = map
+            .flood(&CellId::new(parent, &CellCoord::ZERO), None)
             .entities()
             .collect();
 
@@ -312,39 +321,39 @@ mod tests {
 
         let setup = |mut commands: Commands| {
             commands.spawn_big_space_default(|root| {
-                root.spawn_spatial((GridCell::ZERO, Player));
-                root.spawn_spatial(GridCell::ZERO);
-                root.spawn_spatial(GridCell::ZERO);
+                root.spawn_spatial((CellCoord::ZERO, Player));
+                root.spawn_spatial(CellCoord::ZERO);
+                root.spawn_spatial(CellCoord::ZERO);
                 ROOT.set(root.id()).ok();
             });
         };
 
         let mut app = App::new();
         app.add_plugins((
-            GridHashPlugin::default(),
-            GridHashPlugin::<With<Player>>::new(),
-            GridHashPlugin::<Without<Player>>::new(),
+            CellHashingPlugin::default(),
+            CellHashingPlugin::<With<Player>>::new(),
+            CellHashingPlugin::<Without<Player>>::new(),
         ))
         .add_systems(Startup, setup)
         .update();
 
-        let zero_hash = GridHash::from_parent(*ROOT.get().unwrap(), &GridCell::ZERO);
+        let zero_hash = CellId::from_parent(*ROOT.get().unwrap(), &CellCoord::ZERO);
 
-        let map = app.world().resource::<GridHashMap>();
+        let map = app.world().resource::<CellLookup>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             3,
             "There are a total of 3 spatial entities"
         );
 
-        let map = app.world().resource::<GridHashMap<With<Player>>>();
+        let map = app.world().resource::<CellLookup<With<Player>>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             1,
             "There is only one entity with the Player component"
         );
 
-        let map = app.world().resource::<GridHashMap<Without<Player>>>();
+        let map = app.world().resource::<CellLookup<Without<Player>>>();
         assert_eq!(
             map.get(&zero_hash).unwrap().entities.iter().count(),
             2,
@@ -352,7 +361,7 @@ mod tests {
         );
     }
 
-    /// Verify that [`GridHashMap::just_removed`] and [`GridHashMap::just_inserted`] work correctly when
+    /// Verify that [`CellLookup::newly_emptied`] and [`CellLookup::newly_occupied`] work correctly when
     /// entities are spawned and move between cells.
     #[test]
     fn spatial_map_changed_cell_tracking() {
@@ -367,16 +376,16 @@ mod tests {
 
         let setup = |mut commands: Commands| {
             commands.spawn_big_space_default(|root| {
-                let a = root.spawn_spatial(GridCell::new(0, 0, 0)).id();
-                let b = root.spawn_spatial(GridCell::new(1, 1, 1)).id();
-                let c = root.spawn_spatial(GridCell::new(2, 2, 2)).id();
+                let a = root.spawn_spatial(CellCoord::new(0, 0, 0)).id();
+                let b = root.spawn_spatial(CellCoord::new(1, 1, 1)).id();
+                let c = root.spawn_spatial(CellCoord::new(2, 2, 2)).id();
 
                 root.commands().insert_resource(Entities { a, b, c });
             });
         };
 
         let mut app = App::new();
-        app.add_plugins((BigSpaceMinimalPlugins, GridHashPlugin::default()))
+        app.add_plugins((BigSpaceMinimalPlugins, CellHashingPlugin::default()))
             .add_systems(Startup, setup);
 
         app.update();
@@ -384,7 +393,7 @@ mod tests {
         let entities = app.world().resource::<Entities>().clone();
         let get_hash = |app: &mut App, entity| {
             *app.world_mut()
-                .query::<&GridHash>()
+                .query::<&CellId>()
                 .get(app.world(), entity)
                 .unwrap()
         };
@@ -392,15 +401,15 @@ mod tests {
         let a_hash_t0 = get_hash(&mut app, entities.a);
         let b_hash_t0 = get_hash(&mut app, entities.b);
         let c_hash_t0 = get_hash(&mut app, entities.c);
-        let map = app.world().resource::<GridHashMap>();
-        assert!(map.just_inserted().contains(&a_hash_t0));
-        assert!(map.just_inserted().contains(&b_hash_t0));
-        assert!(map.just_inserted().contains(&c_hash_t0));
+        let map = app.world().resource::<CellLookup>();
+        assert!(map.newly_occupied().contains(&a_hash_t0));
+        assert!(map.newly_occupied().contains(&b_hash_t0));
+        assert!(map.newly_occupied().contains(&c_hash_t0));
 
         // Move entities and run an update
         app.world_mut()
             .entity_mut(entities.a)
-            .get_mut::<GridCell>()
+            .get_mut::<CellCoord>()
             .unwrap()
             .z += 1;
         app.world_mut()
@@ -414,16 +423,16 @@ mod tests {
         let a_hash_t1 = get_hash(&mut app, entities.a);
         let b_hash_t1 = get_hash(&mut app, entities.b);
         let c_hash_t1 = get_hash(&mut app, entities.c);
-        let map = app.world().resource::<GridHashMap>();
+        let map = app.world().resource::<CellLookup>();
 
         // Last grid
-        assert!(map.just_removed().contains(&a_hash_t0)); // Moved cell
-        assert!(map.just_removed().contains(&b_hash_t0)); // Moved cell via transform
-        assert!(!map.just_removed().contains(&c_hash_t0)); // Did not move
+        assert!(map.newly_emptied().contains(&a_hash_t0)); // Moved cell
+        assert!(map.newly_emptied().contains(&b_hash_t0)); // Moved cell via transform
+        assert!(!map.newly_emptied().contains(&c_hash_t0)); // Did not move
 
         // Current grid
-        assert!(map.just_inserted().contains(&a_hash_t1)); // Moved cell
-        assert!(map.just_inserted().contains(&b_hash_t1)); // Moved cell via transform
-        assert!(!map.just_inserted().contains(&c_hash_t1)); // Did not move
+        assert!(map.newly_occupied().contains(&a_hash_t1)); // Moved cell
+        assert!(map.newly_occupied().contains(&b_hash_t1)); // Moved cell via transform
+        assert!(!map.newly_occupied().contains(&c_hash_t1)); // Did not move
     }
 }

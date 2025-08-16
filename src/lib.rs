@@ -11,18 +11,19 @@
 //!
 //! ## Quick Reference
 //!
-//! - [`BigSpace`] : The root of a high precision entity hierarchy.
-//! - [`FloatingOrigin`] : Position of the 32 bit rendering origin.
-//! - [`Grid`] : Defines the size of a grid for its child cells.
-//! - [`GridCell`] : Cell index of an entity within its parent's grid.
-//! - [`GridPrecision`] : Integer precision of a grid.
+//! - [`BigSpace`]: The root of a high-precision entity hierarchy.
+//! - [`FloatingOrigin`]: Position of the 32-bit rendering origin.
+//! - [`Grid`]: Defines the size of a grid for its child cells.
+//! - [`CellCoord`]: Cell index of an entity within its parent's grid.
+//! - [`GridPrecision`]: Integer precision of a grid.
 //!
 //! #### Spatial Hashing
 //!
-//! - [`GridHash`] : The spatial hash of an entity's grid cell.
-//! - [`GridHashMap`] : A map for entity, grid cell, and neighbor lookups.
-//! - [`GridPartition`] : Group of adjacent grid cells.
-//! - [`GridPartitionMap`] : A map for finding independent partitions of entities.
+//! - [`CellId`]: A globally unique ID of an entity's grid cell and a stored hash.
+//! - [`CellHash`]: A fast spatial hash of an entity's grid cell.
+//! - [`CellLookup`]: A resource for entity, grid cell, and neighbor lookups.
+//! - [`PartitionId`]: A globally unique ID for a partition of cells.
+//! - [`PartitionLookup`]: A resource for finding independent partitions of entities.
 //!
 //! Jump to [Usage](crate#usage) to get started.
 //!
@@ -86,7 +87,7 @@
 //!   low-precision entity hierarchies with no added effort or cost.
 //!
 //! While using the [`BigSpaceDefaultPlugins`], the position of entities is now defined with the [`Grid`],
-//! [`GridCell`], and [`Transform`] components. The `Grid` is a large integer grid of cells;
+//! [`CellCoord`], and [`Transform`] components. The `Grid` is a large integer grid of cells;
 //! entities are located within this grid as children using the `GridCell` component. Finally, the
 //! `Transform` is used to position the entity relative to the center of its `GridCell`. If an
 //! entity moves into a neighboring cell, its transform will be automatically recomputed relative to
@@ -177,7 +178,7 @@
 //! ## Absolute Position
 //!
 //! If you are updating the position of an entity with absolute positions, and the position exceeds
-//! the bounds of the entity's grid cell, the floating origin plugin will recenter that entity into
+//! the bounds of the entity's grid cell, the floating origin plugin will re-center that entity into
 //! its new cell. Every time you update that entity, you will be fighting with the plugin as it
 //! constantly recenters your entity. This can especially cause problems with camera controllers
 //! which may not expect the large discontinuity in position as an entity moves between cells.
@@ -187,9 +188,8 @@
 //! precision you have.
 //!
 //! However, if you have something that must not accumulate error, like the orbit of a planet, you
-//! can instead do the orbital calculation (position as a function of time) to compute the absolute
-//! position of the planet with high precision, then directly compute the [`GridCell`] and
-//! [`Transform`] of that entity using [`Grid::translation_to_grid`].
+//! can instead do the orbital calculation first in high precision, then directly compute the
+//! [`CellCoord`] and [`Transform`] of that entity using [`Grid::translation_to_grid`].
 //!
 //! # Next Steps
 //!
@@ -233,15 +233,15 @@ pub mod prelude {
     pub use commands::{BigSpaceCommands, GridCommands, SpatialEntityCommands};
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
-        cell::GridCell,
+        cell::CellCoord,
         local_origin::{Grids, GridsMut, LocalFloatingOrigin},
         Grid,
     };
     pub use hash::{
-        component::{FastGridHash, GridHash},
-        map::{GridHashMap, SpatialEntryToEntities},
-        partition::{GridPartition, GridPartitionId, GridPartitionMap, GridPartitionPlugin},
-        GridHashMapSystem, GridHashPlugin,
+        component::{CellHash, CellHashMap, CellHashSet, CellId},
+        map::{CellLookup, SpatialEntryToEntities},
+        partition::{Partition, PartitionId, PartitionLookup, PartitionPlugin},
+        CellHashingPlugin, SpatialHashSystem,
     };
     pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;
@@ -262,16 +262,16 @@ pub mod prelude {
 /// you are using a grid cell edge length of 10,000 meters, and `1.0` == 1 meter, these correspond
 /// to a total usable volume of a cube with the following edge lengths:
 ///
-/// - `i8`: 2,560 km = 74% of the diameter of the Moon
-/// - `i16`: 655,350 km = 85% of the diameter of the Moon's orbit around Earth
+/// - `i8`: 2,560 km = 74% the diameter of the Moon
+/// - `i16`: 655,350 km = 85% the diameter of the Moon's orbit around Earth
 /// - `i32`: 0.0045 light years = ~4 times the width of the solar system
 /// - `i64`: 19.5 million light years = ~100 times the width of the milky way galaxy
 /// - `i128`: 3.6e+26 light years = ~3.9e+15 times the width of the observable universe
 ///
-/// where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
-/// precision of 0.5mm in any of these cases.
+/// ...where `usable_edge_length = 2^(integer_bits) * cell_edge_length`, resulting in the worst case
+/// precision of 0.5 mm in any of these cases.
 ///
-/// This can also be used for small scales. With a cell edge length of `1e-11`, and using `i128`,
+/// This can also be used for small scales. With a cell's edge length of `1e-11`, and using `i128`,
 /// there is enough precision to render objects the size of protons anywhere in the observable
 /// universe.
 pub mod precision {
@@ -321,10 +321,10 @@ pub mod precision {
         feature = "i64",
         feature = "i128"
     )))]
-    /// No integer [`precision`] feature was enabled; `i64` is used by default.
-    ///
     /// The integer type used as the index for a `big_space` grid. Adds 64 bits of precision, in
     /// addition to bevy's 32 bit [`Transform`], for a total of 96 bits of translational precision.
     /// See [`precision`].
+    ///
+    /// If you see this, no integer [`precision`] feature was enabled, so `i64` was used by default.
     pub type GridPrecision = i64;
 }

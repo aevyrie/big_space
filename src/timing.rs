@@ -74,7 +74,7 @@ impl PropagationStats {
     }
 
     /// How long it took to run
-    /// [`recenter_large_transforms`](crate::grid::cell::GridCell::recenter_large_transforms)
+    /// [`recenter_large_transforms`](crate::grid::cell::CellCoord::recenter_large_transforms)
     /// propagation this update.
     pub fn grid_recentering(&self) -> Duration {
         self.grid_recentering
@@ -86,7 +86,7 @@ impl PropagationStats {
     }
 
     /// How long it took to run high precision
-    /// [`Transform`](bevy_transform::prelude::Transform)+[`GridCell`] propagation this update.
+    /// [`Transform`](bevy_transform::prelude::Transform)+[`CellCoord`] propagation this update.
     pub fn high_precision_propagation(&self) -> Duration {
         self.high_precision_propagation
     }
@@ -138,7 +138,7 @@ impl Div<u32> for PropagationStats {
     }
 }
 
-/// Aggregate runtime statistics across all [`crate::hash::GridHashPlugin`]s.
+/// Aggregate runtime statistics across all [`crate::hash::CellHashingPlugin`]s.
 #[derive(Resource, Debug, Clone, Default, Reflect)]
 pub struct GridHashStats {
     pub(crate) moved_entities: usize,

@@ -14,9 +14,9 @@ pub mod local_origin;
 pub mod propagation;
 
 /// A component that defines a spatial grid that child entities are located on. Child entities are
-/// located on this grid with the [`GridCell`] component.
+/// located on this grid with the [`CellCoord`] component.
 ///
-/// All entities with a [`GridCell`] must be children of an entity with a [`Grid`].
+/// All entities with a [`CellCoord`] must be children of an entity with a [`Grid`].
 ///
 /// Grids are hierarchical, allowing more precision for objects with similar relative velocities.
 /// All entities in the same grid will move together, like standard transform propagation, but with
@@ -74,9 +74,9 @@ impl Grid {
     }
 
     /// Compute the double precision position of an entity's [`Transform`] with respect to the given
-    /// [`GridCell`] within this grid.
+    /// [`CellCoord`] within this grid.
     #[inline]
-    pub fn grid_position_double(&self, pos: &GridCell, transform: &Transform) -> DVec3 {
+    pub fn grid_position_double(&self, pos: &CellCoord, transform: &Transform) -> DVec3 {
         DVec3 {
             x: pos.x as f64 * self.cell_edge_length as f64 + transform.translation.x as f64,
             y: pos.y as f64 * self.cell_edge_length as f64 + transform.translation.y as f64,
@@ -85,9 +85,9 @@ impl Grid {
     }
 
     /// Compute the single precision position of an entity's [`Transform`] with respect to the given
-    /// [`GridCell`].
+    /// [`CellCoord`].
     #[inline]
-    pub fn grid_position(&self, pos: &GridCell, transform: &Transform) -> Vec3 {
+    pub fn grid_position(&self, pos: &CellCoord, transform: &Transform) -> Vec3 {
         Vec3 {
             x: pos.x as f64 as f32 * self.cell_edge_length + transform.translation.x,
             y: pos.y as f64 as f32 * self.cell_edge_length + transform.translation.y,
@@ -95,8 +95,8 @@ impl Grid {
         }
     }
 
-    /// Returns the floating point position of a [`GridCell`].
-    pub fn cell_to_float(&self, pos: &GridCell) -> DVec3 {
+    /// Returns the floating point position of a [`CellCoord`].
+    pub fn cell_to_float(&self, pos: &CellCoord) -> DVec3 {
         DVec3 {
             x: pos.x as f64,
             y: pos.y as f64,
@@ -106,13 +106,13 @@ impl Grid {
 
     /// Convert a large translation into a small translation relative to a grid cell.
     #[inline]
-    pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (GridCell, Vec3) {
+    pub fn translation_to_grid(&self, input: impl Into<DVec3>) -> (CellCoord, Vec3) {
         let l = self.cell_edge_length as f64;
         let input = input.into();
         let DVec3 { x, y, z } = input;
 
         if input.abs().max_element() < self.maximum_distance_from_origin as f64 {
-            return (GridCell::default(), input.as_vec3());
+            return (CellCoord::default(), input.as_vec3());
         }
 
         let x_r = round(x / l);
@@ -123,7 +123,7 @@ impl Grid {
         let t_z = z - z_r * l;
 
         (
-            GridCell {
+            CellCoord {
                 x: x_r as GridPrecision,
                 y: y_r as GridPrecision,
                 z: z_r as GridPrecision,
@@ -134,7 +134,7 @@ impl Grid {
 
     /// Convert a large translation into a small translation relative to a grid cell.
     #[inline]
-    pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (GridCell, Vec3) {
+    pub fn imprecise_translation_to_grid(&self, input: Vec3) -> (CellCoord, Vec3) {
         self.translation_to_grid(input.as_dvec3())
     }
 
@@ -142,7 +142,7 @@ impl Grid {
     #[inline]
     pub fn global_transform(
         &self,
-        local_cell: &GridCell,
+        local_cell: &CellCoord,
         local_transform: &Transform,
     ) -> GlobalTransform {
         // The grid transform from the floating origin's grid, to the local grid.
