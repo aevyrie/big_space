@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use bevy_app::prelude::*;
+use bevy_ecs::entity::EntityHashSet;
 use bevy_ecs::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
@@ -237,7 +238,7 @@ pub fn nearest_objects_in_grid(
         return;
     }
     let cam_layer = cam_layer.to_owned().unwrap_or_default();
-    let cam_children: HashSet<Entity> = children.iter_descendants(cam_entity).collect();
+    let cam_children: EntityHashSet = children.iter_descendants(cam_entity).collect();
 
     let nearest_object = objects
         .iter()
@@ -268,7 +269,7 @@ pub fn camera_controller(
     mut input: ResMut<BigSpaceCameraInput>,
     mut camera: Query<(
         Entity,
-        &mut GridCell,
+        &mut CellCoord,
         &mut Transform,
         &mut BigSpaceCameraController,
     )>,

@@ -37,7 +37,7 @@ fn toggle_plugin(
     grids: Grids,
     mut text: Query<&mut Text>,
     mut disabled: Local<bool>,
-    mut floating_origin: Query<(Entity, &mut GridCell), With<FloatingOrigin>>,
+    mut floating_origin: Query<(Entity, &mut CellCoord), With<FloatingOrigin>>,
 ) -> Result {
     if input.just_pressed(KeyCode::Space) {
         *disabled = !*disabled;
@@ -118,7 +118,7 @@ fn setup_ui(mut commands: Commands) {
 fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_big_space_default(|root| {
         let d = DISTANCE / root.grid().cell_edge_length() as GridPrecision;
-        let distant_grid_cell = GridCell::new(d, d, d);
+        let distant_grid_cell = CellCoord::new(d, d, d);
 
         // Normally, we would put the floating origin on the camera. However in this example, we
         // want to show what happens as the camera is far from the origin, to emulate what

@@ -1,4 +1,4 @@
-//! A helper query argument that ensures you don't forget to handle the [`GridCell`] when you work
+//! A helper query argument that ensures you don't forget to handle the [`CellCoord`] when you work
 //! with a [`Transform`].
 
 use crate::prelude::*;
@@ -8,13 +8,13 @@ use bevy_transform::prelude::*;
 
 #[derive(QueryData)]
 #[query_data(mutable)]
-/// A convenience query argument that groups a [`Transform`] with its [`GridCell`]. If you only want
+/// A convenience query argument that groups a [`Transform`] with its [`CellCoord`]. If you only want
 /// to read from the position, use [`CellTransformReadOnly`] instead, as this will allow the bevy
 /// ECS to run multiple queries using [`CellTransformReadOnly`] at the same time (just like multiple
 /// queries with `&Transform` are fine).
 pub struct CellTransform {
     /// The grid to which `transform` is relative to.
-    pub cell: &'static mut GridCell,
+    pub cell: &'static mut CellCoord,
     /// Grid local transform
     pub transform: &'static mut Transform,
 }
@@ -65,7 +65,7 @@ pub struct CellTransformOwned {
     /// Grid local transform
     pub transform: Transform,
     /// The grid to which `transform` is relative to.
-    pub cell: GridCell,
+    pub cell: CellCoord,
 }
 
 impl core::ops::Sub for CellTransformOwned {

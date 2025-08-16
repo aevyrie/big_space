@@ -1,14 +1,12 @@
 //! Tools for validating high-precision transform hierarchies
 
 use bevy_app::{App, Plugin, PostUpdate};
+use bevy_ecs::entity::EntityHashSet;
 use bevy_ecs::prelude::*;
-use bevy_platform::{
-    collections::{HashMap, HashSet},
-    prelude::*,
-};
+use bevy_platform::{collections::HashMap, prelude::*};
 use bevy_transform::prelude::*;
 
-use crate::{grid::Grid, BigSpace, FloatingOrigin, GridCell};
+use crate::{grid::Grid, BigSpace, CellCoord, FloatingOrigin};
 
 struct ValidationStackEntry {
     parent_node: Box<dyn ValidHierarchyNode>,
@@ -33,7 +31,7 @@ struct ValidatorCaches {
     root_query: Option<QueryState<Entity, Without<ChildOf>>>,
     stack: Vec<ValidationStackEntry>,
     /// Only report errors for an entity one time.
-    error_entities: HashSet<Entity>,
+    error_entities: EntityHashSet,
 }
 
 /// An exclusive system that validate the entity hierarchy and report errors.
@@ -124,9 +122,6 @@ Because it is a child of a {:#?}, the entity must be one of the following:
 {}
 However, the entity has the following components, which does not match any of the allowed archetypes listed above:
 {}
-Common errors include:
-  - Using mismatched GridPrecisions, like GridCell and GridCell<i64>
-  - Spawning an entity with a GridCell as a child of an entity without a Grid.
 
 If possible, use commands.spawn_big_space(), which prevents these errors, instead of manually assembling a hierarchy. See {} for details.", entity, stack_entry.parent_node.name(), stack_entry.parent_node.name(), possibilities, inspect, file!());
                     caches.error_entities.insert(*entity);
@@ -210,7 +205,7 @@ impl ValidHierarchyNode for AnyNonSpatial {
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .without::<GridCell>()
+            .without::<CellCoord>()
             .without::<Transform>()
             .without::<GlobalTransform>()
             .without::<BigSpace>()
@@ -236,7 +231,7 @@ impl ValidHierarchyNode for RootFrame {
             .with::<BigSpace>()
             .with::<Grid>()
             .with::<GlobalTransform>()
-            .without::<GridCell>()
+            .without::<CellCoord>()
             .without::<Transform>()
             .without::<ChildOf>()
             .without::<FloatingOrigin>();
@@ -264,7 +259,7 @@ impl ValidHierarchyNode for RootSpatialLowPrecision {
         query
             .with::<Transform>()
             .with::<GlobalTransform>()
-            .without::<GridCell>()
+            .without::<CellCoord>()
             .without::<BigSpace>()
             .without::<Grid>()
             .without::<ChildOf>()
@@ -290,7 +285,7 @@ impl ValidHierarchyNode for ChildFrame {
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
             .with::<Grid>()
-            .with::<GridCell>()
+            .with::<CellCoord>()
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<ChildOf>()
@@ -321,7 +316,7 @@ impl ValidHierarchyNode for ChildRootSpatialLowPrecision {
             .with::<GlobalTransform>()
             .with::<ChildOf>()
             .with::<crate::grid::propagation::LowPrecisionRoot>()
-            .without::<GridCell>()
+            .without::<CellCoord>()
             .without::<BigSpace>()
             .without::<Grid>()
             .without::<FloatingOrigin>();
@@ -348,7 +343,7 @@ impl ValidHierarchyNode for ChildSpatialLowPrecision {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<ChildOf>()
-            .without::<GridCell>()
+            .without::<CellCoord>()
             .without::<BigSpace>()
             .without::<Grid>()
             .without::<FloatingOrigin>();
@@ -372,7 +367,7 @@ impl ValidHierarchyNode for ChildSpatialHighPrecision {
 
     fn match_self(&self, query: &mut QueryBuilder<(Entity, Option<&Children>)>) {
         query
-            .with::<GridCell>()
+            .with::<CellCoord>()
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<ChildOf>()

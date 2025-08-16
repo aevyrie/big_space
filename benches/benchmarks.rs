@@ -25,7 +25,7 @@ fn global_transform(c: &mut Criterion) {
     let mut group = c.benchmark_group("propagation");
     group.bench_function("global_transform", |b| {
         let grid = Grid::default();
-        let local_cell = GridCell { x: 1, y: 1, z: 1 };
+        let local_cell = CellCoord { x: 1, y: 1, z: 1 };
         let local_transform = Transform::from_xyz(9.0, 200.0, 500.0);
         b.iter(|| {
             black_box(grid.global_transform(&local_cell, &local_transform));
@@ -62,7 +62,7 @@ fn deep_hierarchy(c: &mut Criterion) {
     app.add_plugins((
         MinimalPlugins,
         BigSpaceMinimalPlugins,
-        GridHashPlugin::default(),
+        CellHashingPlugin::default(),
     ))
     .add_systems(Startup, setup)
     .add_systems(Update, translate)
@@ -101,7 +101,7 @@ fn wide_hierarchy(c: &mut Criterion) {
     app.add_plugins((
         MinimalPlugins,
         BigSpaceMinimalPlugins,
-        GridHashPlugin::default(),
+        CellHashingPlugin::default(),
     ))
     .add_systems(Startup, setup)
     .add_systems(Update, translate)
@@ -138,19 +138,19 @@ fn spatial_hashing(c: &mut Criterion) {
             .collect();
 
             for pos in values {
-                root.spawn_spatial(GridCell::new(pos[0], pos[1], pos[2]));
+                root.spawn_spatial(CellCoord::new(pos[0], pos[1], pos[2]));
             }
         });
     }
 
-    fn translate(mut cells: Query<&mut GridCell>) {
+    fn translate(mut cells: Query<&mut CellCoord>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
-            *cell += GridCell::ONE;
+            *cell += CellCoord::ONE;
         });
     }
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::default())
+    app.add_plugins(CellHashingPlugin::default())
         .add_systems(Startup, setup)
         .update();
 
@@ -167,7 +167,7 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    let map = app.world().resource::<GridHashMap>();
+    let map = app.world().resource::<CellLookup>();
     let first = map
         .all_entries()
         .find(|(_, entry)| !entry.entities.is_empty())
@@ -212,7 +212,7 @@ fn spatial_hashing(c: &mut Criterion) {
             for x in HALF_EXTENT.neg()..HALF_EXTENT {
                 for y in HALF_EXTENT.neg()..HALF_EXTENT {
                     for z in HALF_EXTENT.neg()..HALF_EXTENT {
-                        root.spawn_spatial(GridCell::new(x, y, z));
+                        root.spawn_spatial(CellCoord::new(x, y, z));
                     }
                 }
             }
@@ -222,7 +222,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::default())
+    app.add_plugins(CellHashingPlugin::default())
         .add_systems(Startup, setup_uniform::<5>)
         .update();
 
@@ -231,8 +231,8 @@ fn spatial_hashing(c: &mut Criterion) {
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world())
         .unwrap();
-    let spatial_map = app.world().resource::<GridHashMap>();
-    let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let spatial_map = app.world().resource::<CellLookup>();
+    let hash = CellId::__new_manual(parent, &CellCoord { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
     assert_eq!(spatial_map.nearby(entry).count(), 27);
@@ -251,7 +251,7 @@ fn spatial_hashing(c: &mut Criterion) {
     // Uniform Grid Population 1_000_000
 
     let mut app = App::new();
-    app.add_plugins(GridHashPlugin::default())
+    app.add_plugins(CellHashingPlugin::default())
         .add_systems(Startup, setup_uniform::<50>)
         .update();
 
@@ -260,8 +260,8 @@ fn spatial_hashing(c: &mut Criterion) {
         .query_filtered::<Entity, With<BigSpace>>()
         .single(app.world())
         .unwrap();
-    let spatial_map = app.world().resource::<GridHashMap>();
-    let hash = GridHash::__new_manual(parent, &GridCell { x: 0, y: 0, z: 0 });
+    let spatial_map = app.world().resource::<CellLookup>();
+    let hash = CellId::__new_manual(parent, &CellCoord { x: 0, y: 0, z: 0 });
     let entry = spatial_map.get(&hash).unwrap();
 
     assert_eq!(spatial_map.nearby(entry).count(), 27);
@@ -303,7 +303,7 @@ fn hash_filtering(c: &mut Criterion) {
 
         commands.spawn_big_space_default(|root| {
             for (i, pos) in values.iter().enumerate() {
-                let mut cmd = root.spawn_spatial(GridCell::new(pos[0], pos[1], pos[2]));
+                let mut cmd = root.spawn_spatial(CellCoord::new(pos[0], pos[1], pos[2]));
                 if i < N_PLAYERS {
                     cmd.insert(Player);
                 }
@@ -311,7 +311,7 @@ fn hash_filtering(c: &mut Criterion) {
         });
     }
 
-    fn translate(mut cells: Query<&mut GridCell>) {
+    fn translate(mut cells: Query<&mut CellCoord>) {
         cells.iter_mut().take(N_MOVE).for_each(|mut cell| {
             *cell += IVec3::ONE;
         });
@@ -322,7 +322,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::default(),));
+    app.add_plugins((CellHashingPlugin::default(),));
     group.bench_function("No Filter Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -334,7 +334,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<With<Player>>::new(),));
+    app.add_plugins((CellHashingPlugin::<With<Player>>::new(),));
     group.bench_function("With Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -346,7 +346,7 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::<Without<Player>>::new(),));
+    app.add_plugins((CellHashingPlugin::<Without<Player>>::new(),));
     group.bench_function("Without Player Plugin", |b| {
         b.iter(|| {
             black_box(app.update());
@@ -358,9 +358,9 @@ fn hash_filtering(c: &mut Criterion) {
         .add_systems(Update, translate)
         .update();
     app.update();
-    app.add_plugins((GridHashPlugin::default(),))
-        .add_plugins((GridHashPlugin::<With<Player>>::new(),))
-        .add_plugins((GridHashPlugin::<Without<Player>>::new(),));
+    app.add_plugins((CellHashingPlugin::default(),))
+        .add_plugins((CellHashingPlugin::<With<Player>>::new(),))
+        .add_plugins((CellHashingPlugin::<Without<Player>>::new(),));
     group.bench_function("All Plugins", |b| {
         b.iter(|| {
             black_box(app.update());

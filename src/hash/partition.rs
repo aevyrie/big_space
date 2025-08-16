@@ -3,92 +3,87 @@
 use core::{hash::Hash, marker::PhantomData, ops::Deref};
 
 use bevy_app::prelude::*;
+use bevy_ecs::entity::{EntityHashMap, EntityHashSet};
 use bevy_ecs::prelude::*;
 use bevy_platform::prelude::*;
-use bevy_platform::{
-    collections::{HashMap, HashSet},
-    hash::PassHash,
-    time::Instant,
-};
+use bevy_platform::{collections::HashMap, time::Instant};
 use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 
-use super::{GridCell, GridHash, GridHashMap, GridHashMapFilter, GridHashMapSystem};
+use super::component::{CellHashMap, CellHashSet};
+use super::{CellCoord, CellId, CellLookup, ChangedCells, SpatialHashFilter, SpatialHashSystem};
 
-pub use private::GridPartition;
+pub use private::Partition;
 
-/// Adds support for spatial partitioning. Requires [`GridHashPlugin`](super::GridHashPlugin).
-pub struct GridPartitionPlugin<F = ()>(PhantomData<F>)
+/// Adds support for spatial partitioning. Requires [`GridHashPlugin`](super::CellHashingPlugin).
+pub struct PartitionPlugin<F = ()>(PhantomData<F>)
 where
-    F: GridHashMapFilter;
+    F: SpatialHashFilter;
 
-impl<F> GridPartitionPlugin<F>
+impl<F> PartitionPlugin<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// Create a new instance of [`GridPartitionPlugin`].
+    /// Create a new instance of [`PartitionPlugin`].
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl Default for GridPartitionPlugin<()> {
+impl Default for PartitionPlugin<()> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<F> Plugin for GridPartitionPlugin<F>
+impl<F> Plugin for PartitionPlugin<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GridPartitionMap<F>>().add_systems(
+        app.init_resource::<PartitionLookup<F>>().add_systems(
             PostUpdate,
-            GridPartitionMap::<F>::update
-                .in_set(GridHashMapSystem::UpdatePartition)
-                .after(GridHashMapSystem::UpdateMap),
+            PartitionLookup::<F>::update
+                .in_set(SpatialHashSystem::UpdatePartitionLookup)
+                .after(SpatialHashSystem::UpdateCellLookup),
         );
     }
 }
 
-/// Uniquely identifies a [`GridPartition`] in the [`GridPartitionMap`] resource.
+/// Uniquely identifies a [`Partition`] in the [`PartitionLookup`] resource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GridPartitionId(u64);
+pub struct PartitionId(u64);
 
-impl GridPartitionId {
+impl PartitionId {
     /// The inner partition id.
     pub fn id(&self) -> u64 {
         self.0
     }
 }
 
-impl Hash for GridPartitionId {
+impl Hash for PartitionId {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         state.write_u64(self.0);
     }
 }
 
-/// Groups connected [`GridCell`]s into [`GridPartition`]s.
+/// A resource for quickly finding connected groups of occupied grid cells in [`Partition`]s.
 ///
-/// Partitions divide space into independent groups of cells.
-///
-/// The map depends on and is built from a corresponding [`GridHashMap`] with the same
-/// `F:`[`GridHashMapFilter`].
+/// The map is built from a [`CellLookup`] resource with the same `F:`[`SpatialHashFilter`].
 #[derive(Resource)]
-pub struct GridPartitionMap<F = ()>
+pub struct PartitionLookup<F = ()>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    partitions: HashMap<GridPartitionId, GridPartition>,
-    reverse_map: HashMap<GridHash, GridPartitionId, PassHash>,
+    partitions: HashMap<PartitionId, Partition>,
+    reverse_map: CellHashMap<PartitionId>,
     next_partition: u64,
     spooky: PhantomData<F>,
 }
 
-impl<F> Default for GridPartitionMap<F>
+impl<F> Default for PartitionLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
     fn default() -> Self {
         Self {
@@ -100,76 +95,86 @@ where
     }
 }
 
-impl<F> Deref for GridPartitionMap<F>
+impl<F> Deref for PartitionLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    type Target = HashMap<GridPartitionId, GridPartition>;
+    type Target = HashMap<PartitionId, Partition>;
 
     fn deref(&self) -> &Self::Target {
         &self.partitions
     }
 }
 
-impl<F> GridPartitionMap<F>
+impl<F> PartitionLookup<F>
 where
-    F: GridHashMapFilter,
+    F: SpatialHashFilter,
 {
-    /// Returns a reference to the [`GridPartition`], if it exists.
+    /// Returns a reference to the [`Partition`] if it exists.
     #[inline]
-    pub fn resolve(&self, id: &GridPartitionId) -> Option<&GridPartition> {
+    pub fn resolve(&self, id: &PartitionId) -> Option<&Partition> {
         self.partitions.get(id)
     }
 
-    /// Searches for the [`GridPartition`] that contains this `hash`, returning the partition's
-    /// [`GridPartitionId`] if the hash is found in any partition.
+    /// Searches for the [`Partition`] that contains this cell, returning the partition's
+    /// [`PartitionId`] if the cell is found in any partition.
     #[inline]
-    pub fn get(&self, hash: &GridHash) -> Option<&GridPartitionId> {
+    pub fn get(&self, hash: &CellId) -> Option<&PartitionId> {
         self.reverse_map.get(hash)
     }
 
-    /// Iterates over all [`GridPartition`]s.
+    /// Iterates over all [`Partition`]s.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&GridPartitionId, &GridPartition)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&PartitionId, &Partition)> {
         self.partitions.iter()
     }
+}
 
+/// Private methods
+impl<F> PartitionLookup<F>
+where
+    F: SpatialHashFilter,
+{
+    /// Inserts a partition into the map, replacing existing data; if the provided `set` is empty,
+    /// the partition will be removed from the map. In either case, the previous value will be
+    /// returned.
     #[inline]
-    fn insert(&mut self, partition: GridPartitionId, set: HashSet<GridHash, PassHash>) {
+    fn insert(&mut self, partition: PartitionId, set: CellHashSet) -> Option<Partition> {
         let Some(hash) = set.iter().next() else {
-            return;
+            // The set is empty. We will remove the partition entirely.
+            return self.partitions.remove(&partition);
         };
-        let mut min = hash.cell();
-        let mut max = hash.cell();
+        let mut min = hash.coord();
+        let mut max = hash.coord();
         for hash in set.iter() {
             self.reverse_map.insert(*hash, partition);
-            min = min.min(hash.cell());
-            max = max.max(hash.cell());
+            min = min.min(hash.coord());
+            max = max.max(hash.coord());
         }
-        self.partitions.insert(
-            partition,
-            GridPartition::new(hash.grid(), vec![set], min, max),
-        );
+        self.partitions
+            .insert(partition, Partition::new(hash.grid(), vec![set], min, max))
     }
 
+    /// Add a cell to the partition.
     #[inline]
-    fn push(&mut self, partition: &GridPartitionId, hash: &GridHash) {
+    fn push(&mut self, partition: &PartitionId, cell: &CellId) {
         if let Some(partition) = self.partitions.get_mut(partition) {
-            partition.insert(*hash);
+            partition.insert(*cell);
         } else {
             return;
         }
-        self.reverse_map.insert(*hash, *partition);
+        self.reverse_map.insert(*cell, *partition);
     }
 
+    /// Remove a cell from the partition.
     #[inline]
-    fn remove(&mut self, hash: &GridHash) {
-        let Some(old_id) = self.reverse_map.remove(hash) else {
+    fn remove(&mut self, cell: &CellId) {
+        let Some(old_id) = self.reverse_map.remove(cell) else {
             return;
         };
         let mut empty = false;
         if let Some(partition) = self.partitions.get_mut(&old_id) {
-            if partition.remove(hash) && partition.is_empty() {
+            if partition.remove(cell) && partition.is_empty() {
                 empty = true;
             }
         }
@@ -178,18 +183,19 @@ where
         }
     }
 
+    /// Get the next available partition ID.
     #[inline]
-    fn take_next_id(&mut self) -> GridPartitionId {
-        let id = GridPartitionId(self.next_partition);
+    fn take_next_id(&mut self) -> PartitionId {
+        let id = PartitionId(self.next_partition);
         self.next_partition += 1;
         id
     }
 
     /// Merge the supplied set of partitions into a single partition.
-    fn merge(&mut self, partitions: &[GridPartitionId]) {
+    fn merge(&mut self, partitions: &[PartitionId]) {
         let Some(largest_partition) = partitions
             .iter()
-            .filter_map(|id| self.resolve(id).map(GridPartition::num_cells).zip(Some(id)))
+            .filter_map(|id| self.resolve(id).map(Partition::num_cells).zip(Some(id)))
             .reduce(|acc, elem| if elem.0 > acc.0 { elem } else { acc })
             .map(|(_cells, id)| id)
         else {
@@ -201,8 +207,8 @@ where
                 continue;
             };
 
-            partition.iter().for_each(|hash| {
-                self.reverse_map.insert(*hash, *largest_partition);
+            partition.iter().for_each(|cell_guid| {
+                self.reverse_map.insert(*cell_guid, *largest_partition);
             });
 
             self.partitions
@@ -213,17 +219,17 @@ where
     }
 
     fn update(
-        mut partition_map: ResMut<Self>,
+        mut partitions: ResMut<Self>,
         mut timing: ResMut<crate::timing::GridHashStats>,
-        hash_grid: Res<GridHashMap<F>>,
+        cells: Res<CellLookup<F>>,
         // Scratch space allocations
-        mut added_neighbors: Local<Vec<GridPartitionId>>,
-        mut adjacent_to_removals: Local<HashMap<GridPartitionId, HashSet<GridHash, PassHash>>>,
-        mut split_candidates: Local<Vec<(GridPartitionId, HashSet<GridHash, PassHash>)>>,
+        mut added_neighbors: Local<Vec<PartitionId>>,
+        mut split_candidates_map: Local<HashMap<PartitionId, CellHashSet>>,
+        mut split_candidates: Local<Vec<(PartitionId, CellHashSet)>>,
         mut split_results: Local<Vec<Vec<SplitResult>>>,
     ) {
         let start = Instant::now();
-        for added_hash in hash_grid.just_inserted().iter() {
+        for newly_occupied in cells.newly_occupied().iter() {
             added_neighbors.clear();
             added_neighbors.extend(
                 // This intentionally checks the partition map which is out of date, not the spatial
@@ -235,31 +241,31 @@ where
                 //
                 // By using the partition map, we will be able to see the previously occupied cell
                 // before it is removed, merge with that partition, then remove it later.
-                added_hash
+                newly_occupied
                     .adjacent(1)
-                    .filter_map(|hash| partition_map.get(&hash)),
+                    .filter_map(|hash| partitions.get(&hash)),
             );
 
             if let Some(first_partition) = added_neighbors.first() {
                 // When the added cell is surrounded by other cells with at least one partition, add
                 // the new cell to the first partition, then merge all adjacent partitions. Because
                 // the added cell is the center, any neighboring cells are now connected through
-                // this cell, thus their partitions are connected, and should be merged.
-                partition_map.push(first_partition, added_hash);
-                partition_map.merge(&added_neighbors);
+                // this cell, thus their partitions are connected and should be merged.
+                partitions.push(first_partition, newly_occupied);
+                partitions.merge(&added_neighbors);
             } else {
-                let new_partition = partition_map.take_next_id();
-                partition_map.insert(new_partition, [*added_hash].into_iter().collect());
+                let new_id = partitions.take_next_id();
+                partitions.insert(new_id, [*newly_occupied].into_iter().collect());
             }
         }
 
         // Track the cells neighboring removed cells. These may now be disconnected from the rest of
         // their partition.
-        for removed_cell in hash_grid.just_removed().iter() {
-            partition_map.remove(removed_cell);
+        for removed_cell in cells.newly_emptied().iter() {
+            partitions.remove(removed_cell);
         }
 
-        for removed_cell in hash_grid.just_removed().iter() {
+        for removed_cell in cells.newly_emptied().iter() {
             // Group occupied neighbor cells by partition, so we can check if they are still
             // connected to each other after this removal.
             //
@@ -269,7 +275,7 @@ where
             //
             // Unfortunately, it doesn't seem possible to do any early-out optimizations based on
             // the local neighborhood, because we don't have a full picture of the end state yet.
-            // This is why we need to gather all potentially affected cells, and check for partition
+            // This is why we need to gather all potentially affected cells and check for partition
             // splits once everything else has been added/removed.
             //
             // IMPORTANT: this is *intentionally* run in a second iterator after removing cells from
@@ -277,30 +283,34 @@ where
             // aren't adding cells that were just removed but not yet processed.
             removed_cell
                 .adjacent(1)
-                .filter(|hash| hash_grid.contains(hash))
-                .filter_map(|hash| partition_map.get(&hash).zip(Some(hash)))
-                .for_each(|(id, hash)| {
-                    adjacent_to_removals.entry(*id).or_default().insert(hash);
+                .filter(|cell_guid| cells.contains(cell_guid))
+                .filter_map(|cell_guid| partitions.get(&cell_guid).zip(Some(cell_guid)))
+                .for_each(|(partition_id, cell_guid)| {
+                    split_candidates_map
+                        .entry(*partition_id)
+                        .or_default()
+                        .insert(cell_guid);
                 });
         }
 
-        // Finally, we need to test for partitions being split apart by a removal (removing a bridge
-        // in graph theory).
-        *split_candidates = adjacent_to_removals.drain().collect::<Vec<_>>();
+        // Finally, we need to check for partitions being split apart by a removal (removing a
+        // bridge in graph theory).
+        split_candidates.clear();
+        split_candidates.extend(split_candidates_map.drain());
         *split_results = split_candidates.par_splat_map_mut(
             ComputeTaskPool::get(),
             None,
-            |_, affected_cells| {
+            |_index, split_candidates| {
                 let _task_span = bevy_log::info_span!("parallel partition split").entered();
-                affected_cells
+                split_candidates
                     .iter_mut()
                     .filter_map(|(id, adjacent_hashes)| {
                         let mut new_partitions = Vec::with_capacity(0);
                         let mut counter = 0;
                         while let Some(this_cell) = adjacent_hashes.iter().next().copied() {
-                            for cell in hash_grid.flood(&this_cell, None) {
-                                // Note: first visited cell is this_cell
-                                adjacent_hashes.remove(&cell.0);
+                            for neighbor_cell in cells.flood(&this_cell, None) {
+                                // Note: the first visited cell is this_cell
+                                adjacent_hashes.remove(&neighbor_cell.0);
                                 if adjacent_hashes.is_empty() {
                                     break;
                                 }
@@ -314,7 +324,7 @@ where
                                 return None;
                             }
                             new_partitions
-                                .push(hash_grid.flood(&this_cell, None).map(|n| n.0).collect());
+                                .push(cells.flood(&this_cell, None).map(|n| n.0).collect());
 
                             counter += 1;
                         }
@@ -335,16 +345,16 @@ where
         {
             // We want the original partition to retain the most cells to ensure that the smaller
             // sets are the ones that are assigned a new partition ID.
-            new_partitions.sort_unstable_by_key(HashSet::len);
+            new_partitions.sort_unstable_by_key(CellHashSet::len);
             if let Some(largest_partition) = new_partitions.pop() {
-                partition_map.insert(*original_partition_id, largest_partition);
+                partitions.insert(*original_partition_id, largest_partition);
             }
 
             // At this point the reverse map will be out of date. However, `partitions.insert()`
-            // will update all hashes that now have a new partition, with their new ID.
+            // will update all hashes that now have a new partition with their new ID.
             for partition_set in new_partitions.drain(..) {
-                let new_id = partition_map.take_next_id();
-                partition_map.insert(new_id, partition_set);
+                let new_id = partitions.take_next_id();
+                partitions.insert(new_id, partition_set);
             }
         }
         timing.update_partition += start.elapsed();
@@ -352,44 +362,92 @@ where
 }
 
 struct SplitResult {
-    original_partition_id: GridPartitionId,
-    new_partitions: Vec<HashSet<GridHash, PassHash>>,
+    original_partition_id: PartitionId,
+    new_partitions: Vec<CellHashSet>,
 }
 
 /// A private module to ensure the internal fields of the partition are not accessed directly.
 /// Needed to ensure invariants are upheld.
 mod private {
-    use super::{GridCell, GridHash};
+    use super::{CellCoord, CellId};
+    use crate::hash::component::CellHashSet;
     use crate::precision::GridPrecision;
     use bevy_ecs::prelude::*;
-    use bevy_platform::{collections::HashSet, hash::PassHash, prelude::*};
+    use bevy_platform::prelude::*;
 
-    /// A group of nearby [`GridCell`]s on an island disconnected from all other [`GridCell`]s.
-    #[derive(Debug)]
-    pub struct GridPartition {
-        grid: Entity,
-        tables: Vec<HashSet<GridHash, PassHash>>,
-        min: GridCell,
-        max: GridCell,
+    struct PartitionTable {
+        old_cells: Vec<CellHashSet>,
+        just_inserted: Vec<CellHashSet>,
     }
 
-    impl GridPartition {
+    impl PartitionTable {
+        #[inline]
+        fn tables(&self) -> impl Iterator<Item = &CellHashSet> {
+            self.old_cells.iter().chain(self.just_inserted.iter())
+        }
+
+        #[inline]
+        fn contains(&self, hash: &CellId) -> bool {
+            self.tables().any(|table| table.contains(hash))
+        }
+
+        #[inline]
+        fn iter(&self) -> impl Iterator<Item = &CellId> {
+            self.tables().flat_map(|table| table.iter())
+        }
+
+        #[inline]
+        fn num_cells(&self) -> usize {
+            self.tables().map(CellHashSet::len).sum()
+        }
+
+        fn just_added(&self) -> impl Iterator<Item = &CellHashSet> {
+            self.just_inserted.iter()
+        }
+
+        fn insert(&mut self, cell: CellId) {
+            if self.contains(&cell) {
+                return;
+            }
+            if let Some(table) = self.just_inserted.first_mut() {
+                table.insert(cell);
+            } else {
+                self.just_inserted.push(CellHashSet::from_iter([cell]));
+            }
+        }
+
+        fn tick_change(&mut self) {
+            self.old_cells.append(&mut self.just_inserted);
+        }
+    }
+
+    /// A group of nearby grid cells, within the same grid, disconnected from all other cells in
+    /// that grid. Accessed via [`CellPartitionLookup`](super::PartitionLookup).
+    #[derive(Debug)]
+    pub struct Partition {
+        grid: Entity,
+        tables: Vec<CellHashSet>,
+        min: CellCoord,
+        max: CellCoord,
+    }
+
+    impl Partition {
         /// Returns `true` if the `hash` is in this partition.
         #[inline]
-        pub fn contains(&self, hash: &GridHash) -> bool {
+        pub fn contains(&self, hash: &CellId) -> bool {
             self.tables.iter().any(|table| table.contains(hash))
         }
 
-        /// Iterates over all [`GridHash`]s in this partition.
+        /// Iterates over all [`CellId`]s in this partition.
         #[inline]
-        pub fn iter(&self) -> impl Iterator<Item = &GridHash> {
+        pub fn iter(&self) -> impl Iterator<Item = &CellId> {
             self.tables.iter().flat_map(|table| table.iter())
         }
 
         /// Returns the total number of cells in this partition.
         #[inline]
         pub fn num_cells(&self) -> usize {
-            self.tables.iter().map(HashSet::len).sum()
+            self.tables.iter().map(CellHashSet::len).sum()
         }
 
         /// The grid this partition resides in.
@@ -399,60 +457,35 @@ mod private {
         }
 
         /// The maximum grid cell extent of the partition.
-        pub fn max(&self) -> GridCell {
+        pub fn max(&self) -> CellCoord {
             self.max
         }
 
         /// The minimum grid cell extent of the partition.
-        pub fn min(&self) -> GridCell {
+        pub fn min(&self) -> CellCoord {
             self.min
         }
 
-        /// Frees up any unused memory. Returns `false` if the partition is completely empty.
+        /// Returns `true` if the partition is completely empty.
         pub fn is_empty(&self) -> bool {
             self.tables.is_empty()
         }
     }
 
     /// Private internal methods
-    impl GridPartition {
+    impl Partition {
         pub(crate) fn new(
             grid: Entity,
-            tables: Vec<HashSet<GridHash, PassHash>>,
-            min: GridCell,
-            max: GridCell,
+            tables: Vec<CellHashSet>,
+            min: CellCoord,
+            max: CellCoord,
         ) -> Self {
             Self {
                 grid,
-                tables,
                 min,
                 max,
+                tables,
             }
-        }
-
-        /// Tables smaller than this will be drained into other tables when merging. Tables larger than
-        /// this limit will instead be added to a list of tables. This prevents partitions ending up
-        /// with many tables containing a few entries.
-        ///
-        /// Draining and extending a hash set is much slower than moving the entire hash set into a
-        /// list. The tradeoff is that the more tables added, the more there are that need to be
-        /// iterated over when searching for a cell.
-        const MIN_TABLE_SIZE: usize = 20_000;
-
-        #[inline]
-        pub(crate) fn insert(&mut self, cell: GridHash) {
-            if self.contains(&cell) {
-                return;
-            }
-            if let Some(i) = self.smallest_table() {
-                self.tables[i].insert(cell);
-            } else {
-                let mut table = HashSet::default();
-                table.insert(cell);
-                self.tables.push(table);
-            }
-            self.min = self.min.min(cell.cell());
-            self.max = self.max.max(cell.cell());
         }
 
         #[inline]
@@ -465,8 +498,33 @@ mod private {
                 .map(|(i, _len)| i)
         }
 
+        /// Tables smaller than this will be drained into other tables when merging. Tables larger than
+        /// this limit will instead be added to a list of tables. This prevents partitions ending up
+        /// with many tables containing a few entries.
+        ///
+        /// Draining and extending a hash set is much slower than moving the entire hash set into a
+        /// list. The tradeoff is that the more tables added, the more there are that need to be
+        /// iterated over when searching for a cell.
+        const MIN_TABLE_SIZE: usize = 20_000;
+
         #[inline]
-        pub(crate) fn extend(&mut self, mut other: GridPartition) {
+        pub(crate) fn insert(&mut self, cell: CellId) {
+            if self.contains(&cell) {
+                return;
+            }
+            if let Some(i) = self.smallest_table() {
+                self.tables[i].insert(cell);
+            } else {
+                let mut table = CellHashSet::default();
+                table.insert(cell);
+                self.tables.push(table);
+            }
+            self.min = self.min.min(cell.coord());
+            self.max = self.max.max(cell.coord());
+        }
+
+        #[inline]
+        pub(crate) fn extend(&mut self, mut other: Partition) {
             assert_eq!(self.grid, other.grid);
 
             for other_table in other.tables.drain(..) {
@@ -485,14 +543,14 @@ mod private {
             self.max = self.max.max(other.max);
         }
 
-        /// Removes a grid hash from the partition. Returns whether the value was present.
+        /// Removes a cell from the partition. Returns `true` if the cell was present.
         #[inline]
-        pub(crate) fn remove(&mut self, hash: &GridHash) -> bool {
+        pub(crate) fn remove(&mut self, cell: &CellId) -> bool {
             let Some(i_table) = self
                 .tables
                 .iter_mut()
                 .enumerate()
-                .find_map(|(i, table)| table.remove(hash).then_some(i))
+                .find_map(|(i, table)| table.remove(cell).then_some(i))
             else {
                 return false;
             };
@@ -500,14 +558,14 @@ mod private {
                 self.tables.swap_remove(i_table);
             }
 
-            let (cell, min, max) = (hash.cell(), self.min, self.max);
+            let (removed, min, max) = (cell.coord(), self.min, self.max);
             // Only need to recompute the bounds if the removed cell was touching the boundary.
-            if min.x == cell.x || min.y == cell.y || min.z == cell.z {
+            if min.x == removed.x || min.y == removed.y || min.z == removed.z {
                 self.compute_min();
             }
             // Note this is not an `else if`. The cell might be on the max bound in one axis, and the
             // min bound in another.
-            if max.x == cell.x || max.y == cell.y || max.z == cell.z {
+            if max.x == removed.x || max.y == removed.y || max.z == removed.z {
                 self.compute_max();
             }
             true
@@ -517,10 +575,10 @@ mod private {
         /// partition.
         #[inline]
         fn compute_min(&mut self) {
-            if let Some(min) = self.iter().map(GridHash::cell).reduce(|acc, e| acc.min(e)) {
+            if let Some(min) = self.iter().map(CellId::coord).reduce(|acc, e| acc.min(e)) {
                 self.min = min;
             } else {
-                self.min = GridCell::ONE * 1e10f64 as GridPrecision;
+                self.min = CellCoord::ONE * 1e10f64 as GridPrecision;
             }
         }
 
@@ -528,10 +586,10 @@ mod private {
         /// partition.
         #[inline]
         fn compute_max(&mut self) {
-            if let Some(max) = self.iter().map(GridHash::cell).reduce(|acc, e| acc.max(e)) {
+            if let Some(max) = self.iter().map(CellId::coord).reduce(|acc, e| acc.max(e)) {
                 self.max = max;
             } else {
-                self.min = GridCell::ONE * -1e10 as GridPrecision;
+                self.min = CellCoord::ONE * -1e10 as GridPrecision;
             }
         }
     }
