@@ -38,7 +38,7 @@ std = [
 libm = ["bevy_math/libm", "dep:libm"]
 
 [dependencies]
-smallvec = { version = "1.13.2", default-features = false } # Already used by bevy in commands
+smallvec = { version = "1.15.0", default-features = false } # Already used by bevy in commands
 bevy_app = { version = "0.16.0", default-features = false, features = [
     "bevy_reflect",
 ] }
@@ -86,10 +86,9 @@ bevy = { version = "0.16.0", default-features = false, features = [
 ] }
 noise = "0.9"
 turborand = "0.10"
-criterion = "0.5"
-bevy-inspector-egui = "0.31.0"
-bevy_egui = "0.34.1"
-bevy_hanabi = "0.16"
+criterion = "0.7"
+bevy-inspector-egui = "0.33"
+bevy_egui = "0.36"
 
 [lints.clippy]
 doc_markdown = "warn"

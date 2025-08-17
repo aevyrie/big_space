@@ -3,14 +3,13 @@
 use core::{hash::Hash, marker::PhantomData, ops::Deref};
 
 use bevy_app::prelude::*;
-use bevy_ecs::entity::{EntityHashMap, EntityHashSet};
 use bevy_ecs::prelude::*;
 use bevy_platform::prelude::*;
 use bevy_platform::{collections::HashMap, time::Instant};
 use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 
 use super::component::{CellHashMap, CellHashSet};
-use super::{CellCoord, CellId, CellLookup, ChangedCells, SpatialHashFilter, SpatialHashSystem};
+use super::{CellCoord, CellId, CellLookup, SpatialHashFilter, SpatialHashSystem};
 
 pub use private::Partition;
 
@@ -374,52 +373,6 @@ mod private {
     use crate::precision::GridPrecision;
     use bevy_ecs::prelude::*;
     use bevy_platform::prelude::*;
-
-    struct PartitionTable {
-        old_cells: Vec<CellHashSet>,
-        just_inserted: Vec<CellHashSet>,
-    }
-
-    impl PartitionTable {
-        #[inline]
-        fn tables(&self) -> impl Iterator<Item = &CellHashSet> {
-            self.old_cells.iter().chain(self.just_inserted.iter())
-        }
-
-        #[inline]
-        fn contains(&self, hash: &CellId) -> bool {
-            self.tables().any(|table| table.contains(hash))
-        }
-
-        #[inline]
-        fn iter(&self) -> impl Iterator<Item = &CellId> {
-            self.tables().flat_map(|table| table.iter())
-        }
-
-        #[inline]
-        fn num_cells(&self) -> usize {
-            self.tables().map(CellHashSet::len).sum()
-        }
-
-        fn just_added(&self) -> impl Iterator<Item = &CellHashSet> {
-            self.just_inserted.iter()
-        }
-
-        fn insert(&mut self, cell: CellId) {
-            if self.contains(&cell) {
-                return;
-            }
-            if let Some(table) = self.just_inserted.first_mut() {
-                table.insert(cell);
-            } else {
-                self.just_inserted.push(CellHashSet::from_iter([cell]));
-            }
-        }
-
-        fn tick_change(&mut self) {
-            self.old_cells.append(&mut self.just_inserted);
-        }
-    }
 
     /// A group of nearby grid cells, within the same grid, disconnected from all other cells in
     /// that grid. Accessed via [`CellPartitionLookup`](super::PartitionLookup).

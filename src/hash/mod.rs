@@ -117,6 +117,7 @@ impl<F: SpatialHashFilter> Default for ChangedCells<F> {
 }
 
 impl<F: SpatialHashFilter> ChangedCells<F> {
+    /// Iterate over all entities that have moved between cells.
     pub fn iter(&self) -> impl Iterator<Item = &Entity> {
         self.updated.iter()
     }
