@@ -203,7 +203,7 @@ where
         &self,
         seed: &CellId,
         max_depth: Option<GridPrecision>,
-    ) -> impl Iterator<Item = Neighbor> {
+    ) -> impl Iterator<Item = Neighbor<'_>> {
         let starting_cell_cell = seed.coord();
         ContiguousNeighborsIter {
             initial_hash: Some(*seed),
