@@ -23,7 +23,7 @@ pub struct BigSpatialBundle {
     /// The global transform of the entity.
     pub global_transform: GlobalTransform,
     /// The grid position of the entity
-    pub cell: GridCell,
+    pub cell: CellCoord,
 }
 
 /// A `SpatialBundle` that also has a grid, allowing other high precision spatial bundles to be
@@ -40,7 +40,7 @@ pub struct BigGridBundle {
     /// The global transform of the entity for rendering, computed relative to the floating origin.
     pub global_transform: GlobalTransform,
     /// The grid position of the grid within its parent grid.
-    pub cell: GridCell,
+    pub cell: CellCoord,
     /// The grid.
     pub grid: Grid,
 }

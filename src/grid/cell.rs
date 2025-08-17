@@ -7,26 +7,23 @@ use bevy_platform::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
-/// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
-/// this component is a transformation from the center of this cell.
+/// The coordinate of the cell this entity is located in, within its parent's [`Grid`]. The
+/// [`Transform`] of an entity with this component is relative to the center of this cell.
 ///
-/// All entities with a [`GridCell`] must be children of an entity with a [`Grid`].
+/// All entities with a [`CellCoord`] must be children of an entity with a [`Grid`].
 ///
 /// This component adds precision to the translation of an entity's [`Transform`]. In a
 /// high-precision [`BigSpace`], the position of an entity is described by a [`Transform`] *and* a
-/// [`GridCell`]. This component is the index of a cell inside a large [`Grid`], and the
+/// [`CellCoord`]. This component is the index of a cell inside a large [`Grid`], and the
 /// [`Transform`] is the floating point position of the entity relative to the center of this cell.
 ///
 /// If an entity's [`Transform`] becomes large enough that the entity leaves the bounds of its cell,
-/// the [`GridCell`] and [`Transform`] will be automatically recomputed to keep the [`Transform`]
+/// the [`CellCoord`] and [`Transform`] will be automatically recomputed to keep the [`Transform`]
 /// small.
-///
-/// [`BigSpace`]s are only allowed to have a single type of `GridCell`, you cannot mix
-/// [`GridPrecision`]s.
 #[derive(Component, Default, Debug, PartialEq, Eq, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 #[require(Transform, GlobalTransform)]
-pub struct GridCell {
+pub struct CellCoord {
     /// The x-index of the cell.
     pub x: GridPrecision,
     /// The y-index of the cell.
@@ -35,17 +32,17 @@ pub struct GridCell {
     pub z: GridPrecision,
 }
 
-impl GridCell {
-    /// Construct a new [`GridCell`].
+impl CellCoord {
+    /// Construct a new [`CellCoord`].
     pub fn new(x: GridPrecision, y: GridPrecision, z: GridPrecision) -> Self {
         Self { x, y, z }
     }
 
-    /// The origin [`GridCell`].
-    pub const ZERO: Self = GridCell { x: 0, y: 0, z: 0 };
+    /// The origin [`CellCoord`].
+    pub const ZERO: Self = CellCoord { x: 0, y: 0, z: 0 };
 
-    /// A unit value [`GridCell`]. Useful for offsets.
-    pub const ONE: Self = GridCell { x: 1, y: 1, z: 1 };
+    /// A unit value [`CellCoord`]. Useful for offsets.
+    pub const ONE: Self = CellCoord { x: 1, y: 1, z: 1 };
 
     /// Convert this grid cell to a floating point translation within this `grid`.
     pub fn as_dvec3(&self, grid: &Grid) -> DVec3 {
@@ -112,11 +109,11 @@ impl GridCell {
     }
 }
 
-impl core::ops::Add for GridCell {
-    type Output = GridCell;
+impl core::ops::Add for CellCoord {
+    type Output = CellCoord;
 
     fn add(self, rhs: Self) -> Self::Output {
-        GridCell {
+        CellCoord {
             x: self.x.wrapping_add(rhs.x),
             y: self.y.wrapping_add(rhs.y),
             z: self.z.wrapping_add(rhs.z),
@@ -124,11 +121,11 @@ impl core::ops::Add for GridCell {
     }
 }
 
-impl core::ops::Add<IVec3> for GridCell {
-    type Output = GridCell;
+impl core::ops::Add<IVec3> for CellCoord {
+    type Output = CellCoord;
 
     fn add(self, rhs: IVec3) -> Self::Output {
-        GridCell {
+        CellCoord {
             x: self.x.wrapping_add(rhs.x as GridPrecision),
             y: self.y.wrapping_add(rhs.y as GridPrecision),
             z: self.z.wrapping_add(rhs.z as GridPrecision),
@@ -136,11 +133,11 @@ impl core::ops::Add<IVec3> for GridCell {
     }
 }
 
-impl core::ops::Sub for GridCell {
-    type Output = GridCell;
+impl core::ops::Sub for CellCoord {
+    type Output = CellCoord;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        GridCell {
+        CellCoord {
             x: self.x.wrapping_sub(rhs.x),
             y: self.y.wrapping_sub(rhs.y),
             z: self.z.wrapping_sub(rhs.z),
@@ -148,11 +145,11 @@ impl core::ops::Sub for GridCell {
     }
 }
 
-impl core::ops::Sub<IVec3> for GridCell {
-    type Output = GridCell;
+impl core::ops::Sub<IVec3> for CellCoord {
+    type Output = CellCoord;
 
     fn sub(self, rhs: IVec3) -> Self::Output {
-        GridCell {
+        CellCoord {
             x: self.x.wrapping_add(-rhs.x as GridPrecision),
             y: self.y.wrapping_add(-rhs.y as GridPrecision),
             z: self.z.wrapping_add(-rhs.z as GridPrecision),
@@ -160,71 +157,71 @@ impl core::ops::Sub<IVec3> for GridCell {
     }
 }
 
-impl core::ops::Add for &GridCell {
-    type Output = GridCell;
+impl core::ops::Add for &CellCoord {
+    type Output = CellCoord;
 
     fn add(self, rhs: Self) -> Self::Output {
         (*self).add(*rhs)
     }
 }
 
-impl core::ops::Add<IVec3> for &GridCell {
-    type Output = GridCell;
+impl core::ops::Add<IVec3> for &CellCoord {
+    type Output = CellCoord;
 
     fn add(self, rhs: IVec3) -> Self::Output {
         (*self).add(rhs)
     }
 }
 
-impl core::ops::Sub for &GridCell {
-    type Output = GridCell;
+impl core::ops::Sub for &CellCoord {
+    type Output = CellCoord;
 
     fn sub(self, rhs: Self) -> Self::Output {
         (*self).sub(*rhs)
     }
 }
 
-impl core::ops::Sub<IVec3> for &GridCell {
-    type Output = GridCell;
+impl core::ops::Sub<IVec3> for &CellCoord {
+    type Output = CellCoord;
 
     fn sub(self, rhs: IVec3) -> Self::Output {
         (*self).sub(rhs)
     }
 }
 
-impl core::ops::AddAssign for GridCell {
+impl core::ops::AddAssign for CellCoord {
     fn add_assign(&mut self, rhs: Self) {
         use core::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl core::ops::AddAssign<IVec3> for GridCell {
+impl core::ops::AddAssign<IVec3> for CellCoord {
     fn add_assign(&mut self, rhs: IVec3) {
         use core::ops::Add;
         *self = self.add(rhs);
     }
 }
 
-impl core::ops::SubAssign for GridCell {
+impl core::ops::SubAssign for CellCoord {
     fn sub_assign(&mut self, rhs: Self) {
         use core::ops::Sub;
         *self = self.sub(rhs);
     }
 }
 
-impl core::ops::SubAssign<IVec3> for GridCell {
+impl core::ops::SubAssign<IVec3> for CellCoord {
     fn sub_assign(&mut self, rhs: IVec3) {
         use core::ops::Sub;
         *self = self.sub(rhs);
     }
 }
 
-impl core::ops::Mul<GridPrecision> for GridCell {
-    type Output = GridCell;
+impl core::ops::Mul<GridPrecision> for CellCoord {
+    type Output = CellCoord;
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {
-        GridCell {
+        CellCoord {
             x: self.x * rhs,
             y: self.y * rhs,
             z: self.z * rhs,
@@ -232,8 +229,8 @@ impl core::ops::Mul<GridPrecision> for GridCell {
     }
 }
 
-impl core::ops::Mul<GridPrecision> for &GridCell {
-    type Output = GridCell;
+impl core::ops::Mul<GridPrecision> for &CellCoord {
+    type Output = CellCoord;
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {
         (*self).mul(rhs)

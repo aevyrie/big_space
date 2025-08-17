@@ -75,7 +75,7 @@ impl<'a> GridCommands<'a> {
         }
     }
 
-    /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and insert the provided
+    /// Add a high-precision spatial entity ([`CellCoord`]) to this grid, and insert the provided
     /// bundle.
     #[inline]
     pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<'_> {
@@ -84,7 +84,7 @@ impl<'a> GridCommands<'a> {
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
                 Transform::default(),
-                GridCell::default(),
+                CellCoord::default(),
             ))
             .insert(bundle)
             .id();
@@ -101,7 +101,7 @@ impl<'a> GridCommands<'a> {
         self.entity
     }
 
-    /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and apply entity commands
+    /// Add a high-precision spatial entity ([`CellCoord`]) to this grid, and apply entity commands
     /// to it via the closure. This allows you to insert bundles on this new spatial entities, and
     /// add more children to it.
     #[inline]
@@ -110,7 +110,7 @@ impl<'a> GridCommands<'a> {
         self
     }
 
-    /// Add a high-precision spatial entity ([`GridCell`]) to this grid, and apply entity commands
+    /// Add a high-precision spatial entity ([`CellCoord`]) to this grid, and apply entity commands
     /// to it via the closure. This allows you to insert bundles on this new spatial entities, and
     /// add more children to it.
     #[inline]
@@ -137,7 +137,7 @@ impl<'a> GridCommands<'a> {
                 #[cfg(feature = "bevy_render")]
                 bevy_render::view::Visibility::default(),
                 Transform::default(),
-                GridCell::default(),
+                CellCoord::default(),
                 Grid::default(),
             ))
             .insert(bundle)

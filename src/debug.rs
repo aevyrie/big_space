@@ -31,11 +31,11 @@ fn setup_gizmos(mut store: ResMut<GizmoConfigStore>) {
     config.line.width = 1.0;
 }
 
-/// Update the rendered debug bounds to only highlight occupied [`GridCell`]s.
+/// Update the rendered debug bounds to only highlight occupied [`CellCoord`]s.
 fn update_debug_bounds(
     mut gizmos: Gizmos<BigSpaceGizmoConfig>,
     grids: Grids,
-    occupied_cells: Query<(Entity, &GridCell, Option<&FloatingOrigin>)>,
+    occupied_cells: Query<(Entity, &CellCoord, Option<&FloatingOrigin>)>,
 ) {
     for (cell_entity, cell, origin) in occupied_cells.iter() {
         let Some(grid) = grids.parent_grid(cell_entity) else {

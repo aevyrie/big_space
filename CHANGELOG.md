@@ -1,5 +1,21 @@
 # Changelog
 
+## UNRELEASED
+
+### Renamed types for consistency
+
+Redundant `Grid` prefix removed.
+
+- `GridCell` -> `CellCoord`: This is the coordinate of the cell, not the cell itself.
+- `GridHash` -> `CellId`: This is a globally unique ID of the cell, not just a hash.
+- `FastGridHash` -> `CellHash`: This is a hash of the cell's ID.
+- `GridHashMap` -> `CellLookup`: Makes distinct from the `CellHashMap`.
+- `GridHashEntry` -> `CellLookupEntry`
+- `GridPartition` -> `Partition`
+- `GridPartitionId` -> `PartitionId`
+- `GridPartitionMap` -> `PartitionLookup`: Consistent with `CellLookup`.
+- `GridHashMapFilter` -> `SpatialHashFilter`: Filter is used for all spatial hashing.
+
 ## v0.10.0 - 2025-06-21
 
 Bevy 0.16, `no_std`, removed precision generics, switch to plugin groups, naming consistency pass.
@@ -10,7 +26,7 @@ Due to changes in bevy, this plugin once again requires you to disable bevy's bu
 
 ```rs
 DefaultPlugins.build().disable::<TransformPlugin>(),
-```
+````
 
 ### Removed: `GridPrecision` generics
 

@@ -52,7 +52,7 @@ fn setup_scene(
         ));
 
         // Compute the grid cell for the far away objects
-        let (grid_cell, cell_offset) = root_grid
+        let (cell, cell_offset) = root_grid
             .grid()
             .translation_to_grid(DVec3::X * UNIVERSE_DIA);
 
@@ -62,7 +62,7 @@ fn setup_scene(
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(Color::WHITE)),
             Transform::from_translation(cell_offset).with_scale(Vec3::splat(PROTON_DIA)),
-            grid_cell,
+            cell,
         ));
 
         root_grid.spawn_spatial((
@@ -72,7 +72,7 @@ fn setup_scene(
                 ..Default::default()
             }),
             Transform::from_xyz(0.0, 0.0, PROTON_DIA * 2.0),
-            grid_cell,
+            cell,
             FloatingOrigin,
             BigSpaceCameraController::default(),
         ));
@@ -82,7 +82,7 @@ fn setup_scene(
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)
                 .with_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
-            grid_cell,
+            cell,
         ));
     });
 
@@ -98,7 +98,7 @@ fn bounce_atoms(mut atoms: Query<&mut Transform, With<Proton>>, time: Res<Time>)
 }
 
 fn toggle_cam_pos(
-    mut cam: Query<&mut GridCell, With<Camera>>,
+    mut cam: Query<&mut CellCoord, With<Camera>>,
     mut toggle: Local<bool>,
     grid: Query<&Grid>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -113,7 +113,7 @@ fn toggle_cam_pos(
             .translation_to_grid(DVec3::X * UNIVERSE_DIA)
             .0
     } else {
-        GridCell::ZERO
+        CellCoord::ZERO
     };
     *toggle = !*toggle;
     // To prove there is no funny business going on, let's print out the `GlobalTransform` of each
