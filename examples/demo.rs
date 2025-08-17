@@ -126,12 +126,10 @@ fn highlight_nearest_sphere(
         return Ok(());
     };
     let transform = objects.get(entity)?;
-    // Ignore rotation due to panicking in gizmos, as of bevy 0.13
-    let (scale, _, translation) = transform.to_scale_rotation_translation();
     gizmos
         .sphere(
-            translation,
-            scale.x * 0.505,
+            transform.translation(),
+            transform.scale().x * 0.505,
             Color::Srgba(palettes::basic::RED),
         )
         .resolution(128);
