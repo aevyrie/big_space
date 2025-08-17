@@ -306,7 +306,7 @@ fn spawn_spheres(
                 CellHash::from(hash),
                 hash,
                 NonPlayer,
-                // Mesh3d(material_presets.sphere.clone_weak()),
+                Mesh3d(material_presets.sphere.clone_weak()),
                 MeshMaterial3d(material_presets.default.clone_weak()),
                 bevy_render::view::VisibilityRange {
                     start_margin: 1.0..5.0,

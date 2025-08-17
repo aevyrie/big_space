@@ -24,9 +24,7 @@ fn main() {
             BigSpaceDefaultPlugins
                 .build()
                 .enable::<BigSpaceValidationPlugin>(),
-            bevy_egui::EguiPlugin {
-                enable_multipass_for_primary_context: true,
-            },
+            bevy_egui::EguiPlugin::default(),
             bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         ))
         .insert_resource(AmbientLight {

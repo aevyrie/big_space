@@ -5,8 +5,8 @@
 use bevy::prelude::*;
 use big_space::plugin::BigSpaceMinimalPlugins;
 use big_space::prelude::*;
-use core::{iter::repeat_with, ops::Neg};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use core::{hint::black_box, iter::repeat_with, ops::Neg};
+use criterion::{criterion_group, criterion_main, Criterion};
 use turborand::prelude::*;
 
 criterion_group!(

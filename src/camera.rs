@@ -6,7 +6,7 @@ use bevy_ecs::entity::EntityHashSet;
 use bevy_ecs::prelude::*;
 use bevy_input::{mouse::MouseMotion, prelude::*};
 use bevy_math::{prelude::*, DQuat, DVec3};
-use bevy_platform::{collections::HashSet, prelude::*};
+use bevy_platform::prelude::*;
 use bevy_reflect::prelude::*;
 use bevy_render::{
     primitives::Aabb,
