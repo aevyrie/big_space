@@ -331,12 +331,9 @@ fn configure_skybox_image(
     cameras: Query<Entity, With<Camera>>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let mut cubemap = match cubemap {
-        None => {
-            commands.insert_resource(Cubemap(asset_server.load("images/cubemap.png"), false));
-            return;
-        }
-        Some(cubemap) => cubemap,
+    let Some(mut cubemap) = cubemap else {
+        commands.insert_resource(Cubemap(asset_server.load("images/cubemap.png"), false));
+        return;
     };
 
     if cubemap.1 {

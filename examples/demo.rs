@@ -181,7 +181,7 @@ fn ui_text_system(
     let camera_text = if speed > 3.0e8 {
         format!("Speed: {:.0e} * speed of light", speed / 3.0e8)
     } else {
-        format!("Speed: {:.2e} m/s", speed)
+        format!("Speed: {speed:.2e} m/s")
     };
 
     let (nearest_text, fact_text) = if let Some(nearest) = camera.single()?.nearest_object() {
