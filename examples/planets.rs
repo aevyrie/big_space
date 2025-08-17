@@ -333,7 +333,7 @@ fn configure_skybox_image(
 ) {
     let Some(mut cubemap) = cubemap else {
         commands.insert_resource(Cubemap(asset_server.load("images/cubemap.png"), false));
-        return
+        return;
     };
 
     if cubemap.1 {
