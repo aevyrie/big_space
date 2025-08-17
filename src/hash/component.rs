@@ -175,7 +175,7 @@ impl CellId {
 
     /// Update or insert the [`CellId`] of all changed entities that match the optional
     /// [`SpatialHashFilter`].
-    pub(super) fn update<F: SpatialHashFilter>(
+    pub fn update<F: SpatialHashFilter>(
         mut commands: Commands,
         mut changed_cells: ResMut<ChangedCells<F>>,
         mut spatial_entities: Query<
