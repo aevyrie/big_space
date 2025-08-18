@@ -9,21 +9,21 @@ use bevy_transform::prelude::*;
 /// While finding these entities is slow, we only have to do it during hierarchy or archetype
 /// changes. Once the entity is marked (updating its archetype), querying it is now very fast.
 ///
-/// - This entity's parent must be a high precision entity (with a [`GridCell`]).
-/// - This entity must not have a [`GridCell`].
+/// - This entity's parent must be a high precision entity (with a [`CellCoord`]).
+/// - This entity must not have a [`CellCoord`].
 /// - This entity may or may not have children.
 #[derive(Component, Default, Reflect)]
 pub struct LowPrecisionRoot;
 
 impl Grid {
-    /// Update the `GlobalTransform` of entities with a [`GridCell`], using the [`Grid`] the entity
+    /// Update the `GlobalTransform` of entities with a [`CellCoord`], using the [`Grid`] the entity
     /// belongs to.
     pub fn propagate_high_precision(
         mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
         mut entities: ParamSet<(
             Query<(
-                Ref<GridCell>,
+                Ref<CellCoord>,
                 Ref<Transform>,
                 Ref<ChildOf>,
                 &mut GlobalTransform,
@@ -82,7 +82,7 @@ impl Grid {
                 // The global transform of the root grid is the same as the transform of an entity
                 // at the origin - it is determined entirely by the local origin position:
                 *global_transform =
-                    grid.global_transform(&GridCell::default(), &Transform::IDENTITY);
+                    grid.global_transform(&CellCoord::default(), &Transform::IDENTITY);
             });
 
         if let Some(stats) = stats.as_mut() {
@@ -94,13 +94,13 @@ impl Grid {
     pub fn tag_low_precision_roots(
         mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         mut commands: Commands,
-        valid_parent: Query<(), (With<GridCell>, With<GlobalTransform>, With<Children>)>,
+        valid_parent: Query<(), (With<CellCoord>, With<GlobalTransform>, With<Children>)>,
         unmarked: Query<
             (Entity, &ChildOf),
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCell>,
+                Without<CellCoord>,
                 Without<LowPrecisionRoot>,
                 Or<(Changed<ChildOf>, Added<Transform>)>,
             ),
@@ -112,7 +112,7 @@ impl Grid {
                 Or<(
                     Without<Transform>,
                     Without<GlobalTransform>,
-                    With<GridCell>,
+                    With<CellCoord>,
                     Without<ChildOf>,
                 )>,
             ),
@@ -140,7 +140,7 @@ impl Grid {
         }
     }
 
-    /// Update the [`GlobalTransform`] of entities with a [`Transform`], without a [`GridCell`], and
+    /// Update the [`GlobalTransform`] of entities with a [`Transform`], without a [`CellCoord`], and
     /// that are children of an entity with a [`GlobalTransform`]. This will recursively propagate
     /// entities that only have low-precision [`Transform`]s, just like bevy's built in systems.
     pub fn propagate_low_precision(
@@ -150,7 +150,7 @@ impl Grid {
             (
                 // A root big space does not have a grid cell, and not all high precision entities
                 // have a grid
-                Or<(With<Grid>, With<GridCell>)>,
+                Or<(With<Grid>, With<CellCoord>)>,
             ),
         >,
         roots: Query<(Entity, &ChildOf), With<LowPrecisionRoot>>,
@@ -158,7 +158,7 @@ impl Grid {
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<ChildOf>,
-                Without<GridCell>, // Used to prove access to GlobalTransform is disjoint
+                Without<CellCoord>, // Used to prove access to GlobalTransform is disjoint
                 Without<Grid>,
             ),
         >,
@@ -167,7 +167,7 @@ impl Grid {
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCell>,
+                Without<CellCoord>,
                 Without<Grid>,
             ),
         >,
@@ -238,8 +238,8 @@ impl Grid {
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<ChildOf>,
-                Without<GridCell>, // ***ADDED*** Only recurse low-precision entities
-                Without<Grid>,     // ***ADDED*** Only recurse low-precision entities
+                Without<CellCoord>, // ***ADDED*** Only recurse low-precision entities
+                Without<Grid>,      // ***ADDED*** Only recurse low-precision entities
             ),
         >,
         parent_query: &Query<
@@ -247,7 +247,7 @@ impl Grid {
             (
                 With<Transform>,
                 With<GlobalTransform>,
-                Without<GridCell>,
+                Without<CellCoord>,
                 Without<Grid>,
             ),
         >,
@@ -313,7 +313,7 @@ mod tests {
                     root.spawn_spatial(FloatingOrigin);
                     root.spawn_spatial((
                         Transform::from_xyz(3.0, 3.0, 3.0),
-                        GridCell::new(1, 1, 1), // Default cell size is 2000
+                        CellCoord::new(1, 1, 1), // Default cell size is 2000
                     ))
                     .with_children(|spatial| {
                         spatial.spawn((

@@ -126,12 +126,10 @@ fn highlight_nearest_sphere(
         return Ok(());
     };
     let transform = objects.get(entity)?;
-    // Ignore rotation due to panicking in gizmos, as of bevy 0.13
-    let (scale, _, translation) = transform.to_scale_rotation_translation();
     gizmos
         .sphere(
-            translation,
-            scale.x * 0.505,
+            transform.translation(),
+            transform.scale().x * 0.505,
             Color::Srgba(palettes::basic::RED),
         )
         .resolution(128);
@@ -183,7 +181,7 @@ fn ui_text_system(
     let camera_text = if speed > 3.0e8 {
         format!("Speed: {:.0e} * speed of light", speed / 3.0e8)
     } else {
-        format!("Speed: {:.2e} m/s", speed)
+        format!("Speed: {speed:.2e} m/s")
     };
 
     let (nearest_text, fact_text) = if let Some(nearest) = camera.single()?.nearest_object() {

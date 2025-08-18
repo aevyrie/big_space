@@ -1,7 +1,7 @@
 //! Physics support for `big_space`.
 
 use crate::hash::GridHashPlugin;
-use crate::prelude::{GridPartitionMap, GridPartitionPlugin};
+use crate::prelude::{GridPartitionMap, GridPartitionPlugin, PartitionLookup};
 use alloc::boxed::Box;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_ecs::entity::EntityHashMap;
@@ -43,14 +43,13 @@ impl Plugin for BigPhysicsPlugin {
 impl BigPhysicsPlugin {
     /// Insert and remove entities from physics contexts as they move between partitions, spawn, and
     /// despawn.
-    fn assign_entities_to_contexts(partitions: Res<GridPartitionMap<Filter>>) {
-        partitions.
+    fn assign_entities_to_contexts(partitions: Res<PartitionLookup<Filter>>) {
         // Each partition is assigned a physics entity
         // Get the list of added and removed grid cells for each partition
         //      Look up all entities in the added and removed cells, and add/remove them
     }
 
-    /// Read kinematic velocities from the ECS, and update these in physics contexts.
+    /// Read kinematic velocities from the ECS and update these in physics contexts.
     fn read_kinematic_velocities() {}
 
     /// Advance all physics simulations.

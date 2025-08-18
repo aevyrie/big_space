@@ -31,7 +31,7 @@ fn setup_scene(
             root_grid.spawn_spatial((
                 sphere.clone(),
                 matl.clone(),
-                GridCell {
+                CellCoord {
                     x: x * 16,
                     y: y * 16,
                     z: z * 16,

@@ -23,8 +23,8 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpaceDefaultPlugins,
-            GridHashPlugin::default(),
-            GridPartitionPlugin::default(),
+            CellHashingPlugin::default(),
+            PartitionPlugin::default(),
         ))
         .add_plugins(bevy::remote::RemotePlugin::default()) // Core remote protocol
         .add_plugins(bevy::remote::http::RemoteHttpPlugin::default()) // Enable HTTP transport
@@ -33,7 +33,7 @@ fn main() {
             PostUpdate,
             (
                 move_player.after(TransformSystem::TransformPropagate),
-                draw_partitions.after(GridHashMapSystem::UpdatePartition),
+                draw_partitions.after(SpatialHashSystem::UpdatePartitionLookup),
             ),
         )
         .add_systems(Update, (cursor_grab, spawn_spheres))
@@ -87,9 +87,9 @@ impl FromWorld for MaterialPresets {
 
 fn draw_partitions(
     mut gizmos: Gizmos,
-    partitions: Res<GridPartitionMap>,
+    partitions: Res<PartitionLookup>,
     grids: Query<(&GlobalTransform, &Grid)>,
-    camera: Query<&GridHash, With<Camera>>,
+    camera: Query<&CellId, With<Camera>>,
 ) -> Result {
     let camera = camera.single()?;
 
@@ -108,7 +108,7 @@ fn draw_partitions(
             .filter(|hash| *hash != camera)
             .take(1_000)
             .for_each(|h| {
-                let center = [h.cell().x as i32, h.cell().y as i32, h.cell().z as i32];
+                let center = [h.coord().x as i32, h.coord().y as i32, h.coord().z as i32];
                 let local_trans = Transform::from_translation(IVec3::from(center).as_vec3() * l)
                     .with_scale(Vec3::splat(l));
                 gizmos.cuboid(
@@ -137,15 +137,15 @@ fn draw_partitions(
 #[allow(clippy::type_complexity)]
 fn move_player(
     time: Res<Time>,
-    mut player: Query<(&mut Transform, &mut GridCell, &ChildOf, &GridHash), With<Player>>,
+    mut player: Query<(&mut Transform, &mut CellCoord, &ChildOf, &CellId), With<Player>>,
     mut non_player: Query<
-        (&mut Transform, &mut GridCell, &ChildOf),
+        (&mut Transform, &mut CellCoord, &ChildOf),
         (Without<Player>, With<NonPlayer>),
     >,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
     grids: Query<&Grid>,
-    hash_grid: Res<GridHashMap>,
+    hash_grid: Res<CellLookup>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<&mut Text>,
     hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
@@ -269,7 +269,7 @@ fn spawn(mut commands: Commands) {
                 .with_slowing(false)
                 .with_speed(15.0),
             Bloom::default(),
-            GridCell::new(0, 0, HALF_WIDTH as GridPrecision / 2),
+            CellCoord::new(0, 0, HALF_WIDTH as GridPrecision / 2),
         ))
         .with_children(|b| {
             b.spawn(DirectionalLight::default());
@@ -298,12 +298,12 @@ fn spawn_spheres(
     let entity = grid.single()?;
     commands.entity(entity).with_children(|builder| {
         for value in sample_noise(n_spawn, &Simplex::new(345612), &Rng::new()) {
-            let hash = GridHash::__new_manual(entity, &GridCell::default());
+            let hash = CellId::__new_manual(entity, &CellCoord::default());
             builder.spawn((
                 Transform::from_xyz(value.x, value.y, value.z),
                 GlobalTransform::default(),
-                GridCell::default(),
-                FastGridHash::from(hash),
+                CellCoord::default(),
+                CellHash::from(hash),
                 hash,
                 NonPlayer,
                 Mesh3d(material_presets.sphere.clone_weak()),
