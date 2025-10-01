@@ -19,7 +19,7 @@ pub struct CellTransform {
     pub transform: &'static mut Transform,
 }
 
-impl CellTransformItem<'_> {
+impl CellTransformItem<'_, '_> {
     /// Compute the global position with double precision.
     pub fn position_double(&self, grid: &Grid) -> DVec3 {
         grid.grid_position_double(&self.cell, &self.transform)
@@ -39,7 +39,7 @@ impl CellTransformItem<'_> {
     }
 }
 
-impl CellTransformReadOnlyItem<'_> {
+impl CellTransformReadOnlyItem<'_, '_> {
     /// Compute the global position with double precision.
     pub fn position_double(&self, grid: &Grid) -> DVec3 {
         grid.grid_position_double(self.cell, self.transform)

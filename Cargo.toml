@@ -1,6 +1,6 @@
 [package]
 name = "big_space"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 description = "A floating origin plugin for bevy"
 license = "MIT OR Apache-2.0"
@@ -15,7 +15,7 @@ all-features = true
 [features]
 default = ["std"]
 debug = ["std", "bevy_gizmos", "bevy_color"]
-camera = ["std", "bevy_render", "bevy_time", "bevy_input"]
+camera = ["std", "bevy_camera", "bevy_time", "bevy_input"]
 i8 = []
 i16 = []
 i32 = []
@@ -27,7 +27,6 @@ std = [
     "bevy_ecs/std",
     "bevy_math/std",
     "bevy_reflect/std",
-    "bevy_tasks/std",
     "bevy_transform/std",
     "bevy_utils/std",
     "bevy_platform/std",
@@ -39,35 +38,38 @@ libm = ["bevy_math/libm", "dep:libm"]
 
 [dependencies]
 smallvec = { version = "1.15.0", default-features = false } # Already used by bevy in commands
-bevy_app = { version = "0.16.0", default-features = false, features = [
+bevy_app = { version = "0.17.1", default-features = false, features = [
     "bevy_reflect",
 ] }
-bevy_ecs = { version = "0.16.0", default-features = false }
-bevy_log = { version = "0.16.0", default-features = false }
-bevy_math = { version = "0.16.0", default-features = false }
-bevy_reflect = { version = "0.16.0", default-features = false, features = [
+bevy_ecs = { version = "0.17.1", default-features = false }
+bevy_log = { version = "0.17.1", default-features = false }
+bevy_math = { version = "0.17.1", default-features = false }
+bevy_reflect = { version = "0.17.1", default-features = false, features = [
     "glam",
 ] }
-bevy_tasks = { version = "0.16.0", default-features = false }
-bevy_transform = { version = "0.16.0", default-features = false, features = [
+bevy_image = { version = "0.17.1", default-features = false, features = ["zstd_rust"] }
+bevy_tasks = { version = "0.17.1", default-features = false }
+bevy_transform = { version = "0.17.1", default-features = false, features = [
     "bevy-support",
     "bevy_reflect",
 ] }
-bevy_utils = { version = "0.16.0", default-features = false }
-bevy_platform = { version = "0.16.0", default-features = false, features = [
+bevy_utils = { version = "0.17.1", default-features = false }
+bevy_platform = { version = "0.17.1", default-features = false, features = [
     "alloc",
 ] }
 # Optional
-bevy_color = { version = "0.16.0", default-features = false, optional = true }
-bevy_gizmos = { version = "0.16.0", default-features = false, optional = true }
-bevy_render = { version = "0.16.0", default-features = false, optional = true }
-bevy_input = { version = "0.16.0", default-features = false, optional = true }
-bevy_time = { version = "0.16.0", default-features = false, optional = true }
+bevy_color = { version = "0.17.1", default-features = false, optional = true }
+bevy_gizmos = { version = "0.17.1", default-features = false, optional = true }
+bevy_camera = { version = "0.17.1", default-features = false, optional = true }
+bevy_input = { version = "0.17.1", default-features = false, optional = true }
+bevy_time = { version = "0.17.1", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-bevy = { version = "0.16.0", default-features = false, features = [
+bevy = { version = "0.17.1", default-features = false, features = [
     "bevy_scene",
+    "bevy_render",
+    "bevy_post_process",
     "bevy_asset",
     "bevy_color",
     "bevy_gltf",
@@ -83,12 +85,13 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "tonemapping_luts",
     "multi_threaded",
     "png",
+    "reflect_auto_register"
 ] }
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.7"
-bevy-inspector-egui = "0.33"
-bevy_egui = "0.36"
+# bevy-inspector-egui = "0.34"
+# bevy_egui = "0.37"
 
 [lints.clippy]
 doc_markdown = "warn"

@@ -119,7 +119,7 @@ impl Plugin for BigSpacePropagationPlugin {
                     .in_set(BigSpaceSystems::PropagateLowPrecision)
                     .after(BigSpaceSystems::PropagateHighPrecision),
             )
-                .in_set(TransformSystem::TransformPropagate)
+                .in_set(TransformSystems::Propagate)
         };
 
         app.add_systems(PostStartup, configs())
@@ -140,7 +140,7 @@ impl Plugin for BigSpacePropagationPlugin {
                 bevy_compat::propagate_parent_transforms,
                 bevy_transform::systems::sync_simple_transforms,
             )
-                .in_set(TransformSystem::TransformPropagate),
+                .in_set(TransformSystems::Propagate),
         )
         .add_systems(
             PostUpdate,
@@ -148,7 +148,7 @@ impl Plugin for BigSpacePropagationPlugin {
                 bevy_compat::propagate_parent_transforms,
                 bevy_transform::systems::sync_simple_transforms,
             )
-                .in_set(TransformSystem::TransformPropagate),
+                .in_set(TransformSystems::Propagate),
         );
     }
 }
