@@ -167,7 +167,7 @@ doc-scrape-examples = false
 [[example]]
 name = "small_scale"
 path = "examples/small_scale.rs"
-required-features = ["camera", "debug"]
+required-features = ["camera", "debug", "i128"]
 doc-scrape-examples = false
 
 [[example]]
