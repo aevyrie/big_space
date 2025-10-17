@@ -199,7 +199,7 @@ impl BigPhysicsBackend for RapierContext {
     }
 }
 
-fn move_entity(
+fn move_entity_to_ctx(
     entity: Entity,
     from_body: RigidBodyHandle,
     from_collider: ColliderHandle,
@@ -218,12 +218,10 @@ fn move_entity(
             false,
         ))
     {
-        let into_body = into.bodies.insert(RigidBody::from(from_body));
-        let into_collider = into.colliders.insert_with_parent(
-            Collider::from(from_collider),
-            into_body,
-            &mut into.bodies,
-        );
+        let into_body = into.bodies.insert(from_body);
+        let into_collider =
+            into.colliders
+                .insert_with_parent(from_collider, into_body, &mut into.bodies);
         into.entity_map.insert(entity, (into_body, into_collider));
     }
 }
@@ -255,22 +253,23 @@ fn migrate_single(
         return;
     }
 
-    move_entity(entity, body, collider, ctx, other);
+    move_entity_to_ctx(entity, body, collider, ctx, other);
 }
 
-fn consume(&mut self, mut other: BigPhysics, other_to_self: Vec3) {
-    let Some(other) = other.context.downcast_mut::<Self>() else {
+/// Consumes `other` and merges it into `self`.
+fn consume(ctx: &mut RapierContext, mut other: BigPhysics, other_to_self: Vec3) {
+    let Some(other) = other.context.downcast_mut::<RapierContext>() else {
         error!(
             "Cannot merge a {} physics context into a different type of physics context.",
-            std::any::type_name::<Self>()
+            core::any::type_name::<RapierContext>()
         );
         return;
     };
     // Move the origin so the other bodies are in the destination coordinate system.
     other.move_origin(other_to_self);
     // Move all pre-translated entities into the destination physics context
-    let entities_to_move = std::mem::take(&mut other.entity_map);
+    let entities_to_move = core::mem::take(&mut other.entity_map);
     for (entity, (body, collider)) in entities_to_move {
-        move_entity(entity, body, collider, self, other);
+        move_entity_to_ctx(entity, body, collider, ctx, other);
     }
 }

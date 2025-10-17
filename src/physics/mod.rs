@@ -1,13 +1,13 @@
 //! Physics support for `big_space`.
 
-use crate::hash::GridHashPlugin;
-use crate::prelude::{GridPartitionMap, GridPartitionPlugin, PartitionLookup};
+use crate::hash::CellHashingPlugin;
+use crate::prelude::{PartitionLookup, PartitionPlugin};
 use alloc::boxed::Box;
 use bevy_app::{App, Plugin, PostUpdate};
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::prelude::*;
 use bevy_math::{primitives, Quat, Vec3};
-use bevy_reflect::{FromReflect, PartialReflect, Reflect};
+use bevy_reflect::Reflect;
 use bevy_transform::TransformSystem::TransformPropagate;
 use downcast_rs::{impl_downcast, Downcast};
 use rapier3d::prelude::*;
@@ -23,8 +23,8 @@ impl Plugin for BigPhysicsPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<BigRigidBody>()
             .add_plugins((
-                GridHashPlugin::<Filter>::new(),
-                GridPartitionPlugin::<Filter>::new(),
+                CellHashingPlugin::<Filter>::new(),
+                PartitionPlugin::<Filter>::new(),
             ))
             .add_systems(
                 PostUpdate,
