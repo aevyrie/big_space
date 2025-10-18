@@ -4,7 +4,7 @@
 //! origin plugin to work on almost any set of scales.
 //!
 //! In this example, we will be spawning spheres the size of protons, across the width of the
-//! milky way galaxy.
+//! observable universe.
 
 use bevy::prelude::*;
 use bevy_log::info;
