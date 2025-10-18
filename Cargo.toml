@@ -77,6 +77,7 @@ bevy = { version = "0.17.1", default-features = false, features = [
     "bevy_winit",
     "default_font",
     "bevy_ui",
+    "bevy_ui_render",
     "bevy_pbr",
     "bevy_gizmos",
     "animation",
