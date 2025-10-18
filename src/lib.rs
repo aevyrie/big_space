@@ -241,7 +241,7 @@ pub mod prelude {
         component::{CellHash, CellHashMap, CellHashSet, CellId},
         map::{CellLookup, SpatialEntryToEntities},
         partition::{Partition, PartitionId, PartitionLookup, PartitionPlugin},
-        CellHashingPlugin, SpatialHashSystem,
+        CellHashingPlugin, SpatialHashSystems,
     };
     pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;

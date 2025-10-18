@@ -5,10 +5,10 @@
 //! screen, and synchronizing the player locations between both.
 
 use bevy::{
+    camera::{visibility::RenderLayers, Viewport},
     color::palettes,
     prelude::*,
-    render::{camera::Viewport, view::RenderLayers},
-    transform::TransformSystem,
+    transform::TransformSystems,
 };
 use big_space::prelude::*;
 
@@ -24,7 +24,7 @@ fn main() {
             PostUpdate,
             update_cameras
                 .after(big_space::camera::camera_controller)
-                .before(TransformSystem::TransformPropagate),
+                .before(TransformSystems::Propagate),
         )
         .run();
 }
@@ -192,7 +192,7 @@ fn update_cameras(
 
 fn set_camera_viewports(
     windows: Query<&Window>,
-    mut resize_events: EventReader<bevy::window::WindowResized>,
+    mut resize_events: MessageReader<bevy::window::WindowResized>,
     mut left_camera: Query<&mut Camera, (With<LeftCamera>, Without<RightCamera>)>,
     mut right_camera: Query<&mut Camera, With<RightCamera>>,
 ) -> Result {

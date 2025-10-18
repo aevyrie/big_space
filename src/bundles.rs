@@ -10,14 +10,14 @@ use bevy_transform::prelude::*;
 #[derive(Bundle, Default)]
 pub struct BigSpatialBundle {
     /// The visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub visibility: bevy_render::view::Visibility,
+    #[cfg(feature = "bevy_camera")]
+    pub visibility: bevy_camera::visibility::Visibility,
     /// The inherited visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub inherited: bevy_render::view::InheritedVisibility,
+    #[cfg(feature = "bevy_camera")]
+    pub inherited: bevy_camera::visibility::InheritedVisibility,
     /// The view visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub view: bevy_render::view::ViewVisibility,
+    #[cfg(feature = "bevy_camera")]
+    pub view: bevy_camera::visibility::ViewVisibility,
     /// The transform of the entity.
     pub transform: Transform,
     /// The global transform of the entity.
@@ -33,8 +33,8 @@ pub struct BigSpatialBundle {
 #[derive(Bundle, Default)]
 pub struct BigGridBundle {
     /// The visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub visibility: bevy_render::view::Visibility,
+    #[cfg(feature = "bevy_camera")]
+    pub visibility: bevy_camera::visibility::Visibility,
     /// The transform of the entity.
     pub transform: Transform,
     /// The global transform of the entity for rendering, computed relative to the floating origin.
@@ -49,8 +49,8 @@ pub struct BigGridBundle {
 #[derive(Bundle, Default)]
 pub struct BigSpaceRootBundle {
     /// The visibility of the entity.
-    #[cfg(feature = "bevy_render")]
-    pub visibility: bevy_render::view::Visibility,
+    #[cfg(feature = "bevy_camera")]
+    pub visibility: bevy_camera::visibility::Visibility,
     /// The root grid
     pub grid: Grid,
     /// The rendered position of the root grid relative to the floating origin.

@@ -47,11 +47,11 @@ where
                 PostUpdate,
                 (
                     CellId::update::<F>
-                        .in_set(SpatialHashSystem::UpdateCellHashes)
+                        .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(BigSpaceSystems::RecenterLargeTransforms),
                     CellLookup::<F>::update
-                        .in_set(SpatialHashSystem::UpdateCellLookup)
-                        .after(SpatialHashSystem::UpdateCellHashes),
+                        .in_set(SpatialHashSystems::UpdateCellLookup)
+                        .after(SpatialHashSystems::UpdateCellHashes),
                 ),
             );
     }
@@ -65,7 +65,7 @@ impl Default for CellHashingPlugin<()> {
 
 /// System sets for [`CellHashingPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
-pub enum SpatialHashSystem {
+pub enum SpatialHashSystems {
     /// [`CellId`] and [`CellHash`] updated.
     UpdateCellHashes,
     /// [`CellLookup`] updated.
