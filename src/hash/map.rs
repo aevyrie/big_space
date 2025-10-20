@@ -225,7 +225,7 @@ where
     /// These are cells that were previously empty, but now contain at least one entity.
     ///
     /// Useful for incrementally updating data structures that extend the functionality of
-    /// [`CellLookup`]. Updated in [`SpatialHashSystem::UpdateCellLookup`].
+    /// [`CellLookup`]. Updated in [`SpatialHashSystems::UpdateCellLookup`].
     pub fn newly_occupied(&self) -> &CellHashSet {
         &self.map.just_inserted
     }
@@ -235,7 +235,7 @@ where
     /// These are cells that were previously occupied, but now contain no entities.
     ///
     /// Useful for incrementally updating data structures that extend the functionality of
-    /// [`CellLookup`]. Updated in [`SpatialHashSystem::UpdateCellLookup`].
+    /// [`CellLookup`]. Updated in [`SpatialHashSystems::UpdateCellLookup`].
     pub fn newly_emptied(&self) -> &CellHashSet {
         &self.map.just_removed
     }

@@ -88,7 +88,7 @@ impl<T: QueryFilter + Send + Sync + 'static> SpatialHashFilter for T {}
 
 /// Resource to manually track entities that have moved between cells, for optimization purposes.
 ///
-/// Updated every frame in [`CellId::update`] in [`SpatialHashSystem::UpdateCellHashes`].
+/// Updated every frame in [`CellId::update`] in [`SpatialHashSystems::UpdateCellHashes`].
 ///
 /// We use a manual collection instead of a `Changed` query because a query that uses `Changed`
 /// still has to iterate over every single entity. By making a shortlist of changed entities
