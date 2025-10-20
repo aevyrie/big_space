@@ -3,8 +3,8 @@
 use bevy::{
     color::palettes,
     prelude::*,
-    transform::TransformSystem,
-    window::{CursorGrabMode, PrimaryWindow},
+    transform::TransformSystems,
+    window::{CursorGrabMode, CursorOptions, PrimaryWindow},
 };
 use big_space::prelude::*;
 
@@ -19,7 +19,7 @@ fn main() {
         .add_systems(PreUpdate, (cursor_grab_system, ui_text_system))
         .add_systems(
             PostUpdate,
-            highlight_nearest_sphere.after(TransformSystem::TransformPropagate),
+            highlight_nearest_sphere.after(TransformSystems::Propagate),
         )
         .run();
 }
@@ -88,7 +88,7 @@ fn ui_setup(mut commands: Commands) {
             ..default()
         },
         TextColor(Color::WHITE),
-        TextLayout::new_with_justify(JustifyText::Left),
+        TextLayout::new_with_justify(Justify::Left),
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
@@ -105,7 +105,7 @@ fn ui_setup(mut commands: Commands) {
             ..default()
         },
         TextColor(Color::WHITE),
-        TextLayout::new_with_justify(JustifyText::Center),
+        TextLayout::new_with_justify(Justify::Center),
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(10.0),
@@ -138,10 +138,7 @@ fn highlight_nearest_sphere(
 
 #[allow(clippy::type_complexity)]
 fn ui_text_system(
-    mut debug_text: Query<
-        (&mut Text, &GlobalTransform),
-        (With<BigSpaceDebugText>, Without<FunFactText>),
-    >,
+    mut debug_text: Query<&mut Text, (With<BigSpaceDebugText>, Without<FunFactText>)>,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     grids: Grids,
     time: Res<Time>,
@@ -199,9 +196,7 @@ fn ui_text_system(
         ("".into(), "".into())
     };
 
-    let mut debug_text = debug_text.single_mut()?;
-
-    debug_text.0.0 = format!(
+    debug_text.single_mut()?.0 = format!(
         "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
     );
 
@@ -253,23 +248,22 @@ fn closest<'a>(diameter: f32) -> (f32, &'a str) {
 }
 
 fn cursor_grab_system(
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut cam: ResMut<big_space::camera::BigSpaceCameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
 ) -> Result {
-    let mut window = windows.single_mut()?;
+    let mut cursor_options = windows.single_mut()?;
 
     if btn.just_pressed(MouseButton::Left) {
-        window.cursor_options.grab_mode = CursorGrabMode::Locked;
-        window.cursor_options.visible = false;
-        // window.mode = WindowMode::BorderlessFullscreen;
+        cursor_options.grab_mode = CursorGrabMode::Locked;
+        cursor_options.visible = false;
         cam.defaults_disabled = false;
     }
 
     if key.just_pressed(KeyCode::Escape) {
-        window.cursor_options.grab_mode = CursorGrabMode::None;
-        window.cursor_options.visible = true;
+        cursor_options.grab_mode = CursorGrabMode::None;
+        cursor_options.visible = true;
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }

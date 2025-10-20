@@ -4,14 +4,16 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 use bevy::core_pipeline::Skybox;
+use bevy::render::view::Hdr;
+use bevy::window::CursorOptions;
 use bevy::{
+    camera::Exposure,
     color::palettes,
-    core_pipeline::bloom::Bloom,
+    light::{CascadeShadowConfigBuilder, NotShadowCaster},
     math::DVec3,
-    pbr::{CascadeShadowConfigBuilder, NotShadowCaster},
+    post_process::bloom::Bloom,
     prelude::*,
-    render::camera::Exposure,
-    transform::TransformSystem,
+    transform::TransformSystems,
 };
 use big_space::prelude::*;
 use big_space::validation::BigSpaceValidationPlugin;
@@ -24,8 +26,6 @@ fn main() {
             BigSpaceDefaultPlugins
                 .build()
                 .enable::<BigSpaceValidationPlugin>(),
-            bevy_egui::EguiPlugin::default(),
-            bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         ))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
@@ -39,7 +39,7 @@ fn main() {
             (
                 rotate,
                 lighting
-                    .in_set(TransformSystem::TransformPropagate)
+                    .in_set(TransformSystems::Propagate)
                     .after(BigSpaceSystems::PropagateLowPrecision),
                 cursor_grab_system,
                 springy_ship
@@ -240,18 +240,18 @@ fn spawn_solar_system(
                     floating_origin.spawn_spatial((
                         Camera3d::default(),
                         Transform::from_xyz(0.0, 4.0, 22.0),
+                        Hdr,
                         Camera {
-                            hdr: true,
                             clear_color: ClearColorConfig::None,
                             ..default()
                         },
                         Exposure::SUNLIGHT,
                         Bloom::ANAMORPHIC,
-                        bevy::core_pipeline::post_process::ChromaticAberration {
+                        bevy::post_process::effect_stack::ChromaticAberration {
                             intensity: 0.01,
                             ..Default::default()
                         },
-                        bevy::core_pipeline::motion_blur::MotionBlur {
+                        bevy::post_process::motion_blur::MotionBlur {
                             shutter_angle: 1.0,
                             samples: 8,
                         },
@@ -293,25 +293,25 @@ fn spawn_solar_system(
 }
 
 fn cursor_grab_system(
-    mut windows: Query<&mut Window, With<bevy::window::PrimaryWindow>>,
+    mut windows: Query<&mut CursorOptions, With<bevy::window::PrimaryWindow>>,
     mut cam: ResMut<big_space::camera::BigSpaceCameraInput>,
     btn: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
     mut triggered: Local<bool>,
 ) -> Result<()> {
-    let mut window = windows.single_mut()?;
+    let mut cursor_options = windows.single_mut()?;
 
     if btn.just_pressed(MouseButton::Right) || !*triggered {
-        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
-        window.cursor_options.visible = false;
+        cursor_options.grab_mode = bevy::window::CursorGrabMode::Locked;
+        cursor_options.visible = false;
         // window.mode = WindowMode::BorderlessFullscreen;
         cam.defaults_disabled = false;
         *triggered = true;
     }
 
     if key.just_pressed(KeyCode::Escape) {
-        window.cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
-        window.cursor_options.visible = true;
+        cursor_options.grab_mode = bevy::window::CursorGrabMode::None;
+        cursor_options.visible = true;
         // window.mode = WindowMode::Windowed;
         cam.defaults_disabled = true;
     }
@@ -345,8 +345,8 @@ fn configure_skybox_image(
         if image.texture_descriptor.array_layer_count() == 1 {
             image.reinterpret_stacked_2d_as_array(image.height() / image.width());
             image.texture_view_descriptor =
-                Some(bevy_render::render_resource::TextureViewDescriptor {
-                    dimension: Some(bevy_render::render_resource::TextureViewDimension::Cube),
+                Some(bevy::render::render_resource::TextureViewDescriptor {
+                    dimension: Some(bevy::render::render_resource::TextureViewDimension::Cube),
                     ..default()
                 });
         }

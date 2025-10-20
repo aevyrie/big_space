@@ -47,11 +47,11 @@ where
                 PostUpdate,
                 (
                     CellId::update::<F>
-                        .in_set(SpatialHashSystem::UpdateCellHashes)
+                        .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(BigSpaceSystems::RecenterLargeTransforms),
                     CellLookup::<F>::update
-                        .in_set(SpatialHashSystem::UpdateCellLookup)
-                        .after(SpatialHashSystem::UpdateCellHashes),
+                        .in_set(SpatialHashSystems::UpdateCellLookup)
+                        .after(SpatialHashSystems::UpdateCellHashes),
                 ),
             );
     }
@@ -65,7 +65,7 @@ impl Default for CellHashingPlugin<()> {
 
 /// System sets for [`CellHashingPlugin`].
 #[derive(SystemSet, Hash, Debug, PartialEq, Eq, Clone)]
-pub enum SpatialHashSystem {
+pub enum SpatialHashSystems {
     /// [`CellId`] and [`CellHash`] updated.
     UpdateCellHashes,
     /// [`CellLookup`] updated.
@@ -88,7 +88,7 @@ impl<T: QueryFilter + Send + Sync + 'static> SpatialHashFilter for T {}
 
 /// Resource to manually track entities that have moved between cells, for optimization purposes.
 ///
-/// Updated every frame in [`CellId::update`] in [`SpatialHashSystem::UpdateCellHashes`].
+/// Updated every frame in [`CellId::update`] in [`SpatialHashSystems::UpdateCellHashes`].
 ///
 /// We use a manual collection instead of a `Changed` query because a query that uses `Changed`
 /// still has to iterate over every single entity. By making a shortlist of changed entities

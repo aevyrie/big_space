@@ -9,7 +9,7 @@ use bevy_platform::{collections::HashMap, time::Instant};
 use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 
 use super::component::{CellHashMap, CellHashSet};
-use super::{CellCoord, CellId, CellLookup, SpatialHashFilter, SpatialHashSystem};
+use super::{CellCoord, CellId, CellLookup, SpatialHashFilter, SpatialHashSystems};
 
 pub use private::Partition;
 
@@ -42,8 +42,8 @@ where
         app.init_resource::<PartitionLookup<F>>().add_systems(
             PostUpdate,
             PartitionLookup::<F>::update
-                .in_set(SpatialHashSystem::UpdatePartitionLookup)
-                .after(SpatialHashSystem::UpdateCellLookup),
+                .in_set(SpatialHashSystems::UpdatePartitionLookup)
+                .after(SpatialHashSystems::UpdateCellLookup),
         );
     }
 }
