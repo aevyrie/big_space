@@ -91,8 +91,6 @@ bevy = { version = "0.17.1", default-features = false, features = [
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.7"
-# bevy-inspector-egui = "0.34"
-# bevy_egui = "0.37"
 
 [lints.clippy]
 doc_markdown = "warn"

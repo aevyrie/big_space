@@ -138,10 +138,7 @@ fn highlight_nearest_sphere(
 
 #[allow(clippy::type_complexity)]
 fn ui_text_system(
-    mut debug_text: Query<
-        (&mut Text, &GlobalTransform),
-        (With<BigSpaceDebugText>, Without<FunFactText>),
-    >,
+    mut debug_text: Query<&mut Text, (With<BigSpaceDebugText>, Without<FunFactText>)>,
     mut fun_text: Query<&mut Text, (With<FunFactText>, Without<BigSpaceDebugText>)>,
     grids: Grids,
     time: Res<Time>,
@@ -199,15 +196,11 @@ fn ui_text_system(
         ("".into(), "".into())
     };
 
-    if let Ok(mut debug_text) = debug_text.single_mut() {
-        debug_text.0.0 = format!(
+    debug_text.single_mut()?.0 = format!(
         "{grid_text}\n{translation_text}\n\n{real_position_f64_text}\n{real_position_f32_text}\n\n{camera_text}\n{nearest_text}"
     );
-    }
 
-    if let Ok(mut fun_text) = fun_text.single_mut() {
-        fun_text.0 = fact_text;
-    }
+    fun_text.single_mut()?.0 = fact_text;
 
     Ok(())
 }

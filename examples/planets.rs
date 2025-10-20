@@ -26,8 +26,6 @@ fn main() {
             BigSpaceDefaultPlugins
                 .build()
                 .enable::<BigSpaceValidationPlugin>(),
-            // bevy_egui::EguiPlugin::default(),
-            // bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
         ))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
