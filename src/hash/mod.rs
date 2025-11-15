@@ -9,12 +9,11 @@ use bevy_ecs::{prelude::*, query::QueryFilter};
 
 pub mod component;
 pub mod map;
-pub mod partition;
 
 /// Add spatial hashing acceleration to `big_space`, accessible through the [`CellLookup`] resource,
 /// and [`CellId`] components.
 ///
-/// You can optionally add a [`SpatialHashFilter`] to this plugin, to only run the spatial hashing on
+/// You can optionally add a [`SpatialHashFilter`] to this plugin to only run the spatial hashing on
 /// entities that match the query filter. This is useful if you only want to, say, compute hashes
 /// and insert in the [`CellLookup`] for `Player` entities.
 ///
@@ -72,6 +71,8 @@ pub enum SpatialHashSystems {
     UpdateCellLookup,
     /// [`PartitionLookup`] updated.
     UpdatePartitionLookup,
+    /// [`PartitionChange`] updated.
+    UpdatePartitionChange,
 }
 
 /// Used as a [`QueryFilter`] to include or exclude certain types of entities from spatial

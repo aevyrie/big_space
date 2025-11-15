@@ -47,7 +47,6 @@ bevy_math = { version = "0.17.1", default-features = false }
 bevy_reflect = { version = "0.17.1", default-features = false, features = [
     "glam",
 ] }
-bevy_image = { version = "0.17.1", default-features = false, features = ["zstd_rust"] }
 bevy_tasks = { version = "0.17.1", default-features = false }
 bevy_transform = { version = "0.17.1", default-features = false, features = [
     "bevy-support",
@@ -86,7 +85,8 @@ bevy = { version = "0.17.1", default-features = false, features = [
     "tonemapping_luts",
     "multi_threaded",
     "png",
-    "reflect_auto_register"
+    "reflect_auto_register",
+    "zstd_rust"
 ] }
 noise = "0.9"
 turborand = "0.10"
