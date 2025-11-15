@@ -6,7 +6,6 @@ use bevy::{
 };
 use bevy_ecs::entity::EntityHasher;
 use bevy_math::DVec3;
-use big_space::hash::r#mod::PartitionChange;
 use big_space::prelude::*;
 use core::hash::Hasher;
 use noise::{NoiseFn, Simplex};
@@ -26,6 +25,7 @@ fn main() {
             BigSpaceDefaultPlugins,
             CellHashingPlugin::default(),
             PartitionPlugin::default(),
+            PartitionChangePlugin::default(),
         ))
         .add_plugins(bevy::remote::RemotePlugin::default()) // Core remote protocol
         .add_plugins(bevy::remote::http::RemoteHttpPlugin::default()) // Enable HTTP transport
