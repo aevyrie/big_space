@@ -175,6 +175,7 @@ impl CellId {
 
     /// Update or insert the [`CellId`] of all changed entities that match the optional
     /// [`SpatialHashFilter`].
+    #[allow(clippy::too_many_arguments)]
     pub fn update<F: SpatialHashFilter>(
         mut commands: Commands,
         mut changed_cells: ResMut<ChangedCells<F>>,
