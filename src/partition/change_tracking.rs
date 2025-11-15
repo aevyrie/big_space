@@ -16,7 +16,7 @@ use bevy_ecs::world::FromWorld;
 use core::marker::PhantomData;
 
 /// Adds support for spatial partitioning change tracking. Requires
-/// [`GridHashPlugin`](super::CellHashingPlugin) and [`PartitionPlugin`](super::PartitionPlugin).
+/// [`GridHashPlugin`](crate::CellHashingPlugin) and [`PartitionPlugin`](crate::PartitionPlugin).
 pub struct PartitionChangePlugin<F: SpatialHashFilter = ()>(PhantomData<F>);
 
 impl<F: SpatialHashFilter> PartitionChangePlugin<F> {
