@@ -52,7 +52,7 @@ pub struct PartitionChange<F: SpatialHashFilter = ()> {
     /// Current mapping of an entity to its partition as of the last update.
     pub map: EntityHashMap<PartitionId>,
     /// Entities that have changed partition in the last update.
-    pub changed: EntityHashMap<(PartitionId, PartitionId)>,
+    pub changed: EntityHashMap<(Option<PartitionId>, Option<PartitionId>)>,
     spooky: PhantomData<F>,
 }
 
@@ -79,55 +79,77 @@ impl<F: SpatialHashFilter> PartitionChange<F> {
 
         // Compute cell-level partition changes: cells that remained occupied but changed partitions.
         for (cell_hash, entry) in cells.all_entries() {
-            if let (Some(old_pid), Some(new_pid)) =
-                (old_reverse.get(cell_hash), partitions.get(cell_hash))
-            {
-                if old_pid != new_pid {
-                    // All entities in this cell have changed partition without moving cells.
-                    for entity in entry.entities.iter().copied() {
-                        // Preserve the original source if already present; update only destination.
-                        if let Some((_from, to)) = entity_partitions.changed.get_mut(&entity) {
-                            // Keep existing source, just update destination
-                            *to = *new_pid;
-                        } else {
-                            entity_partitions
-                                .changed
-                                .insert(entity, (*old_pid, *new_pid));
+            if let Some(&new_pid) = partitions.get(cell_hash) {
+                // Only mark entities whose previous recorded partition differs from the new one
+                for entity in entry.entities.iter().copied() {
+                    if let Some(prev_pid) = entity_partitions.map.get(&entity).copied() {
+                        if prev_pid != new_pid {
+                            if let Some((_from, to)) = entity_partitions.changed.get_mut(&entity) {
+                                *to = Some(new_pid);
+                            } else {
+                                entity_partitions
+                                    .changed
+                                    .insert(entity, (Some(prev_pid), Some(new_pid)));
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Compute entity-level partition changes for entities that moved cells this frame.
-        let get_old_new_pids =
-            |entity: &Entity, changed: &PartitionChange<F>| -> Option<(PartitionId, PartitionId)> {
-                let (entity_id, cell_hash) = all_hashes.get(*entity).ok()?;
-                let new_pid = *partitions.get(cell_hash)?;
-                let old_pid = changed.map.get(&entity_id).copied()?;
-                (old_pid != new_pid).then_some((old_pid, new_pid))
-            };
+        // Compute entity-level partition changes for entities that moved cells this frame,
+        // were newly spawned (added cell), or had cell removed (despawned/removed component).
         for entity in changed_cells.iter() {
-            let Some((prev_pid, new_pid)) = get_old_new_pids(entity, &entity_partitions) else {
-                continue;
-            };
-            if let Some((_, existing_new_pid)) = entity_partitions.changed.get_mut(entity) {
-                *existing_new_pid = new_pid; // Only update the destination partition
-            } else {
-                entity_partitions
-                    .changed
-                    .insert(*entity, (prev_pid, new_pid));
+            match all_hashes.get(*entity) {
+                // Entity currently has a CellId
+                Ok((entity_id, cell_hash)) => {
+                    let new_pid = partitions.get(cell_hash).copied();
+                    let old_pid = entity_partitions.map.get(&entity_id).copied();
+                    let record = match (old_pid, new_pid) {
+                        (Some(o), Some(n)) if o == n => None, // Partition unchanged
+                        (None, None) => None,                 // Nonsensical
+                        other => Some(other),
+                    };
+                    if let Some((from, to)) = record {
+                        if let Some((existing_from, existing_to)) =
+                            entity_partitions.changed.get_mut(entity)
+                        {
+                            // Preserve the earliest known source if we already have one
+                            if existing_from.is_none() {
+                                *existing_from = from;
+                            }
+                            *existing_to = to;
+                        } else {
+                            entity_partitions.changed.insert(*entity, (from, to));
+                        }
+                    }
+                }
+                // Entity no longer has a CellId -> removed/despawned
+                Err(_) => {
+                    if let Some(prev_pid) = entity_partitions.map.get(entity).copied() {
+                        entity_partitions
+                            .changed
+                            .insert(*entity, (Some(prev_pid), None));
+                    }
+                }
             }
         }
 
         // Apply the delta only after all changes have been collected.
-        let mut apply_list: Vec<(Entity, PartitionId)> =
+        let mut apply_list: Vec<(Entity, Option<PartitionId>)> =
             Vec::with_capacity(entity_partitions.changed.len());
         for (entity, (_from, to)) in entity_partitions.changed.iter() {
             apply_list.push((*entity, *to));
         }
         for (entity, to) in apply_list {
-            entity_partitions.map.insert(entity, to);
+            match to {
+                Some(pid) => {
+                    entity_partitions.map.insert(entity, pid);
+                }
+                None => {
+                    entity_partitions.map.remove(&entity);
+                }
+            }
         }
         // Entities present but not in the map yet are inserted with their current partition.
         for (entity_id, cell_hash) in all_hashes.iter() {

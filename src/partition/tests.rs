@@ -5,8 +5,8 @@ use crate::partition::map::PartitionLookup;
 use crate::partition::PartitionPlugin;
 use crate::plugin::BigSpaceMinimalPlugins;
 use crate::prelude::*;
-use bevy_app::App;
 use bevy_app::Update;
+use bevy_app::{App, Startup};
 use bevy_ecs::prelude::*;
 use bevy_ecs::world::World;
 
@@ -36,7 +36,7 @@ fn fresh_spawn_populates_map_without_changes() {
 
     run_app_once(&mut app);
 
-    // Verify that the two spawned entities are mapped and no changes are recorded
+    // Verify that the two spawned entities are mapped and recorded as spawned changes
     #[derive(Resource, Clone, Copy)]
     struct Spawned {
         e1: Entity,
@@ -60,8 +60,19 @@ fn fresh_spawn_populates_map_without_changes() {
     let entity_partitions = app.world().resource::<PartitionChange>();
     assert!(entity_partitions.map.get(&spawned.e1).is_some());
     assert!(entity_partitions.map.get(&spawned.e2).is_some());
-    // Fresh spawns should not be reported as changes
-    assert!(entity_partitions.changed.is_empty());
+    // Fresh spawns should be reported as (None, Some(_)) changes
+    let (from1, to1) = *entity_partitions
+        .changed
+        .get(&spawned.e1)
+        .expect("spawned entity should be in changed map");
+    assert!(from1.is_none());
+    assert!(to1.is_some());
+    let (from2, to2) = *entity_partitions
+        .changed
+        .get(&spawned.e2)
+        .expect("spawned entity should be in changed map");
+    assert!(from2.is_none());
+    assert!(to2.is_some());
 }
 
 #[test]
@@ -121,8 +132,8 @@ fn moving_between_partitions_records_change() {
         .get(&entities.a)
         .copied()
         .expect("A should have a recorded change");
-    assert_eq!(from, pid_a0);
-    assert_eq!(to, pid_b);
+    assert_eq!(from, Some(pid_a0));
+    assert_eq!(to, Some(pid_b));
     // Map should also be updated
     assert_eq!(ep.map.get(&entities.a).copied(), Some(pid_b));
 
@@ -227,8 +238,8 @@ fn remove_and_readd_triggers_partition_change() {
         .get(&mover)
         .copied()
         .expect("change expected after re-add");
-    assert_eq!(from, pid_from);
-    assert_eq!(to, pid_to);
+    assert_eq!(from, Some(pid_from));
+    assert_eq!(to, Some(pid_to));
 }
 
 #[test]
@@ -263,7 +274,7 @@ fn split_then_merge_back_same_frame_no_false_positive() {
             });
         });
     };
-    app.add_systems(Update, setup);
+    app.add_systems(Startup, setup);
     run_app_once(&mut app);
 
     // Schedule an Update system to remove mid and add a connector at (1,1,0) in the same frame
