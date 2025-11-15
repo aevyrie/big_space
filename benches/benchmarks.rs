@@ -1,6 +1,7 @@
 //! `big_space` benchmarks.
 #![allow(clippy::type_complexity)]
 #![allow(missing_docs)]
+#![allow(clippy::unit_arg)]
 
 use bevy::prelude::*;
 use big_space::plugin::BigSpaceMinimalPlugins;

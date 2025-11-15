@@ -108,8 +108,8 @@ fn moving_between_partitions_records_change() {
     let (a_old_cell, b_cell) = {
         let world = app.world_mut();
         let mut q = world.query::<(&CellId,)>();
-        let a_old = *q.get(&world, entities.a).unwrap().0;
-        let b = *q.get(&world, entities.b).unwrap().0;
+        let a_old = *q.get(world, entities.a).unwrap().0;
+        let b = *q.get(world, entities.b).unwrap().0;
         (a_old, b)
     };
     let parts = app.world().resource::<PartitionLookup>();
