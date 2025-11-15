@@ -214,6 +214,7 @@ pub mod commands;
 pub mod floating_origins;
 pub mod grid;
 pub mod hash;
+pub mod partition;
 pub mod plugin;
 pub mod timing;
 pub mod validation;
@@ -240,8 +241,12 @@ pub mod prelude {
     pub use hash::{
         component::{CellHash, CellHashMap, CellHashSet, CellId},
         map::{CellLookup, SpatialEntryToEntities},
-        partition::{Partition, PartitionId, PartitionLookup, PartitionPlugin},
         CellHashingPlugin, SpatialHashSystems,
+    };
+    pub use partition::{
+        change_tracking::{PartitionChange, PartitionChangePlugin},
+        map::PartitionLookup,
+        Partition, PartitionId, PartitionPlugin,
     };
     pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;

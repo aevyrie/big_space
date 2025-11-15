@@ -16,7 +16,7 @@ const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
 const MOVEMENT_SPEED: f32 = 5.0;
-const PERCENT_STATIC: f32 = 1.0;
+const PERCENT_STATIC: f32 = 0.9;
 
 fn main() {
     App::new()
@@ -25,6 +25,7 @@ fn main() {
             BigSpaceDefaultPlugins,
             CellHashingPlugin::default(),
             PartitionPlugin::default(),
+            PartitionChangePlugin::default(),
         ))
         .add_plugins(bevy::remote::RemotePlugin::default()) // Core remote protocol
         .add_plugins(bevy::remote::http::RemoteHttpPlugin::default()) // Enable HTTP transport
@@ -34,6 +35,7 @@ fn main() {
             (
                 move_player.after(TransformSystems::Propagate),
                 draw_partitions.after(SpatialHashSystems::UpdatePartitionLookup),
+                highlight_changed_entities.after(draw_partitions),
             ),
         )
         .add_systems(Update, (cursor_grab, spawn_spheres))
@@ -52,6 +54,7 @@ struct MaterialPresets {
     default: Handle<StandardMaterial>,
     highlight: Handle<StandardMaterial>,
     flood: Handle<StandardMaterial>,
+    changed: Handle<StandardMaterial>,
     sphere: Handle<Mesh>,
 }
 
@@ -67,6 +70,7 @@ impl FromWorld for MaterialPresets {
         });
         let highlight = materials.add(Color::from(Srgba::new(2.0, 0.0, 8.0, 1.0)));
         let flood = materials.add(Color::from(Srgba::new(1.1, 0.1, 1.0, 1.0)));
+        let changed = materials.add(Color::from(Srgba::new(10.0, 0.0, 0.0, 1.0)));
 
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let sphere = meshes.add(
@@ -80,6 +84,7 @@ impl FromWorld for MaterialPresets {
             default,
             highlight,
             flood,
+            changed,
             sphere,
         }
     }
@@ -382,4 +387,52 @@ fn cursor_grab(
         cursor_options.visible = true;
     }
     Ok(())
+}
+
+// Highlight entities that changed partitions by setting their material to bright red
+// and keep the highlight for 10 frames.
+fn highlight_changed_entities(
+    mut materials: Query<&mut MeshMaterial3d<StandardMaterial>>,
+    material_presets: Res<MaterialPresets>,
+    entity_partitions: Res<PartitionChange>,
+    // Track highlighted entities with a countdown of remaining frames
+    mut active: Local<Vec<(Entity, u8)>>,
+) {
+    // We'll rebuild the active list each frame, carrying forward countdowns
+    let mut next_active: Vec<(Entity, u8)> =
+        Vec::with_capacity(active.len() + entity_partitions.changed.len());
+
+    // 1) Apply new changes: set material to changed and (re)start countdown at 10
+    for entity in entity_partitions.changed.keys().copied() {
+        if let Ok(mut mat) = materials.get_mut(entity) {
+            mat.set_if_neq(material_presets.changed.clone().into());
+        }
+        next_active.push((entity, 10));
+    }
+
+    // 2) Carry over previous active highlights that weren't refreshed this frame
+    for (entity, mut frames_left) in active.drain(..) {
+        // If the entity also changed this frame, it's already added with 10 above
+        if entity_partitions.changed.contains_key(&entity) {
+            continue;
+        }
+        if frames_left > 0 {
+            frames_left -= 1;
+            if frames_left > 0 {
+                // Keep highlighted
+                if let Ok(mut mat) = materials.get_mut(entity) {
+                    mat.set_if_neq(material_presets.changed.clone().into());
+                }
+                next_active.push((entity, frames_left));
+            } else {
+                // Countdown expired: reset to default
+                if let Ok(mut mat) = materials.get_mut(entity) {
+                    mat.set_if_neq(material_presets.default.clone().into());
+                }
+            }
+        }
+    }
+
+    // 3) Replace the active list with the updated one
+    *active = next_active;
 }

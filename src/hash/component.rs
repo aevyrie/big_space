@@ -175,6 +175,7 @@ impl CellId {
 
     /// Update or insert the [`CellId`] of all changed entities that match the optional
     /// [`SpatialHashFilter`].
+    #[allow(clippy::too_many_arguments)]
     pub fn update<F: SpatialHashFilter>(
         mut commands: Commands,
         mut changed_cells: ResMut<ChangedCells<F>>,
@@ -183,6 +184,7 @@ impl CellId {
             (F, Or<(Changed<ChildOf>, Changed<CellCoord>)>),
         >,
         added_entities: Query<(Entity, &ChildOf, &CellCoord), (F, Without<CellId>)>,
+        mut removed_cells: RemovedComponents<CellCoord>,
         mut stats: Option<ResMut<crate::timing::GridHashStats>>,
         mut thread_updated_hashes: Local<PortableParallel<Vec<Entity>>>,
         mut thread_commands: Local<PortableParallel<Vec<(Entity, CellId, CellHash)>>>,
@@ -214,7 +216,10 @@ impl CellId {
                 fast_hash.0 = new_fast_hash;
             },
         );
-        changed_cells.updated.extend(thread_updated_hashes.drain());
+
+        changed_cells
+            .updated
+            .extend(thread_updated_hashes.drain().chain(removed_cells.read()));
 
         if let Some(ref mut stats) = stats {
             stats.hash_update_duration += start.elapsed();
