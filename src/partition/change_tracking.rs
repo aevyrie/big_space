@@ -15,11 +15,12 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::world::FromWorld;
 use core::marker::PhantomData;
 
-/// Adds support for spatial partitioning. Requires [`GridHashPlugin`](super::CellHashingPlugin).
+/// Adds support for spatial partitioning change tracking. Requires
+/// [`GridHashPlugin`](super::CellHashingPlugin) and [`PartitionPlugin`](super::PartitionPlugin).
 pub struct PartitionChangePlugin<F: SpatialHashFilter = ()>(PhantomData<F>);
 
 impl<F: SpatialHashFilter> PartitionChangePlugin<F> {
-    /// Create a new instance of [`crate::prelude::PartitionPlugin`].
+    /// Create a new instance of [`crate::prelude::PartitionChangePlugin`].
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -98,16 +99,14 @@ impl<F: SpatialHashFilter> PartitionChange<F> {
             }
         }
 
-        let get_old_new_pids = |entity: &Entity,
-                                entity_partitions: &PartitionChange<F>|
-         -> Option<(PartitionId, PartitionId)> {
-            let (entity_id, cell_hash) = all_hashes.get(*entity).ok()?;
-            let new_pid = *partitions.get(cell_hash)?;
-            let old_pid = entity_partitions.map.get(&entity_id).copied()?;
-            (old_pid != new_pid).then_some((old_pid, new_pid))
-        };
-
-        // Compute entity-level changes for entities that moved cells this frame.
+        // Compute entity-level partition changes for entities that moved cells this frame.
+        let get_old_new_pids =
+            |entity: &Entity, changed: &PartitionChange<F>| -> Option<(PartitionId, PartitionId)> {
+                let (entity_id, cell_hash) = all_hashes.get(*entity).ok()?;
+                let new_pid = *partitions.get(cell_hash)?;
+                let old_pid = changed.map.get(&entity_id).copied()?;
+                (old_pid != new_pid).then_some((old_pid, new_pid))
+            };
         for entity in changed_cells.iter() {
             let Some((prev_pid, new_pid)) = get_old_new_pids(entity, &entity_partitions) else {
                 continue;
@@ -139,7 +138,7 @@ impl<F: SpatialHashFilter> PartitionChange<F> {
             }
         }
 
-        // Snapshot the previous cell->partition mapping to compute deltas after updates
+        // Snapshot the cell->partition mapping to compute deltas next update
         *old_reverse = partitions.reverse_map.clone();
     }
 }
