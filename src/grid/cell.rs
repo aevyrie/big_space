@@ -7,8 +7,10 @@ use bevy_platform::time::Instant;
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
-/// The coordinate of the cell this entity is located in, within its parent's [`Grid`]. The
-/// [`Transform`] of an entity with this component is relative to the center of this cell.
+/// The integer coordinate of a cubic cell in a [`Grid`].
+///
+/// Locates an entity in a cell within its parent's [`Grid`]. The [`Transform`] of an entity with
+/// this component is a transformation relative to the center of this cell.
 ///
 /// All entities with a [`CellCoord`] must be children of an entity with a [`Grid`].
 ///
@@ -24,11 +26,11 @@ use bevy_transform::prelude::*;
 #[reflect(Component, Default, PartialEq)]
 #[require(Transform, GlobalTransform)]
 pub struct CellCoord {
-    /// The x-index of the cell.
+    /// X coordinate of a cell in its parent [`Grid`].
     pub x: GridPrecision,
-    /// The y-index of the cell.
+    /// Y coordinate of a cell in its parent [`Grid`].
     pub y: GridPrecision,
-    /// The z-index of the cell.
+    /// Z coordinate of a cell in its parent [`Grid`].
     pub z: GridPrecision,
 }
 
@@ -234,5 +236,25 @@ impl core::ops::Mul<GridPrecision> for &CellCoord {
 
     fn mul(self, rhs: GridPrecision) -> Self::Output {
         (*self).mul(rhs)
+    }
+}
+
+impl core::ops::Div<GridPrecision> for CellCoord {
+    type Output = CellCoord;
+
+    fn div(self, rhs: GridPrecision) -> Self::Output {
+        CellCoord {
+            x: self.x / rhs,
+            y: self.y / rhs,
+            z: self.z / rhs,
+        }
+    }
+}
+
+impl core::ops::Div<GridPrecision> for &CellCoord {
+    type Output = CellCoord;
+
+    fn div(self, rhs: GridPrecision) -> Self::Output {
+        (*self).div(rhs)
     }
 }

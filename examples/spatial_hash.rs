@@ -11,7 +11,7 @@ use core::hash::Hasher;
 use noise::{NoiseFn, Simplex};
 use turborand::prelude::*;
 
-// Try bumping this up to really stress test. I'm able to push a million entities with an M3 Max.
+// Try bumping this up to stress-test. I'm able to push a million entities with an M3 Max.
 const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
@@ -27,8 +27,6 @@ fn main() {
             PartitionPlugin::default(),
             PartitionChangePlugin::default(),
         ))
-        .add_plugins(bevy::remote::RemotePlugin::default()) // Core remote protocol
-        .add_plugins(bevy::remote::http::RemoteHttpPlugin::default()) // Enable HTTP transport
         .add_systems(Startup, (spawn, setup_ui))
         .add_systems(
             PostUpdate,
@@ -390,11 +388,10 @@ fn cursor_grab(
 }
 
 // Highlight entities that changed partitions by setting their material to bright red
-// and keep the highlight for 10 frames.
 fn highlight_changed_entities(
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>>,
     material_presets: Res<MaterialPresets>,
-    entity_partitions: Res<PartitionChange>,
+    entity_partitions: Res<PartitionEntities>,
     // Track highlighted entities with a countdown of remaining frames
     mut active: Local<Vec<(Entity, u8)>>,
 ) {
@@ -402,7 +399,6 @@ fn highlight_changed_entities(
     let mut next_active: Vec<(Entity, u8)> =
         Vec::with_capacity(active.len() + entity_partitions.changed.len());
 
-    // 1) Apply new changes: set material to changed and (re)start countdown at 10
     for entity in entity_partitions.changed.keys().copied() {
         if let Ok(mut mat) = materials.get_mut(entity) {
             mat.set_if_neq(material_presets.changed.clone().into());
@@ -410,7 +406,6 @@ fn highlight_changed_entities(
         next_active.push((entity, 10));
     }
 
-    // 2) Carry over previous active highlights that weren't refreshed this frame
     for (entity, mut frames_left) in active.drain(..) {
         // If the entity also changed this frame, it's already added with 10 above
         if entity_partitions.changed.contains_key(&entity) {
@@ -433,6 +428,5 @@ fn highlight_changed_entities(
         }
     }
 
-    // 3) Replace the active list with the updated one
     *active = next_active;
 }

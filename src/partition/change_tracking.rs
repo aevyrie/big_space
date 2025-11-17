@@ -34,9 +34,9 @@ impl Default for PartitionChangePlugin<()> {
 
 impl<F: SpatialHashFilter> Plugin for PartitionChangePlugin<F> {
     fn build(&self, app: &mut App) {
-        app.init_resource::<PartitionChange<F>>().add_systems(
+        app.init_resource::<PartitionEntities<F>>().add_systems(
             PostUpdate,
-            PartitionChange::<F>::update
+            PartitionEntities::<F>::update
                 .in_set(SpatialHashSystems::UpdatePartitionChange)
                 .after(SpatialHashSystems::UpdatePartitionLookup),
         );
@@ -48,7 +48,7 @@ impl<F: SpatialHashFilter> Plugin for PartitionChangePlugin<F> {
 ///
 /// This only works if the [`PartitionChangePlugin`] has been added.
 #[derive(Resource)]
-pub struct PartitionChange<F: SpatialHashFilter = ()> {
+pub struct PartitionEntities<F: SpatialHashFilter = ()> {
     /// Current mapping of an entity to its partition as of the last update.
     pub map: EntityHashMap<PartitionId>,
     /// Entities that have changed partition in the last update.
@@ -56,7 +56,7 @@ pub struct PartitionChange<F: SpatialHashFilter = ()> {
     spooky: PhantomData<F>,
 }
 
-impl<F: SpatialHashFilter> FromWorld for PartitionChange<F> {
+impl<F: SpatialHashFilter> FromWorld for PartitionEntities<F> {
     fn from_world(_world: &mut World) -> Self {
         Self {
             map: Default::default(),
@@ -66,14 +66,14 @@ impl<F: SpatialHashFilter> FromWorld for PartitionChange<F> {
     }
 }
 
-impl<F: SpatialHashFilter> PartitionChange<F> {
+impl<F: SpatialHashFilter> PartitionEntities<F> {
     fn update(
         mut entity_partitions: ResMut<Self>,
         cells: Res<CellLookup<F>>,
         changed_cells: Res<ChangedCells<F>>,
         all_hashes: Query<(Entity, &CellId), F>,
         mut old_reverse: Local<CellHashMap<PartitionId>>,
-        partitions: Res<PartitionLookup>,
+        partitions: Res<PartitionLookup<F>>,
     ) {
         entity_partitions.changed.clear();
 
@@ -148,14 +148,6 @@ impl<F: SpatialHashFilter> PartitionChange<F> {
                 }
                 None => {
                     entity_partitions.map.remove(&entity);
-                }
-            }
-        }
-        // Entities present but not in the map yet are inserted with their current partition.
-        for (entity_id, cell_hash) in all_hashes.iter() {
-            if !entity_partitions.map.contains_key(&entity_id) {
-                if let Some(pid) = partitions.get(cell_hash) {
-                    entity_partitions.map.insert(entity_id, *pid);
                 }
             }
         }

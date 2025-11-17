@@ -4,7 +4,7 @@
 
 //! A floating origin plugin that uses integer grids to extend bevy's [`Transform`] component with
 //! up to 128 bits of added precision. The plugin propagates and computes [`GlobalTransform`]s
-//! relative to floating origins, making the most of 32 bit rendering precision by reducing error
+//! relative to floating origins, making the most of 32-bit rendering precision by reducing error
 //! near the camera.
 //!
 //! <img src="https://raw.githubusercontent.com/aevyrie/big_space/refs/heads/main/assets/bigspacebanner.svg" style="padding:2% 15%">
@@ -81,9 +81,9 @@
 //!   from the origin of the current grid cell.
 //! - High precision coordinates are invisible if you don't need them. You can move objects using
 //!   their `Transform` alone, which results in decent ecosystem compatibility.
-//! - High precision is completely opt-in. If you don't add the `GridCell` component to an entity,
+//! - High precision coordinates optional. If you don't add the `GridCell` component to an entity,
 //!   it behaves like a normal single precision transform, with the same performance cost, yet it
-//!   can exist in the high precision hierarchy. This allows you to load in GLTFs or other
+//!   can exist in the high-precision hierarchy. This allows you to load in GLTFs or other
 //!   low-precision entity hierarchies with no added effort or cost.
 //!
 //! While using the [`BigSpaceDefaultPlugins`], the position of entities is now defined with the [`Grid`],
@@ -92,7 +92,7 @@
 //! `Transform` is used to position the entity relative to the center of its `GridCell`. If an
 //! entity moves into a neighboring cell, its transform will be automatically recomputed relative to
 //! the center of that new cell. This prevents `Transforms` from ever becoming larger than a single
-//! grid cell, and thus prevents floating point precision artifacts.
+//! grid cell and thus prevents floating point precision artifacts.
 //!
 //! The grid adds precision to your transforms. If you are using (32-bit) `Transform`s on an `i32`
 //! grid, you will have 64 bits of precision: 32 bits to address into a large integer grid, and 32
@@ -100,7 +100,7 @@
 //! giving you up to 160 bits of precision of translation.
 //!
 //! `Grid`s can be nested, like `Transform`s. This allows you to define moving grids, which can make
-//! certain use cases much simpler. For example, if you have a planet rotating, and orbiting around
+//! certain use cases much simpler. For example, if you have a planet rotating and orbiting around
 //! its star, it would be very annoying if you had to compute this orbit and rotation for all
 //! objects on the surface in high precision. Instead, you can place the planet and all objects on
 //! its surface in the same grid. The motion of the planet will be inherited by all children in that
@@ -119,21 +119,21 @@
 //!
 //! All of the above applies to the entity marked with the [`FloatingOrigin`] component. The
 //! floating origin can be any high-precision entity in a `BigSpace`, it doesn't need to be a
-//! camera. The only thing special about the entity marked as the floating origin, is that it is
+//! camera. The only thing special about the entity marked as the floating origin is that it is
 //! used to compute the [`GlobalTransform`] of all other entities in that `BigSpace`. To an outside
 //! observer, every high-precision entity within a `BigSpace` is confined to a box the size of a
 //! grid cell - like a game of *Asteroids*. Only once you render the `BigSpace` from the point of
 //! view of the floating origin, by calculating their `GlobalTransform`s, do entities appear very
 //! distant from the floating origin.
 //!
-//! As described above. the `GlobalTransform` of all entities is computed relative to the floating
+//! As described above, the `GlobalTransform` of all entities is computed relative to the floating
 //! origin's grid cell. Because of this, entities very far from the origin will have very large,
 //! imprecise positions. However, this is always relative to the camera (floating origin), so these
 //! artifacts will always be too far away to be seen, no matter where the camera moves. Because this
 //! only affects the `GlobalTransform` and not the `Transform`, this also means that entities will
 //! never permanently lose precision just because they were far from the origin at some point. The
-//! lossy calculation only occurs when computing the `GlobalTransform` of entities, the high
-//! precision `GridCell` and `Transform` are not affected.
+//! lossy calculation only occurs when computing the `GlobalTransform` of entities, the
+//! high-precision `GridCell` and `Transform` are not affected.
 //!
 //! # Usage
 //!
@@ -141,12 +141,12 @@
 //! need an i8, or an i128? See [`precision`] for more details and documentation.
 //!
 //! 1. Add the [`BigSpaceDefaultPlugins`] to your `App`
-//! 2. Spawn a [`BigSpace`] with [`spawn_big_space`](BigSpaceCommands::spawn_big_space), and add
+//! 2. Spawn a [`BigSpace`] with [`spawn_big_space`](BigSpaceCommands::spawn_big_space) and add
 //!    entities to it.
 //! 3. Add the [`FloatingOrigin`] to your active camera in the [`BigSpace`].
 //!
 //! To add more levels to the hierarchy, you can use [`Grid`]s, which themselves can contain
-//! high-precision spatial entities. Grids have the same propagation behavior as `Transform`s, but
+//! high-precision spatial entities. Grids have the same propagation behavior as `Transform`s but
 //! with higher precision.
 //!
 //! Take a look at the [`Grid`] component for some useful helper methods. The component defines the
@@ -244,7 +244,7 @@ pub mod prelude {
         CellHashingPlugin, SpatialHashSystems,
     };
     pub use partition::{
-        change_tracking::{PartitionChange, PartitionChangePlugin},
+        change_tracking::{PartitionChangePlugin, PartitionEntities},
         map::PartitionLookup,
         Partition, PartitionId, PartitionPlugin,
     };

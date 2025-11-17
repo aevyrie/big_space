@@ -57,7 +57,7 @@ fn fresh_spawn_populates_map_without_changes() {
         capture(world_mut);
     }
     let spawned = app.world().resource::<Spawned>();
-    let entity_partitions = app.world().resource::<PartitionChange>();
+    let entity_partitions = app.world().resource::<PartitionEntities>();
     assert!(entity_partitions.map.get(&spawned.e1).is_some());
     assert!(entity_partitions.map.get(&spawned.e2).is_some());
     // Fresh spawns should be reported as (None, Some(_)) changes
@@ -126,7 +126,7 @@ fn moving_between_partitions_records_change() {
     run_app_once(&mut app);
 
     // Assert change recorded for A
-    let ep = app.world().resource::<PartitionChange>();
+    let ep = app.world().resource::<PartitionEntities>();
     let (from, to) = ep
         .changed
         .get(&entities.a)
@@ -139,7 +139,7 @@ fn moving_between_partitions_records_change() {
 
     // Next frame, changed should clear
     run_app_once(&mut app);
-    let ep = app.world().resource::<PartitionChange>();
+    let ep = app.world().resource::<PartitionEntities>();
     assert!(ep.changed.get(&entities.a).is_none());
 }
 
@@ -176,7 +176,7 @@ fn move_within_same_partition_no_change() {
 
     run_app_once(&mut app);
 
-    let ep = app.world().resource::<PartitionChange>();
+    let ep = app.world().resource::<PartitionEntities>();
     assert!(
         ep.changed.get(&e).is_none(),
         "No partition change expected within same partition"
@@ -232,7 +232,7 @@ fn remove_and_readd_triggers_partition_change() {
 
     run_app_once(&mut app);
 
-    let ep = app.world().resource::<PartitionChange>();
+    let ep = app.world().resource::<PartitionEntities>();
     let (from, to) = ep
         .changed
         .get(&mover)
@@ -291,7 +291,7 @@ fn split_then_merge_back_same_frame_no_false_positive() {
     run_app_once(&mut app);
 
     // Verify no changes recorded for left or right (still in original partition id from before)
-    let ep = app.world().resource::<PartitionChange>();
+    let ep = app.world().resource::<PartitionEntities>();
     assert!(ep.changed.get(&app.world().resource::<R>().left).is_none());
     assert!(ep.changed.get(&app.world().resource::<R>().right).is_none());
 }
