@@ -65,7 +65,7 @@ bevy_time = { version = "0.17.1", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-bevy = "0.17.1"
+bevy = { version = "0.17.1", features = ["x11"] }
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.7"
