@@ -65,29 +65,7 @@ bevy_time = { version = "0.17.1", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-bevy = { version = "0.17.1", default-features = false, features = [
-    "bevy_scene",
-    "bevy_render",
-    "bevy_post_process",
-    "bevy_asset",
-    "bevy_color",
-    "bevy_gltf",
-    "bevy_remote",
-    "bevy_winit",
-    "default_font",
-    "bevy_ui",
-    "bevy_ui_render",
-    "bevy_pbr",
-    "bevy_gizmos",
-    "animation",
-    "bevy_window",
-    "x11",
-    "tonemapping_luts",
-    "multi_threaded",
-    "png",
-    "reflect_auto_register",
-    "zstd_rust"
-] }
+bevy = "0.17.1"
 noise = "0.9"
 turborand = "0.10"
 criterion = "0.7"

@@ -71,7 +71,7 @@ pub enum SpatialHashSystems {
     UpdateCellLookup,
     /// [`PartitionLookup`] updated.
     UpdatePartitionLookup,
-    /// [`PartitionChange`] updated.
+    /// [`PartitionEntities`] updated.
     UpdatePartitionChange,
 }
 

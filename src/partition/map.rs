@@ -17,16 +17,24 @@ use core::ops::Deref;
 
 /// A resource for quickly finding connected groups of occupied grid cells in [`Partition`]s.
 ///
+/// Partitions divide space into independent groups of cells.
+///
 /// The map is built from a [`CellLookup`] resource with the same `F:`[`SpatialHashFilter`].
+///
+/// Partitions are built on top of [`CellLookup`], only dealing with
+/// [`CellCoord`](crate::grid::cell::CellCoord)s. For performance reasons, partitions do not track
+/// grid occupancy at the `Entity` level. Instead, partitions are only concerned with which cells
+/// are occupied. To find what entities are present, you will need to look up each of the
+/// partition's [`CellId`]s in the [`CellLookup`]
 #[derive(Resource)]
 pub struct PartitionLookup<F = ()>
 where
     F: SpatialHashFilter,
 {
-    pub(crate) partitions: HashMap<PartitionId, Partition>,
+    partitions: HashMap<PartitionId, Partition>,
     pub(crate) reverse_map: CellHashMap<PartitionId>,
-    pub(crate) next_partition: u64,
-    pub(crate) spooky: PhantomData<F>,
+    next_partition: u64,
+    spooky: PhantomData<F>,
 }
 
 impl<F> Default for PartitionLookup<F>
@@ -75,6 +83,13 @@ where
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&PartitionId, &Partition)> {
         self.partitions.iter()
+    }
+
+    /// Searches for the [`Partition`] that contains this cell, returning the partition's
+    /// [`PartitionId`] if the cell is found in any partition.
+    #[inline]
+    pub fn get_partition(&self, partition: &PartitionId) -> Option<&Partition> {
+        self.partitions.get(partition)
     }
 }
 
