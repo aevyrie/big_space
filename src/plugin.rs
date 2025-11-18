@@ -37,12 +37,11 @@ impl PluginGroup for BigSpaceDefaultPlugins {
 
         group = group
             .add_group(BigSpaceMinimalPlugins)
-            .add(BigSpaceTimingStatsPlugin)
-            .add(BigSpaceValidationPlugin);
+            .add(BigSpaceTimingStatsPlugin);
 
-        #[cfg(not(debug_assertions))]
+        #[cfg(any(debug_assertions, feature = "debug"))]
         {
-            group = group.disable::<BigSpaceValidationPlugin>();
+            group = group.add(BigSpaceValidationPlugin);
         }
         #[cfg(feature = "debug")]
         {
