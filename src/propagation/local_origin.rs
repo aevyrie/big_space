@@ -1,5 +1,5 @@
 //! Describes how the floating origin's position is propagated through the hierarchy of reference
-//! grids, and used to compute the floating origin's position relative to each grid. See
+//! grids and used to compute the floating origin's position relative to each grid. See
 //! [`LocalFloatingOrigin`].
 
 use crate::prelude::*;

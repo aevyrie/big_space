@@ -17,25 +17,23 @@ use bevy_transform::{prelude::*, TransformSystems};
 
 /// Runs the [`big_space`](crate) [`BigSpaceCameraController`].
 pub struct BigSpaceCameraControllerPlugin;
+
 impl Plugin for BigSpaceCameraControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.register_type::<BigSpaceCameraController>()
-            .register_type::<BigSpaceCameraInput>()
-            .init_resource::<BigSpaceCameraInput>()
-            .add_systems(
-                PostUpdate,
-                (
-                    default_camera_inputs
-                        .before(camera_controller)
-                        .run_if(|input: Res<BigSpaceCameraInput>| !input.defaults_disabled),
-                    nearest_objects_in_grid.before(camera_controller),
-                    camera_controller.before(TransformSystems::Propagate),
-                ),
-            );
+        app.init_resource::<BigSpaceCameraInput>().add_systems(
+            PostUpdate,
+            (
+                default_camera_inputs
+                    .before(camera_controller)
+                    .run_if(|input: Res<BigSpaceCameraInput>| !input.defaults_disabled),
+                nearest_objects_in_grid.before(camera_controller),
+                camera_controller.before(TransformSystems::Propagate),
+            ),
+        );
     }
 }
 
-/// A simple fly-cam camera controller.
+/// A fly-cam camera controller that can automatically speed up to cover large empty spaces.
 ///
 /// Add to a camera to enable the built-in [`big_space`](crate) camera controller.
 #[derive(Clone, Debug, Reflect, Component)]

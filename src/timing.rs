@@ -3,6 +3,7 @@
 use alloc::collections::VecDeque;
 use core::{iter::Sum, ops::Div, time::Duration};
 
+use crate::hash::ChangedCells;
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -15,13 +16,11 @@ pub struct BigSpaceTimingStatsPlugin;
 impl Plugin for BigSpaceTimingStatsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PropagationStats>()
-            .register_type::<PropagationStats>()
             .init_resource::<GridHashStats>()
-            .register_type::<GridHashStats>()
             .init_resource::<SmoothedStat<PropagationStats>>()
-            .register_type::<SmoothedStat<PropagationStats>>()
+            .register_type::<SmoothedStat<PropagationStats>>() // Generic types not auto-registered.
             .init_resource::<SmoothedStat<GridHashStats>>()
-            .register_type::<SmoothedStat<GridHashStats>>()
+            .register_type::<SmoothedStat<GridHashStats>>() // Generic types not auto-registered.
             .add_systems(
                 PostUpdate,
                 (GridHashStats::reset, PropagationStats::reset).in_set(BigSpaceSystems::Init),

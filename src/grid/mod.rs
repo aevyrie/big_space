@@ -10,8 +10,6 @@ use bevy_transform::prelude::*;
 use local_origin::LocalFloatingOrigin;
 
 pub mod cell;
-pub mod local_origin;
-pub mod propagation;
 
 /// A component that defines a spatial grid that child entities are located on. Child entities are
 /// located on this grid with the [`CellCoord`] component.

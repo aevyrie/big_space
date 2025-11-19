@@ -11,6 +11,7 @@ use bevy_transform::prelude::*;
 
 /// This plugin will render the bounds of occupied grid cells.
 pub struct BigSpaceDebugPlugin;
+
 impl Plugin for BigSpaceDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_gizmo_group::<BigSpaceGizmoConfig>()

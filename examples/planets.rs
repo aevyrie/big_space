@@ -47,8 +47,6 @@ fn main() {
                     .before(big_space::camera::camera_controller),
             ),
         )
-        .register_type::<Sun>()
-        .register_type::<Rotates>()
         .run();
 }
 

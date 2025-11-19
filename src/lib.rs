@@ -208,14 +208,13 @@ use prelude::*;
 
 pub(crate) mod portable_par;
 
-pub mod bevy_compat;
 pub mod bundles;
 pub mod commands;
-pub mod floating_origins;
 pub mod grid;
 pub mod hash;
 pub mod partition;
 pub mod plugin;
+pub mod propagation;
 pub mod timing;
 pub mod validation;
 pub mod world_query;
@@ -229,10 +228,10 @@ mod tests;
 
 /// Common `big_space` imports.
 pub mod prelude {
+    pub use crate::propagation::floating_origins::{BigSpace, FloatingOrigin};
     use crate::*;
     pub use bundles::{BigGridBundle, BigSpaceRootBundle, BigSpatialBundle};
     pub use commands::{BigSpaceCommands, GridCommands, SpatialEntityCommands};
-    pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
         cell::CellCoord,
         local_origin::{Grids, GridsMut, LocalFloatingOrigin},

@@ -11,7 +11,7 @@ pub struct PortableParallel<T: Send>(
     #[cfg(not(feature = "std"))] bevy_platform::sync::RwLock<Option<T>>,
 );
 
-/// A scope guard of a `Parallel`, when this struct is dropped ,the value will write back to its
+/// A scope guard of a `Parallel`, when this struct is dropped, the value will write back to its
 /// `Parallel`
 impl<T: Send> PortableParallel<T> {
     /// Gets a mutable iterator over all the per-thread queues.

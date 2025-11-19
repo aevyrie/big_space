@@ -41,7 +41,8 @@ where
     fn build(&self, app: &mut App) {
         app.init_resource::<CellLookup<F>>()
             .init_resource::<ChangedCells<F>>()
-            .register_type::<CellId>()
+            .register_type::<CellLookup<F>>() // Generic types are not auto-registered.
+            .register_type::<ChangedCells<F>>() // Generic types are not auto-registered.
             .add_systems(
                 PostUpdate,
                 (

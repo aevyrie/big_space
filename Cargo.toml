@@ -65,7 +65,6 @@ bevy_time = { version = "0.17.1", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 
 [dev-dependencies]
-
 bevy = { version = "0.17.1", default-features = false, features = [
     "animation",
     "bevy_asset",

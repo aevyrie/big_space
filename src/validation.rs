@@ -15,6 +15,7 @@ struct ValidationStackEntry {
 
 /// Adds hierarchy validation features.
 pub struct BigSpaceValidationPlugin;
+
 impl Plugin for BigSpaceValidationPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
@@ -34,7 +35,7 @@ struct ValidatorCaches {
     error_entities: EntityHashSet,
 }
 
-/// An exclusive system that validate the entity hierarchy and report errors.
+/// An exclusive system that validates the entity hierarchy and reports errors.
 pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut World) {
     world.init_resource::<ValidatorCaches>();
     let mut caches = world.remove_resource::<ValidatorCaches>().unwrap();
@@ -315,7 +316,7 @@ impl ValidHierarchyNode for ChildRootSpatialLowPrecision {
             .with::<Transform>()
             .with::<GlobalTransform>()
             .with::<ChildOf>()
-            .with::<crate::grid::propagation::LowPrecisionRoot>()
+            .with::<crate::propagation::LowPrecisionRoot>()
             .without::<CellCoord>()
             .without::<BigSpace>()
             .without::<Grid>()
