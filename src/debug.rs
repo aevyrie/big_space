@@ -46,17 +46,15 @@ fn update_debug_bounds(
             &Transform::from_scale(Vec3::splat(grid.cell_edge_length() * 0.999)),
         );
         if origin.is_none() {
-            gizmos.cuboid(transform, Color::linear_rgb(0.0, 1.0, 0.0));
+            gizmos.cube(transform, Color::linear_rgb(0.0, 1.0, 0.0));
         } else {
             // gizmos.cuboid(transform, Color::rgba(0.0, 0.0, 1.0, 0.5))
         }
     }
 }
 
-#[derive(Default, Reflect)]
+#[derive(Default, Reflect, GizmoConfigGroup)]
 struct BigSpaceGizmoConfig;
-
-impl GizmoConfigGroup for BigSpaceGizmoConfig {}
 
 /// Draw axes for grids.
 fn update_grid_axes(

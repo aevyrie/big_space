@@ -27,7 +27,7 @@ fn main() {
                 .build()
                 .enable::<BigSpaceValidationPlugin>(),
         ))
-        .insert_resource(AmbientLight {
+        .insert_resource(GlobalAmbientLight {
             color: Color::WHITE,
             brightness: 200.0,
             ..Default::default()
