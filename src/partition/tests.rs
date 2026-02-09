@@ -295,3 +295,178 @@ fn split_then_merge_back_same_frame_no_false_positive() {
     assert!(ep.changed.get(&app.world().resource::<R>().left).is_none());
     assert!(ep.changed.get(&app.world().resource::<R>().right).is_none());
 }
+
+#[test]
+fn partition_split_records_changes_for_stationary_entities() {
+    let mut app = App::new();
+    app.add_plugins((
+        BigSpaceMinimalPlugins,
+        CellHashingPlugin::default(),
+        PartitionPlugin::default(),
+        PartitionChangePlugin::default(),
+    ));
+
+    #[derive(Resource, Clone, Copy)]
+    struct R {
+        left: Entity,
+        mid: Entity,
+        right: Entity,
+    }
+
+    let setup = |mut commands: Commands| {
+        commands.spawn_big_space_default(|root| {
+            let left = root.spawn_spatial(CellCoord::new(0, 0, 0)).id();
+            let mid = root.spawn_spatial(CellCoord::new(1, 0, 0)).id();
+            let right = root.spawn_spatial(CellCoord::new(2, 0, 0)).id();
+            root.commands().insert_resource(R { left, mid, right });
+        });
+    };
+    app.add_systems(Startup, setup);
+
+    for _ in 0..10 {
+        run_app_once(&mut app);
+    }
+
+    let (left, right, mid) = {
+        let r = app.world().resource::<R>();
+        (r.left, r.right, r.mid)
+    };
+
+    let (pid_left, pid_mid, pid_right) = {
+        let parts = app.world().resource::<PartitionLookup>();
+        let cell_left = *app.world().get::<CellId>(left).unwrap();
+        let cell_mid = *app.world().get::<CellId>(mid).unwrap();
+        let cell_right = *app.world().get::<CellId>(right).unwrap();
+        (
+            parts.get(&cell_left).copied().unwrap(),
+            parts.get(&cell_mid).copied().unwrap(),
+            parts.get(&cell_right).copied().unwrap(),
+        )
+    };
+    assert_eq!(pid_left, pid_mid);
+    assert_eq!(pid_mid, pid_right);
+
+    // Remove the middle cell to cause a split
+    app.world_mut().commands().entity(mid).despawn();
+
+    let mut left_changed = false;
+    let mut right_changed = false;
+    let mut left_pid_entities = None;
+    let mut right_pid_entities = None;
+
+    for _ in 0..100 {
+        run_app_once(&mut app);
+        let ep = app.world().resource::<PartitionEntities>();
+        if ep.changed.contains_key(&left) {
+            left_changed = true;
+        }
+        if ep.changed.contains_key(&right) {
+            right_changed = true;
+        }
+        left_pid_entities = ep.map.get(&left).copied();
+        right_pid_entities = ep.map.get(&right).copied();
+    }
+
+    let parts = app.world().resource::<PartitionLookup>();
+    let cell_left = *app.world().get::<CellId>(left).unwrap();
+    let cell_right = *app.world().get::<CellId>(right).unwrap();
+    let left_pid_actual = parts.get(&cell_left).copied().unwrap();
+    let right_pid_actual = parts.get(&cell_right).copied().unwrap();
+
+    assert_ne!(
+        left_pid_actual, right_pid_actual,
+        "Partitions should have split in PartitionLookup"
+    );
+    assert_ne!(
+        left_pid_entities, right_pid_entities,
+        "Partitions should have split in PartitionEntities"
+    );
+
+    assert!(
+        left_changed || right_changed,
+        "At least one entity should have recorded a partition change"
+    );
+}
+
+#[test]
+fn partition_merge_records_changes_for_stationary_entities() {
+    let mut app = App::new();
+    app.add_plugins((
+        BigSpaceMinimalPlugins,
+        CellHashingPlugin::default(),
+        PartitionPlugin::default(),
+        PartitionChangePlugin::default(),
+    ));
+
+    #[derive(Resource, Clone, Copy)]
+    struct R {
+        root: Entity,
+        left: Entity,
+        right: Entity,
+    }
+
+    let setup = |mut commands: Commands| {
+        commands.spawn_big_space_default(|root| {
+            let left = root.spawn_spatial(CellCoord::new(0, 0, 0)).id();
+            let right = root.spawn_spatial(CellCoord::new(2, 0, 0)).id();
+            let root_id = root.id();
+            root.commands().insert_resource(R {
+                root: root_id,
+                left,
+                right,
+            });
+        });
+    };
+    app.add_systems(Startup, setup);
+
+    for _ in 0..10 {
+        run_app_once(&mut app);
+    }
+
+    let (left, right) = {
+        let r = app.world().resource::<R>();
+        (r.left, r.right)
+    };
+
+    let ep = app.world().resource::<PartitionEntities>();
+    let left_pid_initial = *ep.map.get(&left).expect("left not mapped");
+    let right_pid_initial = *ep.map.get(&right).expect("right not mapped");
+    assert_ne!(left_pid_initial, right_pid_initial);
+
+    // Add a connector to merge them
+    let root_id = app.world().resource::<R>().root;
+    app.world_mut()
+        .commands()
+        .grid(root_id, Grid::default())
+        .spawn_spatial(CellCoord::new(1, 0, 0));
+
+    let mut left_changed = false;
+    let mut right_changed = false;
+    let mut left_pid_entities = None;
+    let mut right_pid_entities = None;
+
+    for _ in 0..100 {
+        run_app_once(&mut app);
+        let ep = app.world().resource::<PartitionEntities>();
+        if ep.changed.contains_key(&left) {
+            left_changed = true;
+        }
+        if ep.changed.contains_key(&right) {
+            right_changed = true;
+        }
+        left_pid_entities = ep.map.get(&left).copied();
+        right_pid_entities = ep.map.get(&right).copied();
+    }
+
+    // After merge, both should be in the same partition
+    assert_eq!(
+        left_pid_entities, right_pid_entities,
+        "Partitions should have merged in PartitionEntities"
+    );
+
+    // At least one of them MUST have changed its partition ID to match the other
+    assert!(
+        left_changed || right_changed,
+        "At least one entity should have recorded a partition change during merge"
+    );
+}

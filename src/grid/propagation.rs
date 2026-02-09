@@ -174,12 +174,16 @@ impl Grid {
     ) {
         let start = bevy_platform::time::Instant::now();
         let update_transforms = |low_precision_root, parent_transform: Ref<GlobalTransform>| {
-            // High precision global transforms are change-detected, and are only updated if that
+            // High precision global transforms are change-detected and are only updated if that
             // entity has moved relative to the floating origin's grid cell.
             let changed = parent_transform.is_changed();
 
+            #[expect(
+                unsafe_code,
+                reason = "`propagate_recursive()` is unsafe due to its use of `Query::get_unchecked()`."
+            )]
             // SAFETY:
-            // - Unlike the bevy version of this, we do not iterate over all children of the root,
+            // - Unlike the bevy version of this, we do not iterate over all children of the root
             //   and manually verify each child has a parent component that points back to the same
             //   entity. Instead, we query the roots directly, so we know they are unique.
             // - We may operate as if all descendants are consistent, since `propagate_recursive`
@@ -189,10 +193,6 @@ impl Grid {
             //   other root entities' `propagate_recursive` calls will not conflict with this one.
             // - Since this is the only place where `transform_query` gets used, there will be no
             //   conflicting fetches elsewhere.
-            #[expect(
-                unsafe_code,
-                reason = "`propagate_recursive()` is unsafe due to its use of `Query::get_unchecked()`."
-            )]
             unsafe {
                 Self::propagate_recursive(
                     &parent_transform,

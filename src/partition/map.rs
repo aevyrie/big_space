@@ -10,6 +10,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use bevy_ecs::prelude::*;
 use bevy_platform::collections::HashMap;
+use bevy_platform::hash::PassHash;
 use bevy_platform::time::Instant;
 use bevy_tasks::{ComputeTaskPool, ParallelSliceMut};
 use core::marker::PhantomData;
@@ -31,7 +32,7 @@ pub struct PartitionLookup<F = ()>
 where
     F: SpatialHashFilter,
 {
-    partitions: HashMap<PartitionId, Partition>,
+    partitions: HashMap<PartitionId, Partition, PassHash>,
     pub(crate) reverse_map: CellHashMap<PartitionId>,
     next_partition: u64,
     spooky: PhantomData<F>,
@@ -55,7 +56,7 @@ impl<F> Deref for PartitionLookup<F>
 where
     F: SpatialHashFilter,
 {
-    type Target = HashMap<PartitionId, Partition>;
+    type Target = HashMap<PartitionId, Partition, PassHash>;
 
     fn deref(&self) -> &Self::Target {
         &self.partitions
@@ -187,7 +188,7 @@ where
         cells: Res<CellLookup<F>>,
         // Scratch space allocations
         mut added_neighbors: Local<Vec<PartitionId>>,
-        mut split_candidates_map: Local<HashMap<PartitionId, CellHashSet>>,
+        mut split_candidates_map: Local<HashMap<PartitionId, CellHashSet, PassHash>>,
         mut split_candidates: Local<Vec<(PartitionId, CellHashSet)>>,
         mut split_results: Local<Vec<Vec<SplitResult>>>,
     ) {
