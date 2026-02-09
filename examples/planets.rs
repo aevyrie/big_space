@@ -27,7 +27,7 @@ fn main() {
                 .build()
                 .enable::<BigSpaceValidationPlugin>(),
         ))
-        .insert_resource(AmbientLight {
+        .insert_resource(GlobalAmbientLight {
             color: Color::WHITE,
             brightness: 200.0,
             ..Default::default()
@@ -343,7 +343,9 @@ fn configure_skybox_image(
         // NOTE: PNGs do not have any metadata that could indicate they contain a cubemap texture,
         // so they appear as one texture. The following code reconfigures the texture as necessary.
         if image.texture_descriptor.array_layer_count() == 1 {
-            image.reinterpret_stacked_2d_as_array(image.height() / image.width());
+            image
+                .reinterpret_stacked_2d_as_array(image.height() / image.width())
+                .unwrap();
             image.texture_view_descriptor =
                 Some(bevy::render::render_resource::TextureViewDescriptor {
                     dimension: Some(bevy::render::render_resource::TextureViewDimension::Cube),

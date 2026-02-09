@@ -114,7 +114,7 @@ fn draw_partitions(
                 let center = [h.coord().x as i32, h.coord().y as i32, h.coord().z as i32];
                 let local_trans = Transform::from_translation(IVec3::from(center).as_vec3() * l)
                     .with_scale(Vec3::splat(l));
-                gizmos.cuboid(
+                gizmos.cube(
                     transform.mul_transform(local_trans),
                     Hsla::new(hue, 1.0, 0.5, 0.2),
                 );
@@ -127,7 +127,7 @@ fn draw_partitions(
         let center = min + (size) * 0.5;
         let local_trans = Transform::from_translation(center).with_scale(size + l * 2.0);
 
-        gizmos.cuboid(
+        gizmos.cube(
             transform.mul_transform(local_trans),
             Hsla::new(hue, 1.0, 0.5, 0.9),
         );
@@ -352,9 +352,9 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 padding: UiRect::all(Val::Px(16.)),
                 margin: UiRect::all(Val::Px(12.)),
                 border: UiRect::all(Val::Px(1.)),
+                border_radius: BorderRadius::all(Val::Px(8.0)),
                 ..default()
             },
-            BorderRadius::all(Val::Px(8.0)),
             BorderColor::all(Color::linear_rgba(0.03, 0.03, 0.03, 0.95)),
             BackgroundColor(Color::linear_rgba(0.012, 0.012, 0.012, 0.95)),
         ))
