@@ -8,7 +8,6 @@ use crate::hash::SpatialHashFilter;
 use crate::hash::SpatialHashSystems;
 use crate::partition::map::PartitionLookup;
 use crate::partition::PartitionId;
-use alloc::vec::Vec;
 use bevy_app::prelude::*;
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::prelude::*;
@@ -20,7 +19,7 @@ use core::marker::PhantomData;
 pub struct PartitionChangePlugin<F: SpatialHashFilter = ()>(PhantomData<F>);
 
 impl<F: SpatialHashFilter> PartitionChangePlugin<F> {
-    /// Create a new instance of [`crate::prelude::PartitionChangePlugin`].
+    /// Create a new instance of [`PartitionChangePlugin`].
     pub fn new() -> Self {
         Self(PhantomData)
     }
@@ -68,88 +67,87 @@ impl<F: SpatialHashFilter> FromWorld for PartitionEntities<F> {
 
 impl<F: SpatialHashFilter> PartitionEntities<F> {
     fn update(
-        mut entity_partitions: ResMut<Self>,
+        mut this: ResMut<Self>,
         cells: Res<CellLookup<F>>,
         changed_cells: Res<ChangedCells<F>>,
         all_hashes: Query<(Entity, &CellId), F>,
         mut old_reverse: Local<CellHashMap<PartitionId>>,
         partitions: Res<PartitionLookup<F>>,
     ) {
-        entity_partitions.changed.clear();
+        // 1. Clear the list of entities that have changed partitions
+        this.changed.clear();
 
-        // Compute cell-level partition changes: cells that remained occupied but changed partitions.
-        for (cell_hash, entry) in cells.all_entries() {
-            if let Some(&new_pid) = partitions.get(cell_hash) {
-                // Only mark entities whose previous recorded partition differs from the new one
-                for entity in entry.entities.iter().copied() {
-                    if let Some(prev_pid) = entity_partitions.map.get(&entity).copied() {
-                        if prev_pid != new_pid {
-                            if let Some((_from, to)) = entity_partitions.changed.get_mut(&entity) {
-                                *to = Some(new_pid);
-                            } else {
-                                entity_partitions
-                                    .changed
-                                    .insert(entity, (Some(prev_pid), Some(new_pid)));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Compute entity-level partition changes for entities that moved cells this frame,
-        // were newly spawned (added cell), or had cell removed (despawned/removed component).
+        // 2. Iterate through all entities that have moved between cells, using the already
+        // optimized `ChangedCells` resource used for grid cells. Check these moved entities to see
+        // if they have also changed partitions. This should also include spawned/despawned.
         for entity in changed_cells.iter() {
             match all_hashes.get(*entity) {
-                // Entity currently has a CellId
                 Ok((entity_id, cell_hash)) => {
                     let new_pid = partitions.get(cell_hash).copied();
-                    let old_pid = entity_partitions.map.get(&entity_id).copied();
-                    let record = match (old_pid, new_pid) {
+                    let old_pid = this.map.get(&entity_id).copied();
+                    let partition_change = match (old_pid, new_pid) {
                         (Some(o), Some(n)) if o == n => None, // Partition unchanged
                         (None, None) => None,                 // Nonsensical
-                        other => Some(other),
+                        other => Some(other),                 // Valid change
                     };
-                    if let Some((from, to)) = record {
-                        if let Some((existing_from, existing_to)) =
-                            entity_partitions.changed.get_mut(entity)
-                        {
+                    if let Some((from, to)) = partition_change {
+                        if let Some((existing_from, existing_to)) = this.changed.get_mut(entity) {
                             // Preserve the earliest known source if we already have one
                             if existing_from.is_none() {
                                 *existing_from = from;
                             }
                             *existing_to = to;
                         } else {
-                            entity_partitions.changed.insert(*entity, (from, to));
+                            this.changed.insert(*entity, (from, to));
                         }
                     }
                 }
-                // Entity no longer has a CellId -> removed/despawned
+                // If the query fails, the entity no longer has a `CellId` because it was removed
+                // or the entity was despawned.
                 Err(_) => {
-                    if let Some(prev_pid) = entity_partitions.map.get(entity).copied() {
-                        entity_partitions
-                            .changed
-                            .insert(*entity, (Some(prev_pid), None));
+                    if let Some(prev_pid) = this.map.get(entity).copied() {
+                        this.changed.insert(*entity, (Some(prev_pid), None));
                     }
                 }
             }
         }
 
-        // Apply the delta only after all changes have been collected.
-        let mut apply_list: Vec<(Entity, Option<PartitionId>)> =
-            Vec::with_capacity(entity_partitions.changed.len());
-        for (entity, (_from, to)) in entity_partitions.changed.iter() {
-            apply_list.push((*entity, *to));
-        }
-        for (entity, to) in apply_list {
-            match to {
-                Some(pid) => {
-                    entity_partitions.map.insert(entity, pid);
-                }
-                None => {
-                    entity_partitions.map.remove(&entity);
+        // 3. Consider entities that have not moved, but their partition has changed out from
+        // underneath them. This can happen when partitions merge and split - the entity did not
+        // move but is now in a new partition.
+        //
+        // Check these changes at the cell level so we scale with the number of cells, not the
+        // number of entities, and additionally avoid many lookups.
+        //
+        // It's important this is run after the moved-entity checks in step 2, because the entities
+        // found from cell changes may *also* have moved, and we would miss that information if we
+        // only used cell-level tracking.
+        for (cell_id, entry) in cells.all_entries() {
+            if let Some(&new_pid) = partitions.get(cell_id) {
+                if let Some(&old_pid) = old_reverse.get(cell_id) {
+                    if new_pid != old_pid {
+                        for entity in entry.entities.iter().copied() {
+                            this.changed
+                                .entry(entity)
+                                // Don't overwrite entities that moved cells, they have already been tracked.
+                                .or_insert((Some(old_pid), Some(new_pid)));
+                        }
+                    }
                 }
             }
+        }
+
+        // 4. Apply the changes to the entity partition map after all changes have been collected.
+        let PartitionEntities { map, changed, .. } = this.as_mut();
+        for (entity, (_source, destination)) in changed.iter() {
+            match destination {
+                Some(pid) => {
+                    map.insert(*entity, *pid);
+                }
+                None => {
+                    map.remove(entity);
+                }
+            };
         }
 
         // Snapshot the cell->partition mapping to compute deltas next update
