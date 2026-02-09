@@ -74,6 +74,7 @@ bevy = { version = "0.18.0", default-features = false, features = [
   "bevy_asset",
   "bevy_color",
   "bevy_gizmos",
+  "bevy_gizmos_render",
   "bevy_gltf",
   "bevy_log",
   "bevy_pbr",
