@@ -74,7 +74,7 @@ turborand = "0.10"
 criterion = "0.8"
 
 [lints.clippy]
-doc_markdown = "warn"c
+doc_markdown = "warn"
 manual_let_else = "warn"
 match_same_arms = "warn"
 redundant_closure_for_method_calls = "warn"
