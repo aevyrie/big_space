@@ -45,9 +45,15 @@ where
             .add_systems(
                 PostUpdate,
                 (
+                    ChangedCells::<F>::clear.in_set(SpatialHashSystems::ClearChangedCells),
                     CellId::update::<F>
                         .in_set(SpatialHashSystems::UpdateCellHashes)
-                        .after(BigSpaceSystems::RecenterLargeTransforms),
+                        .after(BigSpaceSystems::RecenterLargeTransforms)
+                        .after(SpatialHashSystems::ClearChangedCells),
+                    CellId::initialize_stationary::<F>
+                        .in_set(SpatialHashSystems::UpdateCellHashes)
+                        .after(CellId::update::<F>)
+                        .after(SpatialHashSystems::ClearChangedCells),
                     CellLookup::<F>::update
                         .in_set(SpatialHashSystems::UpdateCellLookup)
                         .after(SpatialHashSystems::UpdateCellHashes),
@@ -73,6 +79,8 @@ pub enum SpatialHashSystems {
     UpdatePartitionLookup,
     /// [`PartitionEntities`] updated.
     UpdatePartitionChange,
+    /// Clear the [`ChangedCells`] resource.
+    ClearChangedCells,
 }
 
 /// Used as a [`QueryFilter`] to include or exclude certain types of entities from spatial
@@ -118,9 +126,24 @@ impl<F: SpatialHashFilter> Default for ChangedCells<F> {
 }
 
 impl<F: SpatialHashFilter> ChangedCells<F> {
+    /// Clear the list of updated entities.
+    pub fn clear(mut this: ResMut<Self>) {
+        this.updated.clear();
+    }
+
     /// Iterate over all entities that have moved between cells.
     pub fn iter(&self) -> impl Iterator<Item = &Entity> {
         self.updated.iter()
+    }
+
+    /// Returns the number of entities that have moved between cells this frame.
+    pub fn len(&self) -> usize {
+        self.updated.len()
+    }
+
+    /// Mark an entity as having changed grid cells.
+    pub fn insert(&mut self, entity: Entity) {
+        self.updated.insert(entity);
     }
 }
 
@@ -360,6 +383,57 @@ mod tests {
             map.get(&zero_hash).unwrap().entities.iter().count(),
             2,
             "There are two entities without the player component"
+        );
+    }
+
+    /// Regression test for the spatial_hash example crash.
+    ///
+    /// On the first frame an entity spawned in `Startup` has its [`CellId`] inserted via deferred
+    /// commands during [`SpatialHashSystems::UpdateCellHashes`].  Any user system that queries the
+    /// [`CellLookup`] must therefore be ordered *after*
+    /// [`SpatialHashSystems::UpdateCellLookup`]; otherwise the entity is not yet present in the
+    /// map and an unwrap will panic.
+    #[test]
+    fn cell_lookup_populated_when_ordered_after_update() {
+        use bevy::prelude::*;
+
+        static ENTITY: OnceLock<Entity> = OnceLock::new();
+        // Set inside the PostUpdate system when the entity's CellId is found in the lookup.
+        static FOUND: OnceLock<()> = OnceLock::new();
+
+        let setup = |mut commands: Commands| {
+            commands.spawn_big_space_default(|root| {
+                let entity = root.spawn_spatial(CellCoord::ZERO).id();
+                ENTITY.set(entity).ok();
+            });
+        };
+
+        // This system mimics `move_player` from the spatial_hash example.
+        // It runs BEFORE UpdateCellLookup (wrong ordering), so the entity should NOT be
+        // in the lookup on the first frame – replicating the crash.
+        let check = |all_hashes: Query<(Entity, &CellId)>, lookup: Res<CellLookup>| {
+            let target = *ENTITY.get().unwrap();
+            if let Some((_, hash)) = all_hashes.iter().find(|(e, _)| *e == target) {
+                if lookup.get(hash).is_some() {
+                    FOUND.set(()).ok();
+                }
+            }
+        };
+
+        let mut app = App::new();
+        app.add_plugins((BigSpaceMinimalPlugins, CellHashingPlugin::default()))
+            .add_systems(Startup, setup)
+            .add_systems(
+                PostUpdate,
+                check.after(SpatialHashSystems::UpdateCellLookup),
+            );
+
+        app.update();
+
+        assert!(
+            FOUND.get().is_some(),
+            "Entity spawned in Startup should be in CellLookup when the user system runs \
+             after SpatialHashSystems::UpdateCellLookup"
         );
     }
 

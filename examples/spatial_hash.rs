@@ -5,7 +5,9 @@ use bevy::{
     render::view::Hdr, window::CursorOptions,
 };
 use bevy_ecs::entity::EntityHasher;
+use bevy_ecs::schedule::ScheduleCleanupPolicy;
 use bevy_math::DVec3;
+use bevy_tasks::{available_parallelism, ComputeTaskPool, TaskPoolBuilder};
 use big_space::prelude::*;
 use core::hash::Hasher;
 use noise::{NoiseFn, Simplex};
@@ -16,29 +18,52 @@ const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
 const MOVEMENT_SPEED: f32 = 5.0;
-const PERCENT_STATIC: f32 = 0.9;
+const PERCENT_STATIC: f32 = 1.0;
 
 fn main() {
-    App::new()
-        .add_plugins((
-            DefaultPlugins.build().disable::<TransformPlugin>(),
-            BigSpaceDefaultPlugins,
-            CellHashingPlugin::default(),
-            PartitionPlugin::default(),
-            PartitionChangePlugin::default(),
-        ))
-        .add_systems(Startup, (spawn, setup_ui))
-        .add_systems(
-            PostUpdate,
-            (
-                move_player.after(TransformSystems::Propagate),
-                draw_partitions.after(SpatialHashSystems::UpdatePartitionLookup),
-                highlight_changed_entities.after(draw_partitions),
-            ),
-        )
-        .add_systems(Update, (cursor_grab, spawn_spheres))
-        .init_resource::<MaterialPresets>()
-        .run();
+    ComputeTaskPool::get_or_init(|| {
+        TaskPoolBuilder::new()
+            .num_threads(available_parallelism())
+            .build()
+    });
+
+    let mut app = App::new();
+    app.add_plugins((
+        DefaultPlugins.build().disable::<TransformPlugin>(),
+        BigSpaceDefaultPlugins,
+        CellHashingPlugin::default(),
+        PartitionPlugin::default(),
+        PartitionChangePlugin::default(),
+    ))
+    .add_systems(Startup, (spawn, setup_ui))
+    .add_systems(
+        PostUpdate,
+        (
+            move_player
+                .after(TransformSystems::Propagate)
+                .after(SpatialHashSystems::UpdateCellLookup),
+            draw_partitions.after(SpatialHashSystems::UpdatePartitionLookup),
+            highlight_changed_entities.after(draw_partitions),
+        ),
+    )
+    .add_systems(Update, (cursor_grab, spawn_spheres))
+    .init_resource::<MaterialPresets>();
+
+    // These two removed systems kill perf because of table scans
+    app.remove_systems_in_set(
+        PostUpdate,
+        bevy::app::update_reparented::<ComputedUiTargetCamera, (), ChildOf>,
+        ScheduleCleanupPolicy::default(),
+    )
+    .ok();
+    app.remove_systems_in_set(
+        PostUpdate,
+        bevy::app::update_reparented::<ComputedUiRenderTargetInfo, (), ChildOf>,
+        ScheduleCleanupPolicy::default(),
+    )
+    .ok();
+
+    app.run();
 }
 
 #[derive(Component)]
@@ -163,10 +188,11 @@ fn move_player(
 
     let t = time.elapsed_secs() * 1.0;
     let scale = MOVEMENT_SPEED / HALF_WIDTH;
+    let num_moving = ((1.0 - PERCENT_STATIC) * n_entities as f32) as usize;
     if scale.abs() > 0.0 {
         // Avoid change detection
         for (i, (mut transform, _, _)) in non_player.iter_mut().enumerate() {
-            if i < ((1.0 - PERCENT_STATIC) * n_entities as f32) as usize {
+            if i < num_moving {
                 transform.translation.x += t.sin() * scale;
                 transform.translation.y += t.cos() * scale;
                 transform.translation.z += (t * 2.3).sin() * scale;
@@ -297,25 +323,46 @@ fn spawn_spheres(
     };
 
     let entity = grid.single()?;
+    let num_moving = ((1.0 - PERCENT_STATIC) * n_spawn as f32) as usize;
     commands.entity(entity).with_children(|builder| {
-        for value in sample_noise(n_spawn, &Simplex::new(345612), &Rng::new()) {
+        for (i, value) in sample_noise(n_spawn, &Simplex::new(345612), &Rng::new()).enumerate() {
             let hash = CellId::__new_manual(entity, &CellCoord::default());
-            builder.spawn((
-                Transform::from_xyz(value.x, value.y, value.z),
-                GlobalTransform::default(),
-                CellCoord::default(),
-                CellHash::from(hash),
-                hash,
-                NonPlayer,
-                Mesh3d(material_presets.sphere.clone()),
-                MeshMaterial3d(material_presets.default.clone()),
-                bevy_camera::visibility::VisibilityRange {
-                    start_margin: 1.0..5.0,
-                    end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                    use_aabb: false,
-                },
-                bevy_camera::visibility::NoFrustumCulling,
-            ));
+            if i < num_moving {
+                builder.spawn((
+                    Transform::from_xyz(value.x, value.y, value.z),
+                    GlobalTransform::default(),
+                    CellCoord::default(),
+                    CellHash::from(hash),
+                    hash,
+                    NonPlayer,
+                    Mesh3d(material_presets.sphere.clone()),
+                    MeshMaterial3d(material_presets.default.clone()),
+                    bevy_camera::visibility::VisibilityRange {
+                        start_margin: 1.0..5.0,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                        use_aabb: false,
+                    },
+                    bevy_camera::visibility::NoFrustumCulling,
+                ));
+            } else {
+                builder.spawn((
+                    Transform::from_xyz(value.x, value.y, value.z),
+                    GlobalTransform::default(),
+                    CellCoord::default(),
+                    CellHash::from(hash),
+                    hash,
+                    NonPlayer,
+                    Mesh3d(material_presets.sphere.clone()),
+                    MeshMaterial3d(material_presets.default.clone()),
+                    bevy_camera::visibility::VisibilityRange {
+                        start_margin: 1.0..5.0,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                        use_aabb: false,
+                    },
+                    bevy_camera::visibility::NoFrustumCulling,
+                    Stationary,
+                ));
+            }
         }
     });
     Ok(())

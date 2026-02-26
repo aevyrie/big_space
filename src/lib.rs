@@ -236,7 +236,7 @@ pub mod prelude {
     pub use grid::{
         cell::CellCoord,
         local_origin::{Grids, GridsMut, LocalFloatingOrigin},
-        Grid,
+        Grid, Stationary, StationaryComputed,
     };
     pub use hash::{
         component::{CellHash, CellHashMap, CellHashSet, CellId},

@@ -82,7 +82,10 @@ impl CellCoord {
     pub fn recenter_large_transforms(
         mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
-        mut changed_transform: Query<(&mut Self, &mut Transform, &ChildOf), Changed<Transform>>,
+        mut changed_transform: Query<
+            (&mut Self, &mut Transform, &ChildOf),
+            (Changed<Transform>, Without<Stationary>),
+        >,
     ) {
         let start = Instant::now();
         changed_transform

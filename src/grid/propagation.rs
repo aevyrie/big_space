@@ -19,14 +19,16 @@ impl Grid {
     /// Update the `GlobalTransform` of entities with a [`CellCoord`], using the [`Grid`] the entity
     /// belongs to.
     pub fn propagate_high_precision(
-        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         grids: Query<&Grid>,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         mut entities: ParamSet<(
             Query<(
                 Ref<CellCoord>,
                 Ref<Transform>,
                 Ref<ChildOf>,
                 &mut GlobalTransform,
+                Option<&Stationary>,
+                Option<&StationaryComputed>,
             )>,
             Query<(&Grid, &mut GlobalTransform), With<BigSpace>>,
         )>,
@@ -38,10 +40,8 @@ impl Grid {
         // parallelism. The only thing I can see to make this faster is archetype change detection.
         // Change filters are not archetype filters, so they scale with the total number of entities
         // that match the query, regardless of change.
-        entities
-            .p0()
-            .par_iter_mut()
-            .for_each(|(cell, transform, parent, mut global_transform)| {
+        entities.p0().par_iter_mut().for_each(
+            |(cell, transform, parent, mut global_transform, stationary, computed)| {
                 if let Ok(grid) = grids.get(parent.parent()) {
                     // Optimization: we don't need to recompute the transforms if the entity hasn't
                     // moved and the floating origin's local origin in that grid hasn't changed.
@@ -55,15 +55,20 @@ impl Grid {
                     // the amount of computation needed that grid. In the future, we might be able
                     // to spread that work across grids, entities far away can maybe be delayed for
                     // a grid or two without being noticeable.
+                    let is_stationary = stationary.is_some();
+                    let is_computed = computed.is_some();
+
                     if !grid.local_floating_origin().is_local_origin_unchanged()
-                        || transform.is_changed()
+                        || (transform.is_changed() && !is_stationary)
                         || cell.is_changed()
                         || parent.is_changed()
+                        || (is_stationary && !is_computed)
                     {
                         *global_transform = grid.global_transform(&cell, &transform);
                     }
                 }
-            });
+            },
+        );
 
         // Root grids
         //

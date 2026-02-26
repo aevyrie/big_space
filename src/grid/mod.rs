@@ -13,6 +13,21 @@ pub mod cell;
 pub mod local_origin;
 pub mod propagation;
 
+#[derive(Debug, Clone, Reflect, Component, Default)]
+#[reflect(Component, Default)]
+/// A component that optimizes entities that do not move.
+///
+/// When an entity is marked as stationary, the plugin will skip most per-frame computations for it.
+/// This includes grid recentering and spatial hashing updates. The `CellCoord` and `CellId`
+/// will only be computed when the entity is spawned or when its parent changes.
+pub struct Stationary;
+
+/// Internal marker component used to identify [`Stationary`] entities that have had their initial
+/// grid cell and spatial hash computed.
+#[derive(Debug, Clone, Reflect, Component, Default)]
+#[reflect(Component, Default)]
+pub struct StationaryComputed;
+
 /// A component that defines a spatial grid that child entities are located on. Child entities are
 /// located on this grid with the [`CellCoord`] component.
 ///

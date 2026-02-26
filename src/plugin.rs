@@ -76,6 +76,8 @@ impl Plugin for BigSpaceCorePlugin {
             .register_type::<GlobalTransform>()
             .register_type::<TransformTreeChanged>()
             .register_type::<CellCoord>()
+            .register_type::<Stationary>()
+            .register_type::<StationaryComputed>()
             .register_type::<Grid>()
             .register_type::<BigSpace>()
             .register_type::<FloatingOrigin>()
