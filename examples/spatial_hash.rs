@@ -335,14 +335,14 @@ fn spawn_spheres(
                     CellHash::from(hash),
                     hash,
                     NonPlayer,
-                    Mesh3d(material_presets.sphere.clone()),
-                    MeshMaterial3d(material_presets.default.clone()),
-                    bevy_camera::visibility::VisibilityRange {
-                        start_margin: 1.0..5.0,
-                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                        use_aabb: false,
-                    },
-                    bevy_camera::visibility::NoFrustumCulling,
+                    // Mesh3d(material_presets.sphere.clone()),
+                    // MeshMaterial3d(material_presets.default.clone()),
+                    // bevy_camera::visibility::VisibilityRange {
+                    //     start_margin: 1.0..5.0,
+                    //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                    //     use_aabb: false,
+                    // },
+                    // bevy_camera::visibility::NoFrustumCulling,
                 ));
             } else {
                 builder.spawn((
@@ -352,14 +352,14 @@ fn spawn_spheres(
                     CellHash::from(hash),
                     hash,
                     NonPlayer,
-                    Mesh3d(material_presets.sphere.clone()),
-                    MeshMaterial3d(material_presets.default.clone()),
-                    bevy_camera::visibility::VisibilityRange {
-                        start_margin: 1.0..5.0,
-                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                        use_aabb: false,
-                    },
-                    bevy_camera::visibility::NoFrustumCulling,
+                    // Mesh3d(material_presets.sphere.clone()),
+                    // MeshMaterial3d(material_presets.default.clone()),
+                    // bevy_camera::visibility::VisibilityRange {
+                    //     start_margin: 1.0..5.0,
+                    //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                    //     use_aabb: false,
+                    // },
+                    // bevy_camera::visibility::NoFrustumCulling,
                     Stationary,
                 ));
             }

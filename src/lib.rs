@@ -216,6 +216,7 @@ pub mod grid;
 pub mod hash;
 pub mod partition;
 pub mod plugin;
+pub mod stationary;
 pub mod timing;
 pub mod validation;
 pub mod world_query;
@@ -236,7 +237,7 @@ pub mod prelude {
     pub use grid::{
         cell::CellCoord,
         local_origin::{Grids, GridsMut, LocalFloatingOrigin},
-        Grid, Stationary, StationaryComputed,
+        Grid,
     };
     pub use hash::{
         component::{CellHash, CellHashMap, CellHashSet, CellId},
@@ -250,6 +251,7 @@ pub mod prelude {
     };
     pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;
+    pub use stationary::{BigSpaceStationaryPlugin, GridDirtyTick, Stationary, StationaryComputed};
     pub use world_query::{CellTransform, CellTransformOwned, CellTransformReadOnly};
 
     #[cfg(feature = "camera")]
