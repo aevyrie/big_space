@@ -418,6 +418,43 @@ mod tests {
     use crate::prelude::*;
     use bevy::prelude::*;
 
+    /// Verifies that `traverse_grid` correctly recurses into sub-grids.
+    ///
+    /// Hierarchy: Root BigSpace → SubGrid (CellCoord + Grid + Transform(100,0,0))
+    ///                                  → Entity (CellCoord + Transform(50,0,0))
+    ///
+    /// Entity's GT should be 100 + 50 = 150 from the root FO.
+    #[test]
+    fn sub_grid_gt_is_correct() {
+        #[derive(Component)]
+        struct TestEntity;
+
+        let mut app = App::new();
+        app.add_plugins(BigSpaceMinimalPlugins)
+            .add_systems(Startup, |mut commands: Commands| {
+                commands.spawn_big_space_default(|root| {
+                    root.spawn_spatial(FloatingOrigin);
+                    // Sub-grid at (100, 0, 0) in root grid containing an entity at (50, 0, 0).
+                    root.with_grid_default(|sub_grid| {
+                        sub_grid.insert(Transform::from_xyz(100.0, 0.0, 0.0));
+                        sub_grid.spawn_spatial((Transform::from_xyz(50.0, 0.0, 0.0), TestEntity));
+                    });
+                });
+            });
+
+        app.update();
+
+        let mut q = app
+            .world_mut()
+            .query_filtered::<&GlobalTransform, With<TestEntity>>();
+        let gt = *q.single(app.world()).unwrap();
+        assert_eq!(
+            gt.translation(),
+            Vec3::new(150.0, 0.0, 0.0),
+            "Entity in sub-grid should have GT = sub-grid pos + entity pos = 150"
+        );
+    }
+
     #[test]
     fn low_precision_in_big_space() {
         #[derive(Component)]

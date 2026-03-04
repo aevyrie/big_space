@@ -47,6 +47,11 @@ impl GridDirtyTick {
 /// of changed non-stationary entities and marks each ancestor [`Grid`] dirty via
 /// [`GridDirtyTick`]. It also auto-inserts [`GridDirtyTick`] on any [`Grid`] that doesn't
 /// have it yet.
+///
+/// Additionally, any [`Grid`] whose [`Children`] list changed this frame (entities added
+/// or removed) marks itself and all ancestor grids dirty, ensuring newly spawned entities
+/// (including [`Stationary`] ones excluded by `changed`) always get their initial
+/// [`GlobalTransform`] computed even if the grid subtree was previously clean.
 pub(crate) fn mark_dirty_subtrees(
     mut commands: Commands,
     system_ticks: SystemChangeTick,
@@ -60,6 +65,9 @@ pub(crate) fn mark_dirty_subtrees(
             Or<(Changed<Transform>, Changed<CellCoord>, Changed<ChildOf>)>,
         ),
     >,
+    // Catches grids that gained or lost children this frame (including newly spawned
+    // Stationary entities excluded by `changed`) without scanning all CellCoord entities.
+    grids_with_changed_children: Query<Entity, (With<Grid>, Changed<Children>)>,
 ) {
     // Auto-insert on any Grid that doesn't have GridDirtyTick yet.
     // Commands are deferred, so newly inserted grids treat themselves as dirty (correct for
@@ -71,22 +79,43 @@ pub(crate) fn mark_dirty_subtrees(
     let current_tick = system_ticks.this_run().get();
 
     for parent_rel in changed.iter() {
-        let mut ancestor = parent_rel.parent();
-        loop {
-            let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) else {
-                break;
-            };
-            // bypass_change_detection to avoid spurious Changed<GridDirtyTick> noise
-            let d = dirty.bypass_change_detection();
-            // Early exit: if already marked this tick, all ancestors were marked too
-            if d.0 == current_tick {
-                break;
-            }
-            d.0 = current_tick;
-            match parents.get(ancestor) {
-                Ok(p) => ancestor = p.parent(),
-                Err(_) => break,
-            }
+        mark_ancestor_grids(
+            parent_rel.parent(),
+            current_tick,
+            &mut dirty_ticks,
+            &parents,
+        );
+    }
+
+    // Mark the grid itself (and its ancestors) dirty whenever its children list changes.
+    // This ensures a freshly spawned child entity receives its initial GlobalTransform
+    // even when the grid's subtree was otherwise clean.
+    for grid_entity in grids_with_changed_children.iter() {
+        mark_ancestor_grids(grid_entity, current_tick, &mut dirty_ticks, &parents);
+    }
+}
+
+fn mark_ancestor_grids(
+    start: Entity,
+    current_tick: u32,
+    dirty_ticks: &mut Query<&mut GridDirtyTick>,
+    parents: &Query<&ChildOf>,
+) {
+    let mut ancestor = start;
+    loop {
+        let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) else {
+            break;
+        };
+        // bypass_change_detection to avoid spurious Changed<GridDirtyTick> noise
+        let d = dirty.bypass_change_detection();
+        // Early exit: if already marked this tick, all ancestors were marked too
+        if d.0 == current_tick {
+            break;
+        }
+        d.0 = current_tick;
+        match parents.get(ancestor) {
+            Ok(p) => ancestor = p.parent(),
+            Err(_) => break,
         }
     }
 }
@@ -107,8 +136,9 @@ pub(crate) fn mark_dirty_subtrees(
 ///
 /// # Note
 ///
-/// This plugin is **not** included in [`BigSpaceMinimalPlugins`] or [`BigSpaceDefaultPlugins`].
-/// Add it manually when you want the optimization.
+/// This plugin is included in [`BigSpaceDefaultPlugins`] but **not** in
+/// [`BigSpaceMinimalPlugins`]. Add it manually alongside [`BigSpaceMinimalPlugins`] when you
+/// want the optimization without the full default plugin set.
 pub struct BigSpaceStationaryPlugin;
 
 impl Plugin for BigSpaceStationaryPlugin {

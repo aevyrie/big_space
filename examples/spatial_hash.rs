@@ -5,7 +5,6 @@ use bevy::{
     render::view::Hdr, window::CursorOptions,
 };
 use bevy_ecs::entity::EntityHasher;
-use bevy_ecs::schedule::ScheduleCleanupPolicy;
 use bevy_math::DVec3;
 use bevy_tasks::{available_parallelism, ComputeTaskPool, TaskPoolBuilder};
 use big_space::prelude::*;
@@ -48,20 +47,6 @@ fn main() {
     )
     .add_systems(Update, (cursor_grab, spawn_spheres))
     .init_resource::<MaterialPresets>();
-
-    // These two removed systems kill perf because of table scans
-    app.remove_systems_in_set(
-        PostUpdate,
-        bevy::app::update_reparented::<ComputedUiTargetCamera, (), ChildOf>,
-        ScheduleCleanupPolicy::default(),
-    )
-    .ok();
-    app.remove_systems_in_set(
-        PostUpdate,
-        bevy::app::update_reparented::<ComputedUiRenderTargetInfo, (), ChildOf>,
-        ScheduleCleanupPolicy::default(),
-    )
-    .ok();
 
     app.run();
 }
@@ -335,14 +320,14 @@ fn spawn_spheres(
                     CellHash::from(hash),
                     hash,
                     NonPlayer,
-                    // Mesh3d(material_presets.sphere.clone()),
-                    // MeshMaterial3d(material_presets.default.clone()),
-                    // bevy_camera::visibility::VisibilityRange {
-                    //     start_margin: 1.0..5.0,
-                    //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                    //     use_aabb: false,
-                    // },
-                    // bevy_camera::visibility::NoFrustumCulling,
+                    Mesh3d(material_presets.sphere.clone()),
+                    MeshMaterial3d(material_presets.default.clone()),
+                    bevy_camera::visibility::VisibilityRange {
+                        start_margin: 1.0..5.0,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                        use_aabb: false,
+                    },
+                    bevy_camera::visibility::NoFrustumCulling,
                 ));
             } else {
                 builder.spawn((
@@ -352,14 +337,14 @@ fn spawn_spheres(
                     CellHash::from(hash),
                     hash,
                     NonPlayer,
-                    // Mesh3d(material_presets.sphere.clone()),
-                    // MeshMaterial3d(material_presets.default.clone()),
-                    // bevy_camera::visibility::VisibilityRange {
-                    //     start_margin: 1.0..5.0,
-                    //     end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
-                    //     use_aabb: false,
-                    // },
-                    // bevy_camera::visibility::NoFrustumCulling,
+                    Mesh3d(material_presets.sphere.clone()),
+                    MeshMaterial3d(material_presets.default.clone()),
+                    bevy_camera::visibility::VisibilityRange {
+                        start_margin: 1.0..5.0,
+                        end_margin: HALF_WIDTH * CELL_WIDTH * 0.5..HALF_WIDTH * CELL_WIDTH * 0.8,
+                        use_aabb: false,
+                    },
+                    bevy_camera::visibility::NoFrustumCulling,
                     Stationary,
                 ));
             }
