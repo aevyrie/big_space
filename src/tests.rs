@@ -121,6 +121,92 @@ fn stationary_entities_do_not_recenter() {
 }
 
 #[test]
+fn remove_stationary_move_then_readd() {
+    let mut app = App::new();
+    app.add_plugins(BigSpaceMinimalPlugins)
+        .add_plugins(BigSpaceStationaryPlugin)
+        .add_plugins(CellHashingPlugin::default());
+
+    let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+
+    // FO at origin
+    app.world_mut()
+        .spawn((CellCoord::default(), FloatingOrigin))
+        .set_parent_in_place(grid_entity);
+
+    let entity = app
+        .world_mut()
+        .spawn((
+            Transform::from_translation(Vec3::ZERO),
+            CellCoord::new(1, 0, 0),
+            Stationary,
+        ))
+        .set_parent_in_place(grid_entity)
+        .id();
+
+    // Stabilize
+    app.update();
+    app.update();
+
+    let cell_before = *app.world().get::<CellCoord>(entity).unwrap();
+    assert_eq!(cell_before, CellCoord::new(1, 0, 0));
+
+    // Remove Stationary, move the entity far enough to trigger recentering, then re-add
+    app.world_mut().entity_mut(entity).remove::<Stationary>();
+    app.update(); // cleanup_removed_stationary removes StationaryComputed
+
+    app.world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
+        .translation = Vec3::new(100_000.0, 0.0, 0.0);
+    app.update(); // recentering runs because entity is no longer Stationary
+
+    let cell_after_move = *app.world().get::<CellCoord>(entity).unwrap();
+    assert_ne!(
+        cell_after_move,
+        CellCoord::new(1, 0, 0),
+        "Entity should have been recentered into a new cell after removing Stationary"
+    );
+
+    // Re-add Stationary
+    app.world_mut().entity_mut(entity).insert(Stationary);
+    app.update();
+
+    // Verify StationaryComputed is re-applied and the entity is in the CellLookup
+    assert!(
+        app.world().get::<StationaryComputed>(entity).is_some(),
+        "StationaryComputed should be re-inserted after re-adding Stationary"
+    );
+
+    let cell_id = *app.world().get::<CellId>(entity).unwrap();
+    let lookup = app.world().resource::<CellLookup<()>>();
+    assert!(
+        lookup
+            .get(&cell_id)
+            .unwrap()
+            .entities()
+            .any(|e| e == entity),
+        "Entity should be in CellLookup after re-adding Stationary"
+    );
+
+    // Verify it no longer recenters
+    let cell_snapshot = *app.world().get::<CellCoord>(entity).unwrap();
+    app.world_mut()
+        .entity_mut(entity)
+        .get_mut::<Transform>()
+        .unwrap()
+        .translation = Vec3::new(200_000.0, 0.0, 0.0);
+    app.update();
+
+    assert_eq!(
+        *app.world().get::<CellCoord>(entity).unwrap(),
+        cell_snapshot,
+        "After re-adding Stationary, recentering should be skipped again"
+    );
+}
+
+#[test]
 fn stationary_entities_are_correctly_initialized() {
     let mut app = App::new();
     app.add_plugins(BigSpaceMinimalPlugins);
@@ -166,7 +252,7 @@ fn stationary_entity_spawned_with_cellid_is_registered() {
     let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
 
     let coord = CellCoord::new(1, 2, 3);
-    let cell_id = CellId::__new_manual(grid_entity, &coord);
+    let cell_id = CellId::new_manual(grid_entity, &coord);
     let cell_hash = CellHash::from(cell_id);
 
     let stationary = app
@@ -208,7 +294,7 @@ fn moving_entity_spawned_with_cellid_is_registered() {
     let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
 
     let coord = CellCoord::new(1, 2, 3);
-    let cell_id = CellId::__new_manual(grid_entity, &coord);
+    let cell_id = CellId::new_manual(grid_entity, &coord);
     let cell_hash = CellHash::from(cell_id);
 
     let _moving = app

@@ -311,7 +311,7 @@ fn spawn_spheres(
     let num_moving = ((1.0 - PERCENT_STATIC) * n_spawn as f32) as usize;
     commands.entity(entity).with_children(|builder| {
         for (i, value) in sample_noise(n_spawn, &Simplex::new(345612), &Rng::new()).enumerate() {
-            let hash = CellId::__new_manual(entity, &CellCoord::default());
+            let hash = CellId::new_manual(entity, &CellCoord::default());
             if i < num_moving {
                 builder.spawn((
                     Transform::from_xyz(value.x, value.y, value.z),

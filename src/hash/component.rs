@@ -124,9 +124,16 @@ impl CellId {
         }
     }
 
-    /// Do not use this to manually construct this component. You've been warned.
-    #[doc(hidden)]
-    pub fn __new_manual(parent: Entity, cell: &CellCoord) -> Self {
+    /// Manually construct a [`CellId`] from a grid entity and cell coordinate.
+    ///
+    /// # Warning
+    ///
+    /// Prefer letting the plugin compute [`CellId`] automatically. Only use this when you
+    /// need to pre-compute a [`CellId`] at spawn time for batch insertion (e.g. to avoid
+    /// the one-frame delay of deferred commands). The caller is responsible for ensuring
+    /// that `parent` is a valid [`Grid`] entity and that `cell` matches the entity's
+    /// [`CellCoord`].
+    pub fn new_manual(parent: Entity, cell: &CellCoord) -> Self {
         Self::from_parent(parent, cell)
     }
 

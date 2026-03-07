@@ -4,7 +4,10 @@
 
 use crate::prelude::*;
 use bevy_app::prelude::*;
-use bevy_ecs::{change_detection::Tick, prelude::*, system::SystemChangeTick};
+use bevy_ecs::{
+    change_detection::Tick, lifecycle::HookContext, prelude::*, system::SystemChangeTick,
+    world::DeferredWorld,
+};
 use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 
@@ -13,9 +16,25 @@ use bevy_transform::prelude::*;
 /// When an entity is marked as stationary, the plugin will skip most per-frame computations for it.
 /// This includes grid recentering and spatial hashing updates. The `CellCoord` and `CellId`
 /// will only be computed when the entity is spawned or when its parent changes.
+///
+/// # Important
+///
+/// Do **not** move a `Stationary` entity by mutating its [`Transform`]. Stationary entities are
+/// excluded from grid-cell recentering, so a large translation will never be snapped back into
+/// the correct cell. If you need to relocate a stationary entity, remove the `Stationary`
+/// component first, move the entity, and then re-add it.
 #[derive(Debug, Clone, Reflect, Component, Default)]
+#[component(on_remove = Stationary::on_remove)]
 #[reflect(Component, Default)]
 pub struct Stationary;
+
+impl Stationary {
+    /// Removes [`StationaryComputed`] when [`Stationary`] is removed, so that the entity
+    /// re-enters the normal update path for recentering and spatial hashing.
+    fn on_remove(mut world: DeferredWorld, ctx: HookContext) {
+        world.commands().entity(ctx.entity).remove::<StationaryComputed>();
+    }
+}
 
 /// Internal marker component used to identify [`Stationary`] entities that have had their initial
 /// grid cell and spatial hash computed.

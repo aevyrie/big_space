@@ -54,13 +54,14 @@ impl Grid {
                 With<BigSpace>,
             >,
         )>,
+        mut root_tasks: Local<Vec<(Grid, Vec<Entity>)>>,
     ) {
         let start = bevy_platform::time::Instant::now();
 
         // Phase 1: Process root BigSpace grids.
         // Collect traversal tasks (cloned grid data + child entity lists) so we can release p1
-        // before accessing p0.
-        let mut root_tasks: Vec<(Grid, Vec<Entity>)> = Vec::new();
+        // before accessing p0. Uses Local to reuse allocations across frames.
+        root_tasks.clear();
 
         for (grid, dirty_tick, children, mut gt) in params.p1().iter_mut() {
             // Update root GT when the floating origin's position in this grid changed.
@@ -355,8 +356,8 @@ impl Grid {
             (Ref<Transform>, &mut GlobalTransform, Option<&Children>),
             (
                 With<ChildOf>,
-                Without<CellCoord>, // ***ADDED*** Only recurse low-precision entities
-                Without<Grid>,      // ***ADDED*** Only recurse low-precision entities
+                Without<CellCoord>,
+                Without<Grid>,
             ),
         >,
         parent_query: &Query<
