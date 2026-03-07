@@ -55,7 +55,13 @@ impl Grid {
         }
     }
 
-    /// Get the position of the floating origin relative to the current grid.
+    /// The [`LocalFloatingOrigin`] for this grid, describing where the floating origin's grid
+    /// cell origin is located relative to this grid.
+    ///
+    /// Computed each frame by [`LocalFloatingOrigin::compute_all`] before transform propagation.
+    /// Use [`LocalFloatingOrigin::is_local_origin_unchanged`] to check whether the relationship
+    /// between the floating origin and this grid has changed since the last frame - when
+    /// unchanged, entities in this grid that haven't moved can skip GT recomputation.
     #[inline]
     pub fn local_floating_origin(&self) -> &LocalFloatingOrigin {
         &self.local_floating_origin

@@ -45,7 +45,9 @@ where
             .add_systems(
                 PostUpdate,
                 (
-                    ChangedCells::<F>::clear.in_set(SpatialHashSystems::ClearChangedCells),
+                    ChangedCells::<F>::clear
+                        .in_set(SpatialHashSystems::ClearChangedCells)
+                        .after(BigSpaceSystems::Init),
                     CellId::update::<F>
                         .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(BigSpaceSystems::RecenterLargeTransforms)

@@ -418,7 +418,7 @@ fn stationary_entity_gt_updates_when_fo_moves() {
         .set_parent_in_place(root)
         .id();
 
-    // Stationary entity at cell (2, 0, 0) — 2 * 2000 = 4000 from the FO
+    // Stationary entity at cell (2, 0, 0) - 2 * 2000 = 4000 from the FO
     let stationary = app
         .world_mut()
         .spawn((CellCoord::new(2, 0, 0), Stationary))
@@ -440,7 +440,7 @@ fn stationary_entity_gt_updates_when_fo_moves() {
         "Stationary entity should be at 4000 with FO at cell 0"
     );
 
-    // Move the FO to cell (1, 0, 0) — now entity is only 2000 away
+    // Move the FO to cell (1, 0, 0) - now entity is only 2000 away
     app.world_mut()
         .entity_mut(fo)
         .get_mut::<CellCoord>()

@@ -112,12 +112,12 @@ impl Plugin for BigSpacePropagationPlugin {
                 LocalFloatingOrigin::compute_all
                     .in_set(BigSpaceSystems::LocalFloatingOrigins)
                     .after(BigSpaceSystems::RecenterLargeTransforms),
+                Grid::propagate_root_grids
+                    .in_set(BigSpaceSystems::PropagateHighPrecision)
+                    .after(BigSpaceSystems::LocalFloatingOrigins),
                 Grid::propagate_high_precision
                     .in_set(BigSpaceSystems::PropagateHighPrecision)
                     .after(BigSpaceSystems::LocalFloatingOrigins),
-                Grid::propagate_leaf_entities
-                    .in_set(BigSpaceSystems::PropagateHighPrecision)
-                    .after(Grid::propagate_high_precision),
                 Grid::propagate_low_precision
                     .in_set(BigSpaceSystems::PropagateLowPrecision)
                     .after(BigSpaceSystems::PropagateHighPrecision),

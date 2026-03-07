@@ -17,7 +17,7 @@ const HALF_WIDTH: f32 = 50.0;
 const CELL_WIDTH: f32 = 10.0;
 // How fast the entities should move, causing them to move into neighboring cells.
 const MOVEMENT_SPEED: f32 = 5.0;
-const PERCENT_STATIC: f32 = 1.0;
+const PERCENT_STATIC: f32 = 0.999;
 
 fn main() {
     ComputeTaskPool::get_or_init(|| {
@@ -153,8 +153,9 @@ fn move_player(
     mut player: Query<(&mut Transform, &mut CellCoord, &ChildOf, &CellId), With<Player>>,
     mut non_player: Query<
         (&mut Transform, &mut CellCoord, &ChildOf),
-        (Without<Player>, With<NonPlayer>),
+        (Without<Player>, With<NonPlayer>, Without<Stationary>),
     >,
+    count: Query<(), With<NonPlayer>>,
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
     grids: Query<&Grid>,
@@ -164,7 +165,7 @@ fn move_player(
     hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
     prop_stats: Res<big_space::timing::SmoothedStat<big_space::timing::PropagationStats>>,
 ) -> Result {
-    let n_entities = non_player.iter().len();
+    let n_entities = count.count();
     for neighbor in neighbors.iter() {
         if let Ok(mut material) = materials.get_mut(*neighbor) {
             material.set_if_neq(material_presets.default.clone().into());
@@ -173,17 +174,11 @@ fn move_player(
 
     let t = time.elapsed_secs() * 1.0;
     let scale = MOVEMENT_SPEED / HALF_WIDTH;
-    let num_moving = ((1.0 - PERCENT_STATIC) * n_entities as f32) as usize;
     if scale.abs() > 0.0 {
-        // Avoid change detection
-        for (i, (mut transform, _, _)) in non_player.iter_mut().enumerate() {
-            if i < num_moving {
-                transform.translation.x += t.sin() * scale;
-                transform.translation.y += t.cos() * scale;
-                transform.translation.z += (t * 2.3).sin() * scale;
-            } else {
-                break;
-            }
+        for (mut transform, _, _) in non_player.iter_mut() {
+            transform.translation.x += t.sin() * scale;
+            transform.translation.y += t.cos() * scale;
+            transform.translation.z += (t * 2.3).sin() * scale;
         }
     }
 
