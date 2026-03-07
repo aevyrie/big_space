@@ -2,6 +2,8 @@
 
 use crate::{prelude::*, stationary::GridDirtyTick};
 use bevy_ecs::{prelude::*, system::SystemChangeTick};
+#[cfg(feature = "std")]
+use bevy_log::tracing::Instrument;
 use bevy_reflect::Reflect;
 use bevy_transform::prelude::*;
 
@@ -94,6 +96,122 @@ impl Grid {
                 }
             },
         );
+
+        if let Some(stats) = stats.as_mut() {
+            stats.high_precision_propagation += start.elapsed();
+        }
+    }
+
+    /// Update the [`GlobalTransform`] of all entities with a [`CellCoord`], using a
+    /// producer-consumer architecture with a [`BufferedChannel`].
+    ///
+    /// A single producer sequentially visits every [`Grid`], checks whether the grid can be
+    /// skipped (unchanged local floating origin **and** clean subtree), and sends the
+    /// [`Children`] of dirty grids through a buffered channel. Consumer tasks, spawned upfront
+    /// on the [`ComputeTaskPool`], pull batches of entities from the channel and update their
+    /// [`GlobalTransform`] via [`Query::get_unchecked`].
+    ///
+    /// This is the default high-precision propagation system on `std` targets. The flat
+    /// [`Self::propagate_high_precision`] variant is used on `no_std`.
+    ///
+    /// [`BufferedChannel`]: crate::buffered_channel::BufferedChannel
+    /// [`ComputeTaskPool`]: bevy_tasks::ComputeTaskPool
+    #[cfg(feature = "std")]
+    #[expect(
+        unsafe_code,
+        reason = "Uses get_unchecked and a Send wrapper for sharing queries across threads."
+    )]
+    pub fn propagate_high_precision_channeled(
+        system_ticks: SystemChangeTick,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
+        grids: Query<(&Grid, Option<&GridDirtyTick>, Option<&Children>)>,
+        entities: Query<
+            (
+                Ref<CellCoord>,
+                Ref<Transform>,
+                Ref<ChildOf>,
+                &mut GlobalTransform,
+                Has<Stationary>,
+                Has<StationaryComputed>,
+            ),
+            With<CellCoord>,
+        >,
+        mut channel: Local<crate::buffered_channel::BufferedChannel<Entity>>,
+    ) {
+        let start = bevy_platform::time::Instant::now();
+        let task_pool = bevy_tasks::ComputeTaskPool::get();
+        let shared_entities = &entities;
+        let shared_grids = &grids;
+
+        task_pool.scope(|scope| {
+            channel.chunk_size = 1024 * 10;
+            let (rx, tx) = channel.unbounded();
+            let shared_entities = &shared_entities;
+
+            // Spawn consumer workers upfront.
+            let num_workers = task_pool.thread_num().max(1);
+            for _ in 0..num_workers {
+                let rx = rx.clone();
+                scope.spawn(
+                    async move {
+                        while let Ok(chunk) = rx.recv().await {
+                            for &entity in chunk.iter() {
+                                // SAFETY: Each entity is sent through the channel at most
+                                // once (each entity has exactly one parent grid, and each
+                                // grid's children are sent exactly once by the producer).
+                                // Therefore, no two consumer tasks will call get_unchecked
+                                // on the same entity.
+                                let Ok((
+                                    cell,
+                                    transform,
+                                    parent,
+                                    mut gt,
+                                    is_stationary,
+                                    is_computed,
+                                )) = (unsafe { shared_entities.get_unchecked(entity) })
+                                else {
+                                    continue;
+                                };
+
+                                // Read-only lookup of the parent grid.
+                                let Ok((grid, _, _)) = shared_grids.get(parent.parent()) else {
+                                    continue;
+                                };
+
+                                if !grid.local_floating_origin().is_local_origin_unchanged()
+                                    || (transform.is_changed() && !is_stationary)
+                                    || cell.is_changed()
+                                    || parent.is_changed()
+                                    || (is_stationary && !is_computed)
+                                {
+                                    *gt = grid.global_transform(&cell, &transform);
+                                }
+                            }
+                        }
+                    }
+                    .instrument(bevy_log::info_span!("hp_propagation_worker")),
+                );
+            }
+            // Drop the extra receiver clone so consumers see channel closure.
+            drop(rx);
+
+            // Producer: visit each grid, skip clean subtrees, send dirty children.
+            grids.par_iter().for_each_init(
+                || tx.clone(),
+                |sender, (grid, dirty_tick, children)| {
+                    let subtree_clean = dirty_tick.is_some_and(|dt| !dt.is_dirty(system_ticks));
+                    if grid.local_floating_origin().is_local_origin_unchanged() && subtree_clean {
+                        return;
+                    }
+
+                    let Some(children) = children else { return };
+                    for child in children.iter() {
+                        sender.send_blocking(child).ok();
+                    }
+                },
+            );
+            drop(tx);
+        });
 
         if let Some(stats) = stats.as_mut() {
             stats.high_precision_propagation += start.elapsed();

@@ -221,6 +221,9 @@ pub mod timing;
 pub mod validation;
 pub mod world_query;
 
+#[cfg(feature = "std")]
+pub(crate) mod buffered_channel;
+
 #[cfg(feature = "camera")]
 pub mod camera;
 #[cfg(feature = "debug")]

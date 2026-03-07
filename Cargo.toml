@@ -33,6 +33,7 @@ std = [
   "bevy_color?/std",
   "bevy_input?/std",
   "bevy_time?/std",
+  "dep:async-channel",
 ]
 libm = ["bevy_math/libm", "dep:libm"]
 
@@ -66,6 +67,7 @@ bevy_input = { version = "0.18.0", default-features = false, optional = true, fe
 ] }
 bevy_time = { version = "0.18.0", default-features = false, optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
+async-channel = { version = "2.5", optional = true }
 
 [dev-dependencies]
 bevy = { version = "0.18.0", default-features = false, features = [

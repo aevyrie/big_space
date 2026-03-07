@@ -189,6 +189,14 @@ impl Plugin for BigSpaceStationaryPlugin {
             .register_type::<StationaryComputed>()
             .register_type::<GridDirtyTick>();
 
+        #[cfg(feature = "std")]
+        let dirty_configs = || {
+            mark_dirty_subtrees
+                .in_set(BigSpaceSystems::PropagateHighPrecision)
+                .before(Grid::propagate_high_precision_channeled)
+                .after(BigSpaceSystems::LocalFloatingOrigins)
+        };
+        #[cfg(not(feature = "std"))]
         let dirty_configs = || {
             mark_dirty_subtrees
                 .in_set(BigSpaceSystems::PropagateHighPrecision)
