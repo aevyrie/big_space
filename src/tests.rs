@@ -321,8 +321,9 @@ fn moving_entity_spawned_with_cellid_is_registered() {
 #[test]
 fn stationary_entities_do_not_trigger_unnecessary_updates() {
     let mut app = App::new();
-    app.add_plugins(BigSpaceMinimalPlugins);
-    app.add_plugins(CellHashingPlugin::default());
+    app.add_plugins(BigSpaceMinimalPlugins)
+        .add_plugins(BigSpaceStationaryPlugin)
+        .add_plugins(CellHashingPlugin::default());
 
     let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
 
@@ -489,7 +490,7 @@ fn dynamically_spawned_stationary_entity_gets_gt() {
         .set_parent_in_place(root)
         .id();
 
-    // One more frame: mark_dirty_subtrees must detect Added<CellCoord> and mark the grid dirty.
+    // One more frame: mark_dirty_subtrees detects Changed<Children> on the grid and marks it dirty.
     app.update();
 
     let gt = app

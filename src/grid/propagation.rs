@@ -4,7 +4,49 @@ use crate::{prelude::*, stationary::GridDirtyTick};
 use alloc::vec::Vec;
 use bevy_ecs::{prelude::*, system::SystemChangeTick};
 use bevy_reflect::Reflect;
+use bevy_tasks::ComputeTaskPool;
 use bevy_transform::prelude::*;
+
+/// Wraps a type-erased pointer to the cells [`Query`] for sending across
+/// [`ComputeTaskPool`] scope tasks.
+///
+/// Stores the address as `usize` (which is always [`Send`]) to prevent Rust's partial-capture
+/// optimization from capturing the inner `*const T` field (which is [`Send`]) individually
+/// in `async move` blocks — that would incorrectly make the block non-[`Send`].
+///
+/// # Safety
+///
+/// Callers must ensure that concurrent tasks access only disjoint entity sets, preventing
+/// aliased mutable references from [`Query::get_unchecked`]. This is upheld by the tree/forest
+/// structure of the big space hierarchy: each entity has exactly one parent grid, so sibling
+/// subtrees never share entities.
+#[derive(Clone, Copy)]
+struct SendCellsQuery(usize);
+
+// SAFETY: See struct documentation above — safety is delegated to callers who must guarantee
+// disjoint entity access across concurrent tasks.
+#[expect(
+    unsafe_code,
+    reason = "SendCellsQuery wraps a raw query pointer for cross-task sharing; \
+              safety is upheld by the big-space forest structure."
+)]
+unsafe impl Send for SendCellsQuery {}
+
+impl SendCellsQuery {
+    /// # Safety
+    ///
+    /// The pointer must originate from a valid `&Q`, and the caller must ensure no other
+    /// mutable access to the same entities occurs concurrently.
+    #[expect(
+        unsafe_code,
+        reason = "Reconstructs a typed reference from the stored address; \
+                  safety guaranteed by the forest structure."
+    )]
+    unsafe fn as_ref<Q>(&self) -> &Q {
+        // SAFETY: See method documentation.
+        unsafe { &*(self.0 as *const Q) }
+    }
+}
 
 /// Marks entities in the big space hierarchy that are themselves roots of a low-precision subtree.
 /// While finding these entities is slow, we only have to do it during hierarchy or archetype
@@ -28,7 +70,8 @@ impl Grid {
         system_ticks: SystemChangeTick,
         mut stats: Option<ResMut<crate::timing::PropagationStats>>,
         mut params: ParamSet<(
-            // p0: all CellCoord entities — includes sub-grids (Grid + CellCoord)
+            // p0: sub-grid entities only (Grid + CellCoord). Leaf entities (CellCoord, no Grid)
+            // are handled by the separate `propagate_leaf_entities` system.
             Query<
                 (
                     Ref<CellCoord>,
@@ -37,11 +80,11 @@ impl Grid {
                     &mut GlobalTransform,
                     Option<&Stationary>,
                     Option<&StationaryComputed>,
-                    Option<&Grid>,
+                    &Grid,
                     Option<&GridDirtyTick>,
                     Option<&Children>,
                 ),
-                With<CellCoord>,
+                (With<CellCoord>, With<Grid>),
             >,
             // p1: root BigSpace grids — no CellCoord, disjoint from p0
             Query<
@@ -86,21 +129,37 @@ impl Grid {
         // Phase 2: Tree-walk child entities using p0 with get_unchecked.
         // Safety contract for all traverse_grid calls below:
         //   - The big-space hierarchy is a forest: each entity has at most one parent.
-        //   - Root subtrees are independent; we process them sequentially.
+        //   - Root subtrees are independent; we process them in parallel when > 1 exist.
         //   - Within each root, traverse_grid visits each entity at most once.
         //   - All Mut<GlobalTransform> borrows from one loop iteration are released before
         //     recursing into child grids, so no aliasing occurs.
         let cells_query = params.p0();
-        for (grid, children) in &root_tasks {
-            #[expect(
-                unsafe_code,
-                reason = "Tree walk requires get_unchecked to avoid per-entity HashMap lookups; \
-                          safety guaranteed by the forest structure of the hierarchy."
-            )]
-            // SAFETY: See contract above.
-            unsafe {
-                Self::traverse_grid(grid, children, &cells_query, system_ticks);
+        #[expect(
+            unsafe_code,
+            reason = "Tree walk requires get_unchecked to avoid per-entity HashMap lookups; \
+                      safety guaranteed by the forest structure of the hierarchy."
+        )]
+        if root_tasks.len() <= 1 {
+            for (grid, children) in &root_tasks {
+                // SAFETY: See contract above.
+                unsafe { Self::traverse_grid(grid, children, &cells_query, system_ticks) }
             }
+        } else {
+            // Multiple independent BigSpace roots: process in parallel.
+            // SAFETY: Root subtrees are disjoint by the forest structure; each task accesses
+            // a different entity set. SendCellsQuery safely transmits the raw pointer.
+            let sendable = SendCellsQuery(&cells_query as *const _ as usize);
+            ComputeTaskPool::get().scope(|scope| {
+                for (grid, children) in &root_tasks {
+                    let q = sendable;
+                    scope.spawn(async move {
+                        // SAFETY: See above. `as_ref` takes self by value, forcing the compiler
+                        // to capture the whole `SendCellsQuery` (usize, Send) rather than its
+                        // individual field (which would otherwise be a non-Send raw pointer).
+                        unsafe { Self::traverse_grid(grid, children, q.as_ref(), system_ticks) }
+                    });
+                }
+            });
         }
 
         if let Some(stats) = stats.as_mut() {
@@ -135,11 +194,11 @@ impl Grid {
                 &mut GlobalTransform,
                 Option<&Stationary>,
                 Option<&StationaryComputed>,
-                Option<&Grid>,
+                &Grid,
                 Option<&GridDirtyTick>,
                 Option<&Children>,
             ),
-            With<CellCoord>,
+            (With<CellCoord>, With<Grid>),
         >,
         system_ticks: SystemChangeTick,
     ) {
@@ -151,6 +210,9 @@ impl Grid {
             // SAFETY: The tree structure guarantees each entity appears as a child of at most one
             // grid, so this entity is visited exactly once across the entire traversal. All
             // previously returned Mut<> borrows from prior iterations are dropped at loop body end.
+            //
+            // Leaf entities (CellCoord, no Grid) do not match the query and return Err here;
+            // they are handled by the parallel `propagate_leaf_entities` system instead.
             let Ok((
                 cell,
                 transform,
@@ -158,7 +220,7 @@ impl Grid {
                 mut gt,
                 stationary,
                 computed,
-                child_grid,
+                sub_grid,
                 dirty_tick,
                 grandchildren,
             )) = (unsafe { cells_query.get_unchecked(child) })
@@ -169,7 +231,7 @@ impl Grid {
             let is_stationary = stationary.is_some();
             let is_computed = computed.is_some();
 
-            // Same update condition as the original flat par_iter_mut.
+            // Update GT for this sub-grid entity.
             if !grid.local_floating_origin().is_local_origin_unchanged()
                 || (transform.is_changed() && !is_stationary)
                 || cell.is_changed()
@@ -179,32 +241,111 @@ impl Grid {
                 *gt = grid.global_transform(&cell, &transform);
             }
 
-            // If this child is also a sub-grid, check whether its subtree needs processing.
-            if let Some(sub_grid) = child_grid {
-                let subtree_clean = dirty_tick.is_some_and(|d| !d.is_dirty(system_ticks));
-                if sub_grid.local_floating_origin().is_local_origin_unchanged() && subtree_clean {
-                    // The sub-grid's origin is unchanged and no entity in its subtree changed;
-                    // skip this entire subtree.
-                    continue;
-                }
-
-                let gc: Vec<Entity> = grandchildren
-                    .map(|c| c.iter().collect())
-                    .unwrap_or_default();
-                // Clone the sub-grid data so all Mut<> borrows from get_unchecked are released
-                // before we recurse.
-                child_grids.push((sub_grid.clone(), gc));
+            // Check whether this sub-grid's subtree needs processing.
+            let subtree_clean = dirty_tick.is_some_and(|d| !d.is_dirty(system_ticks));
+            if sub_grid.local_floating_origin().is_local_origin_unchanged() && subtree_clean {
+                // The sub-grid's origin is unchanged and no entity in its subtree changed;
+                // skip this entire subtree.
+                continue;
             }
+
+            let gc: Vec<Entity> = grandchildren
+                .map(|c| c.iter().collect())
+                .unwrap_or_default();
+            // Clone the sub-grid data so all Mut<> borrows from get_unchecked are released
+            // before we recurse.
+            child_grids.push((sub_grid.clone(), gc));
             // All Mut<> borrows (gt, cell, transform, parent_rel) are dropped here.
         }
 
         // All Mut<> borrows from the children loop are now released; safe to recurse.
-        for (sub_grid, gc) in &child_grids {
-            // SAFETY: sub-grids are distinct children; their subtrees are disjoint by the tree
-            // property. No Mut<> borrows from the outer loop remain.
-            unsafe {
-                Self::traverse_grid(sub_grid, gc, cells_query, system_ticks);
+        if child_grids.len() <= 1 {
+            for (sub_grid, gc) in &child_grids {
+                // SAFETY: sub-grids are distinct children; their subtrees are disjoint by the
+                // tree property. No Mut<> borrows from the outer loop remain.
+                unsafe { Self::traverse_grid(sub_grid, gc, cells_query, system_ticks) }
             }
+        } else {
+            // Multiple sibling sub-grids: process in parallel.
+            // SAFETY: Sibling subtrees are disjoint; each task accesses a different entity set.
+            // SendCellsQuery safely transmits the raw pointer; the get_unchecked safety is
+            // upheld by the forest structure (no aliased Mut<> borrows).
+            let sendable = SendCellsQuery(cells_query as *const _ as usize);
+            ComputeTaskPool::get().scope(|scope| {
+                for (sub_grid, gc) in &child_grids {
+                    let q = sendable;
+                    scope.spawn(async move {
+                        // SAFETY: See above. `as_ref` takes self by value, forcing the compiler
+                        // to capture the whole `SendCellsQuery` (usize, Send) rather than its
+                        // individual field (which would otherwise be a non-Send raw pointer).
+                        unsafe { Self::traverse_grid(sub_grid, gc, q.as_ref(), system_ticks) }
+                    });
+                }
+            });
+        }
+    }
+
+    /// Update the [`GlobalTransform`] of leaf entities — those with [`CellCoord`] but without
+    /// [`Grid`].
+    ///
+    /// Runs as a flat [`Query::par_iter_mut`] over all leaf entities, looking up each entity's
+    /// parent [`Grid`] by entity ID to retrieve the [`LocalFloatingOrigin`] that was already
+    /// propagated by [`LocalFloatingOrigin::compute_all`]. This is safe to parallelize because
+    /// every entity's GT depends only on its own components (owned) and its parent grid's
+    /// [`LocalFloatingOrigin`] (shared read).
+    ///
+    /// Runs after [`Grid::propagate_high_precision`], which handles the sub-grid hierarchy and
+    /// updates [`GlobalTransform`] for sub-grid entities.
+    pub fn propagate_leaf_entities(
+        system_ticks: SystemChangeTick,
+        mut stats: Option<ResMut<crate::timing::PropagationStats>>,
+        grids: Query<(&Grid, Option<&GridDirtyTick>)>,
+        mut entities: Query<
+            (
+                Ref<CellCoord>,
+                Ref<Transform>,
+                Ref<ChildOf>,
+                &mut GlobalTransform,
+                Option<&Stationary>,
+                Option<&StationaryComputed>,
+            ),
+            (With<CellCoord>, Without<Grid>),
+        >,
+    ) {
+        let start = bevy_platform::time::Instant::now();
+
+        entities.par_iter_mut().for_each(
+            |(cell, transform, parent_rel, mut gt, stationary, computed)| {
+                let Ok((grid, dirty_tick)) = grids.get(parent_rel.parent()) else {
+                    return;
+                };
+
+                let is_stationary = stationary.is_some();
+                let is_computed = computed.is_some();
+
+                // Grid-level early exit: if the grid's origin is unchanged and its subtree is
+                // clean (no non-stationary entity changed this frame), skip without touching the
+                // per-entity change-detection fields. This is semantically equivalent to the
+                // subtree pruning in `traverse_grid`, but applied per-entity so it works with the
+                // flat parallel iteration.
+                let subtree_clean = dirty_tick.is_some_and(|dt| !dt.is_dirty(system_ticks));
+                if grid.local_floating_origin().is_local_origin_unchanged() && subtree_clean {
+                    return;
+                }
+
+                if !grid.local_floating_origin().is_local_origin_unchanged()
+                    || (transform.is_changed() && !is_stationary)
+                    || cell.is_changed()
+                    || parent_rel.is_changed()
+                    || (is_stationary && !is_computed)
+                {
+                    *gt = grid.global_transform(&cell, &transform);
+                }
+            },
+        );
+
+        if let Some(stats) = stats.as_mut() {
+            stats.high_precision_propagation += start.elapsed();
         }
     }
 

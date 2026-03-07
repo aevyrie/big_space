@@ -37,7 +37,14 @@ impl Stationary {
 }
 
 /// Internal marker component used to identify [`Stationary`] entities that have had their initial
-/// grid cell and spatial hash computed.
+/// [`GlobalTransform`] computed.
+///
+/// Inserted by [`BigSpaceStationaryPlugin`] (via [`mark_stationary_computed`]) after the first
+/// frame's [`Grid::propagate_high_precision`] run. When present, [`Grid::traverse_grid`] skips
+/// recomputing the [`GlobalTransform`] for this entity unless the floating origin moves.
+///
+/// Also inserted by [`CellHashingPlugin`](crate::hash::CellHashingPlugin) after the first
+/// spatial hash computation, so both plugins can be used independently without conflict.
 #[derive(Debug, Clone, Reflect, Component, Default)]
 #[reflect(Component, Default)]
 pub struct StationaryComputed;
@@ -139,6 +146,22 @@ fn mark_ancestor_grids(
     }
 }
 
+/// Inserts [`StationaryComputed`] on [`Stationary`] entities at the end of the frame.
+///
+/// Runs in [`Last`] to guarantee every [`PostUpdate`] system (including spatial hashing) has
+/// had one full frame to observe entities with [`Stationary`] but without [`StationaryComputed`].
+/// Placing this in [`Last`] avoids the Bevy auto-`apply_deferred` that would otherwise be
+/// inserted mid-[`PostUpdate`] between this system (Commands writer) and any system that
+/// filters `Without<StationaryComputed>`.
+fn mark_stationary_computed(
+    mut commands: Commands,
+    uninitialized: Query<Entity, (With<Stationary>, Without<StationaryComputed>)>,
+) {
+    for entity in uninitialized.iter() {
+        commands.entity(entity).insert(StationaryComputed);
+    }
+}
+
 /// Opt-in plugin that enables the stationary entity subtree-pruning optimization.
 ///
 /// Add this plugin to enable dirty-tick tracking for [`Grid`] subtrees. When active,
@@ -166,13 +189,17 @@ impl Plugin for BigSpaceStationaryPlugin {
             .register_type::<StationaryComputed>()
             .register_type::<GridDirtyTick>();
 
-        let configs = || {
+        let dirty_configs = || {
             mark_dirty_subtrees
                 .in_set(BigSpaceSystems::PropagateHighPrecision)
                 .before(Grid::propagate_high_precision)
                 .after(BigSpaceSystems::LocalFloatingOrigins)
         };
-        app.add_systems(PostUpdate, configs())
-            .add_systems(PostStartup, configs());
+        // mark_stationary_computed runs in Last (not PostUpdate) so it cannot trigger
+        // Bevy's auto-apply_deferred before any PostUpdate system that filters
+        // Without<StationaryComputed> (e.g. CellId::initialize_stationary).
+        app.add_systems(PostUpdate, dirty_configs())
+            .add_systems(PostStartup, dirty_configs())
+            .add_systems(Last, mark_stationary_computed);
     }
 }

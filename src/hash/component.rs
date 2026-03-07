@@ -291,7 +291,6 @@ impl CellId {
                     let fast_hash: CellHash = current_id.into();
                     commands.entity(entity).insert((current_id, fast_hash));
                 }
-                commands.entity(entity).insert(StationaryComputed);
                 changed_cells.insert(entity);
             }
         }
