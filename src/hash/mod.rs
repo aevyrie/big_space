@@ -393,7 +393,7 @@ mod tests {
         );
     }
 
-    /// Regression test for the spatial_hash example crash.
+    /// Regression test for the `spatial_hash` example crash.
     ///
     /// On the first frame an entity spawned in `Startup` has its [`CellId`] inserted via deferred
     /// commands during [`SpatialHashSystems::UpdateCellHashes`].  Any user system that queries the

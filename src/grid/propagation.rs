@@ -115,6 +115,7 @@ impl Grid {
     /// [`Self::propagate_high_precision`] variant is used on `no_std`.
     ///
     /// [`BufferedChannel`]: crate::buffered_channel::BufferedChannel
+    #[allow(rustdoc::private_intra_doc_links)]
     /// [`ComputeTaskPool`]: bevy_tasks::ComputeTaskPool
     #[cfg(feature = "std")]
     #[expect(
@@ -425,10 +426,10 @@ mod tests {
     use crate::prelude::*;
     use bevy::prelude::*;
 
-    /// Verifies that entities in sub-grids get the correct GlobalTransform.
+    /// Verifies that entities in sub-grids get the correct `GlobalTransform`.
     ///
-    /// Hierarchy: Root BigSpace → SubGrid (CellCoord + Grid + Transform(100,0,0))
-    ///                                  → Entity (CellCoord + Transform(50,0,0))
+    /// Hierarchy: Root `BigSpace` → `SubGrid` (`CellCoord` + Grid + Transform(100,0,0))
+    ///                                  → Entity (`CellCoord` + Transform(50,0,0))
     ///
     /// Entity's GT should be 100 + 50 = 150 from the root FO.
     #[test]
@@ -462,9 +463,9 @@ mod tests {
         );
     }
 
-    /// Verifies that the root BigSpace grid's GlobalTransform updates when the floating
-    /// origin moves to a new cell. The root grid has no CellCoord, so it must be handled
-    /// separately from the flat par_iter over CellCoord entities.
+    /// Verifies that the root `BigSpace` grid's `GlobalTransform` updates when the floating
+    /// origin moves to a new cell. The root grid has no `CellCoord`, so it must be handled
+    /// separately from the flat `par_iter` over `CellCoord` entities.
     #[test]
     fn root_grid_gt_updates_when_fo_moves() {
         let mut app = App::new();

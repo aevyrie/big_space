@@ -48,11 +48,11 @@ impl Stationary {
 /// Internal marker component used to identify [`Stationary`] entities that have had their initial
 /// [`GlobalTransform`] computed.
 ///
-/// Inserted by [`BigSpaceStationaryPlugin`] (via [`mark_stationary_computed`]) after the first
-/// frame's [`Grid::propagate_high_precision`] run. When present, [`Grid::traverse_grid`] skips
+/// Inserted by [`BigSpaceStationaryPlugin`] (via `mark_stationary_computed`) after the first
+/// frame's [`Grid::propagate_high_precision`] run. When present, propagation skips
 /// recomputing the [`GlobalTransform`] for this entity unless the floating origin moves.
 ///
-/// Also inserted by [`CellHashingPlugin`](crate::hash::CellHashingPlugin) after the first
+/// Also inserted by [`CellHashingPlugin`] after the first
 /// spatial hash computation, so both plugins can be used independently without conflict.
 #[derive(Debug, Clone, Reflect, Component, Default)]
 #[reflect(Component, Default)]
@@ -188,8 +188,9 @@ fn mark_stationary_computed(
 /// # Note
 ///
 /// This plugin is included in [`BigSpaceDefaultPlugins`] but **not** in
-/// [`BigSpaceMinimalPlugins`]. Add it manually alongside [`BigSpaceMinimalPlugins`] when you
-/// want the optimization without the full default plugin set.
+/// [`BigSpaceMinimalPlugins`](crate::plugin::BigSpaceMinimalPlugins). Add it manually alongside
+/// [`BigSpaceMinimalPlugins`](crate::plugin::BigSpaceMinimalPlugins) when you want the
+/// optimization without the full default plugin set.
 pub struct BigSpaceStationaryPlugin;
 
 impl Plugin for BigSpaceStationaryPlugin {

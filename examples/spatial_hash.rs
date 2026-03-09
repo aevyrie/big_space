@@ -123,9 +123,12 @@ struct NonPlayer;
 #[derive(Resource)]
 struct MaterialPresets {
     default: Handle<StandardMaterial>,
+    #[allow(dead_code)]
     highlight: Handle<StandardMaterial>,
+    #[allow(dead_code)]
     flood: Handle<StandardMaterial>,
     changed: Handle<StandardMaterial>,
+    #[allow(dead_code)]
     sphere: Handle<Mesh>,
 }
 
@@ -235,7 +238,7 @@ fn move_player(
     mut materials: Query<&mut MeshMaterial3d<StandardMaterial>, Without<Player>>,
     mut neighbors: Local<Vec<Entity>>,
     grids: Query<(&Grid, Option<&GridConfig>)>,
-    hash_grid: Res<CellLookup>,
+    _hash_grid: Res<CellLookup>,
     material_presets: Res<MaterialPresets>,
     mut text: Query<&mut Text>,
     hash_stats: Res<big_space::timing::SmoothedStat<big_space::timing::GridHashStats>>,
@@ -267,7 +270,7 @@ fn move_player(
     }
 
     // Move the player along a path within its parent grid's extent.
-    let (mut transform, mut cell, child_of, hash) = player.single_mut()?;
+    let (mut transform, mut cell, child_of, _hash) = player.single_mut()?;
     let (grid, cfg) = grids.get(child_of.parent())?;
     let hw = cfg.map_or(50.0, |c| c.half_width);
     let cw = grid.cell_edge_length();
@@ -594,10 +597,8 @@ fn highlight_changed_entities(
                     mat.set_if_neq(material_presets.changed.clone().into());
                 }
                 next_active.push((entity, frames_left));
-            } else {
-                if let Ok(mut mat) = materials.get_mut(entity) {
-                    mat.set_if_neq(material_presets.default.clone().into());
-                }
+            } else if let Ok(mut mat) = materials.get_mut(entity) {
+                mat.set_if_neq(material_presets.default.clone().into());
             }
         }
     }
