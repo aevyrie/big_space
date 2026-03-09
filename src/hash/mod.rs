@@ -143,6 +143,11 @@ impl<F: SpatialHashFilter> ChangedCells<F> {
         self.updated.len()
     }
 
+    /// Returns true if there are no entities that have moved between cells this frame.
+    pub fn is_empty(&self) -> bool {
+        self.updated.is_empty()
+    }
+
     /// Mark an entity as having changed grid cells.
     pub fn insert(&mut self, entity: Entity) {
         self.updated.insert(entity);

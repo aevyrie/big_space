@@ -290,10 +290,12 @@ pub fn camera_controller(
         // Framerate-independent exponential smoothing. At 60fps (dt=1/60) the exponent
         // is 1.0, reproducing the original per-frame behavior. At other framerates the
         // decay scales correctly so the feel is consistent.
-        let lerp_translation =
-            1.0 - controller.smoothness.clamp(0.0, 0.999).powf(dt * 60.0);
-        let lerp_rotation =
-            1.0 - controller.rotational_smoothness.clamp(0.0, 0.999).powf(dt * 60.0);
+        let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.999).powf(dt * 60.0);
+        let lerp_rotation = 1.0
+            - controller
+                .rotational_smoothness
+                .clamp(0.0, 0.999)
+                .powf(dt * 60.0);
 
         let (vel_t_current, vel_r_current) = (controller.vel_translation, controller.vel_rotation);
         let (vel_t_target, vel_r_target) =

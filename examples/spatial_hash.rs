@@ -442,7 +442,13 @@ fn spawn_spheres(
     };
 
     for (entity, cfg) in grids.iter() {
-        spawn_entities_in_grid(&mut commands, entity, cfg, n_spawn_per_grid, &material_presets);
+        spawn_entities_in_grid(
+            &mut commands,
+            entity,
+            cfg,
+            n_spawn_per_grid,
+            &material_presets,
+        );
     }
     Ok(())
 }

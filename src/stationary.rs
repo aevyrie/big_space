@@ -19,10 +19,16 @@ use bevy_transform::prelude::*;
 ///
 /// # Important
 ///
-/// Do **not** move a `Stationary` entity by mutating its [`Transform`]. Stationary entities are
-/// excluded from grid-cell recentering, so a large translation will never be snapped back into
-/// the correct cell. If you need to relocate a stationary entity, remove the `Stationary`
-/// component first, move the entity, and then re-add it.
+/// Do **not** move a `Stationary` entity by mutating its [`Transform`] or [`CellCoord`].
+/// Stationary entities are excluded from grid-cell recentering and spatial hash updates, so
+/// changes to these components will not be picked up by the plugin. If you need to relocate a
+/// stationary entity, remove the `Stationary` component first, move the entity, and then
+/// re-add it.
+///
+/// Note that when a `Stationary` entity is first spawned, its [`Transform`] translation is
+/// recentered into the correct grid cell (updating both [`CellCoord`] and [`Transform`]).
+/// This one-time snap ensures the entity starts in a valid state regardless of the initial
+/// translation magnitude.
 #[derive(Debug, Clone, Reflect, Component, Default)]
 #[component(on_remove = Stationary::on_remove)]
 #[reflect(Component, Default)]
@@ -32,7 +38,10 @@ impl Stationary {
     /// Removes [`StationaryComputed`] when [`Stationary`] is removed, so that the entity
     /// re-enters the normal update path for recentering and spatial hashing.
     fn on_remove(mut world: DeferredWorld, ctx: HookContext) {
-        world.commands().entity(ctx.entity).remove::<StationaryComputed>();
+        world
+            .commands()
+            .entity(ctx.entity)
+            .remove::<StationaryComputed>();
     }
 }
 

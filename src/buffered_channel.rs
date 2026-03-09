@@ -1,8 +1,8 @@
 //! Copied from bevy main, can switch over after bevy 0.19
 
-use bevy_utils::Parallel;
 use alloc::vec::Vec;
 use async_channel::{Receiver, Sender};
+use bevy_utils::Parallel;
 use core::ops::{Deref, DerefMut};
 
 /// An asynchronous MPSC channel that buffers messages and reuses allocations with thread locals.
