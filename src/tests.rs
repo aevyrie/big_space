@@ -673,18 +673,16 @@ fn stationary_plugin_excluded_from_minimal_plugins() {
 /// Verifies that [`BigSpaceStationaryPlugin`] is included in [`BigSpaceDefaultPlugins`].
 #[test]
 fn stationary_plugin_included_in_default_plugins() {
-    use crate::plugin::{
-        BigSpaceCameraControllerPlugin, BigSpaceDebugPlugin, BigSpaceValidationPlugin,
-    };
+    use crate::plugin::BigSpaceValidationPlugin;
 
     let mut app = App::new();
-    app.add_plugins(
-        BigSpaceDefaultPlugins
-            .build()
-            .disable::<BigSpaceCameraControllerPlugin>()
-            .disable::<BigSpaceDebugPlugin>()
-            .disable::<BigSpaceValidationPlugin>(),
-    );
+    let group = BigSpaceDefaultPlugins.build();
+    #[cfg(feature = "camera")]
+    let group = group.disable::<crate::plugin::BigSpaceCameraControllerPlugin>();
+    #[cfg(feature = "debug")]
+    let group = group.disable::<crate::plugin::BigSpaceDebugPlugin>();
+    let group = group.disable::<BigSpaceValidationPlugin>();
+    app.add_plugins(group);
     let root = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
     app.update();
     assert!(
