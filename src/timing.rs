@@ -3,6 +3,7 @@
 use alloc::collections::VecDeque;
 use core::{iter::Sum, ops::Div, time::Duration};
 
+use crate::hash::SpatialHashSystems;
 use crate::prelude::*;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -30,7 +31,9 @@ impl Plugin for BigSpaceTimingStatsPlugin {
                 PostUpdate,
                 (update_totals, update_averages)
                     .chain()
-                    .after(TransformSystems::Propagate),
+                    .after(TransformSystems::Propagate)
+                    .after(SpatialHashSystems::UpdateCellLookup)
+                    .after(SpatialHashSystems::UpdatePartitionLookup),
             );
     }
 }

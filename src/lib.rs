@@ -216,9 +216,13 @@ pub mod grid;
 pub mod hash;
 pub mod partition;
 pub mod plugin;
+pub mod stationary;
 pub mod timing;
 pub mod validation;
 pub mod world_query;
+
+#[cfg(feature = "std")]
+pub(crate) mod buffered_channel;
 
 #[cfg(feature = "camera")]
 pub mod camera;
@@ -250,6 +254,7 @@ pub mod prelude {
     };
     pub use plugin::{BigSpaceDefaultPlugins, BigSpaceSystems};
     pub use precision::GridPrecision;
+    pub use stationary::{BigSpaceStationaryPlugin, GridDirtyTick, Stationary, StationaryComputed};
     pub use world_query::{CellTransform, CellTransformOwned, CellTransformReadOnly};
 
     #[cfg(feature = "camera")]

@@ -66,11 +66,9 @@ mod inner {
         /// The above requirements help to ensure this transform has a small magnitude, maximizing
         /// precision, and minimizing floating point error.
         grid_transform: DAffine3,
-        /// Returns `true` iff the position of the floating origin's grid origin has not moved
-        /// relative to this grid.
-        ///
-        /// When true, this means that any entities in this grid that have not moved do not need to
-        /// have their `GlobalTransform` recomputed.
+        /// `true` if the floating origin's position relative to this grid is identical to the
+        /// previous frame. When `true`, unchanged entities in this grid can skip GT recomputation.
+        /// Set by [`Self::set`] each frame by comparing the new value to the previous one.
         is_local_origin_unchanged: bool,
     }
 
@@ -137,7 +135,22 @@ mod inner {
             }
         }
 
-        /// Returns true iff the local origin has not changed relative to the floating origin.
+        /// Returns `true` if the floating origin's position relative to this grid has not changed
+        /// since the last frame.
+        ///
+        /// When this returns `true`, entities in this grid whose own [`Transform`], [`CellCoord`],
+        /// or parent have not changed can skip [`GlobalTransform`] recomputation - the result
+        /// would be identical to the previous frame.
+        ///
+        /// When this returns `false`, the floating origin has moved into a different cell, or the
+        /// grid hierarchy has shifted, and **every** entity in this grid needs its
+        /// [`GlobalTransform`] recomputed, even if the entity itself hasn't moved.
+        ///
+        /// Updated each frame by [`Self::set`], which is called from
+        /// [`Self::compute_all`].
+        ///
+        /// [`Transform`]: bevy_transform::prelude::Transform
+        /// [`GlobalTransform`]: bevy_transform::prelude::GlobalTransform
         #[inline]
         pub fn is_local_origin_unchanged(&self) -> bool {
             self.is_local_origin_unchanged
