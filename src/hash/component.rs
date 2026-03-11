@@ -292,6 +292,7 @@ impl CellId {
                     commands.entity(entity).insert((current_id, fast_hash));
                 }
                 changed_cells.insert(entity);
+                commands.entity(entity).insert(StationaryComputed);
             }
         }
     }
