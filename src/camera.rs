@@ -360,6 +360,12 @@ fn nearest_via_partitions<F: SpatialHashFilter>(
     partitions: &PartitionLookup<F>,
     cell_lookup: &CellLookup<F>,
 ) -> Option<(Entity, f64)> {
+    // Bail early if no entities match the query (e.g., all have had visibility components
+    // stripped by a render culling system), avoiding an exhaustive partition scan.
+    if objects.is_empty() {
+        return None;
+    }
+
     // Compute cell-space distance from camera to each partition AABB, sorted nearest-first.
     let cam = IVec3::new(cam_cell.x as i32, cam_cell.y as i32, cam_cell.z as i32);
     let mut sorted: Vec<(&PartitionId, &Partition, f64)> = partitions
@@ -378,18 +384,13 @@ fn nearest_via_partitions<F: SpatialHashFilter>(
     sorted.sort_unstable_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(core::cmp::Ordering::Equal));
 
     // Get the grid's cell edge length for converting cell distance to world distance.
+    // NOTE: this assumes all partitions share the same grid. Multi-grid scenes may need
+    // per-partition cell_edge values.
     let cell_edge = sorted
         .first()
         .and_then(|(_, p, _)| grids.get(p.grid()).ok())
         .map(|g| g.cell_edge_length() as f64)
         .unwrap_or(1.0);
-
-    // If no entities match the query at all (e.g., all have had visibility components
-    // stripped by a render culling system), bail immediately to avoid an exhaustive
-    // O(partitions × cells) scan that can never find a result.
-    if objects.is_empty() {
-        return None;
-    }
 
     let mut best: Option<(Entity, f64)> = None;
     // Track how many partitions we've scanned without finding any candidate.
@@ -491,10 +492,11 @@ pub fn camera_controller(
         let [min, max] = controller.speed_bounds;
         let speed = speed.clamp(min, max);
 
-        let dt = time.delta_secs_f64().min(0.1); // Clamp to 100ms to prevent flying on perf dips
-                                                 // Framerate-independent exponential smoothing. At 60fps (dt=1/60) the exponent
-                                                 // is 1.0, reproducing the original per-frame behavior. At other framerates the
-                                                 // decay scales correctly so the feel is consistent.
+        // Clamp to 100ms to prevent flying on perf dips.
+        let dt = time.delta_secs_f64().min(0.1);
+        // Framerate-independent exponential smoothing. At 60fps (dt=1/60) the exponent
+        // is 1.0, reproducing the original per-frame behavior. At other framerates the
+        // decay scales correctly so the feel is consistent.
         let lerp_translation = 1.0 - controller.smoothness.clamp(0.0, 0.999).powf(dt * 60.0);
         let lerp_rotation = 1.0
             - controller
