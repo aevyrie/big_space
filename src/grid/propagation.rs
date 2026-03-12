@@ -205,7 +205,8 @@ impl Grid {
             // Large dirty grids are collected via thread-local storage (no
             // contention) and chunked into separate scope tasks after par_iter.
             let min_chunk = n_threads * 10;
-            let mut large_grids = bevy_utils::Parallel::<alloc::vec::Vec<(Entity, bool)>>::default();
+            let mut large_grids =
+                bevy_utils::Parallel::<alloc::vec::Vec<(Entity, bool)>>::default();
             grids.par_iter().for_each_init(
                 || tx.clone(),
                 |sender, (grid_entity, grid, dirty_tick, children)| {
@@ -226,7 +227,9 @@ impl Grid {
                         }
                     } else {
                         // Large grid — collect into thread-local vec for chunking.
-                        large_grids.borrow_local_mut().push((grid_entity, fo_unchanged));
+                        large_grids
+                            .borrow_local_mut()
+                            .push((grid_entity, fo_unchanged));
                     }
                 },
             );
