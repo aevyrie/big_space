@@ -52,7 +52,7 @@ where
                         .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(BigSpaceSystems::RecenterLargeTransforms)
                         .after(SpatialHashSystems::ClearChangedCells),
-                    CellId::initialize_stationary::<F>
+                    CellId::compute_stationary_cell::<F>
                         .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(CellId::update::<F>)
                         .after(SpatialHashSystems::ClearChangedCells),
