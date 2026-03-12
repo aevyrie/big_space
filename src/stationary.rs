@@ -14,8 +14,19 @@ use bevy_transform::prelude::*;
 /// A component that optimizes entities that do not move.
 ///
 /// When an entity is marked as stationary, the plugin will skip most per-frame computations for it.
-/// This includes grid recentering and spatial hashing updates. The `CellCoord` and `CellId`
-/// will only be computed when the entity is spawned or when its parent changes.
+/// This includes grid recentering and spatial hashing updates. The `CellCoord` will only be
+/// computed when the entity is spawned or when its parent changes.
+///
+/// # One-frame initialization delay
+///
+/// `Stationary` takes effect one full frame after insertion. During that first frame the entity
+/// has `With<Stationary>` but not yet `With<StationaryInitialized>`, giving every system
+/// (propagation, spatial hashing, etc.) one pass to process the entity before it goes to sleep.
+///
+/// - **Systems that need to run before sleep** should query
+///   `(With<Stationary>, Without<StationaryInitialized>)`.
+/// - **Systems that want to skip sleeping entities** should query
+///   `With<StationaryInitialized>`.
 ///
 /// # Important
 ///
@@ -35,28 +46,28 @@ use bevy_transform::prelude::*;
 pub struct Stationary;
 
 impl Stationary {
-    /// Removes [`StationaryComputed`] when [`Stationary`] is removed, so that the entity
+    /// Removes [`StationaryInitialized`] when [`Stationary`] is removed, so that the entity
     /// re-enters the normal update path for recentering and spatial hashing.
     fn on_remove(mut world: DeferredWorld, ctx: HookContext) {
         world
             .commands()
             .entity(ctx.entity)
-            .try_remove::<StationaryComputed>();
+            .try_remove::<StationaryInitialized>();
     }
 }
 
-/// Internal marker component used to identify [`Stationary`] entities that have had their initial
-/// [`GlobalTransform`] computed.
+/// Marker inserted by [`BigSpaceStationaryPlugin`] one frame after [`Stationary`] is added.
 ///
-/// Inserted by [`BigSpaceStationaryPlugin`] (via `mark_stationary_computed`) after the first
-/// frame's [`Grid::propagate_high_precision`] run. When present, propagation skips
-/// recomputing the [`GlobalTransform`] for this entity unless the floating origin moves.
+/// During the first frame an entity has `Stationary` but not yet `StationaryInitialized`,
+/// giving all systems (propagation, spatial hashing, etc.) one pass to process the entity.
+/// After that frame, `StationaryInitialized` is inserted and the entity is considered
+/// *sleeping* - propagation skips recomputing its [`GlobalTransform`] unless the floating
+/// origin moves, and [`CellHashingPlugin`] skips recomputing its [`CellId`].
 ///
-/// Also inserted by [`CellHashingPlugin`] after the first
-/// spatial hash computation, so both plugins can be used independently without conflict.
+/// See the docs on [`Stationary`] for the recommended query patterns.
 #[derive(Debug, Clone, Reflect, Component, Default)]
 #[reflect(Component, Default)]
-pub struct StationaryComputed;
+pub struct StationaryInitialized;
 
 /// Enables subtree pruning in [`Grid::propagate_high_precision`].
 ///
@@ -155,28 +166,23 @@ fn mark_ancestor_grids(
     }
 }
 
-/// Inserts [`StationaryComputed`] on [`Stationary`] entities that are **not** tracked by
-/// [`CellHashingPlugin`].
+/// Inserts [`StationaryInitialized`] on [`Stationary`] entities that have been present for at
+/// least one full frame.
 ///
-/// When `CellHashingPlugin` is active, [`CellId::initialize_stationary`] inserts
-/// `StationaryComputed` reactively after updating the entity's [`CellId`]. This
-/// system handles the remaining case: entities that only need propagation (no spatial hashing).
+/// By waiting until [`Ref::is_added`] returns `false`, every system (propagation, spatial
+/// hashing, etc.) gets one pass to process the entity before it goes to sleep.
 ///
-/// Runs in [`Last`] so that transform propagation has one full frame to observe the entity with
-/// `Stationary` but without `StationaryComputed`.
-fn mark_stationary_computed(
+/// Runs in [`Last`] so that its deferred commands cannot trigger Bevy's automatic
+/// `apply_deferred` during [`PostUpdate`], which would interfere with systems that filter
+/// `Without<StationaryInitialized>`.
+fn mark_stationary_initialized(
     mut commands: Commands,
-    uninitialized: Query<
-        Entity,
-        (
-            With<Stationary>,
-            Without<StationaryComputed>,
-            Without<CellId>,
-        ),
-    >,
+    uninitialized: Query<(Entity, Ref<Stationary>), Without<StationaryInitialized>>,
 ) {
-    for entity in uninitialized.iter() {
-        commands.entity(entity).insert(StationaryComputed);
+    for (entity, stationary) in uninitialized.iter() {
+        if !stationary.is_added() {
+            commands.entity(entity).insert(StationaryInitialized);
+        }
     }
 }
 
@@ -191,7 +197,7 @@ fn mark_stationary_computed(
 /// Without this plugin, all grid subtrees are visited every frame (correct, just less efficient
 /// for worlds with many stationary entities spread across many grids).
 ///
-/// This plugin also registers reflection for [`Stationary`], [`StationaryComputed`], and
+/// This plugin also registers reflection for [`Stationary`], [`StationaryInitialized`], and
 /// [`GridDirtyTick`].
 ///
 /// # Note
@@ -205,7 +211,7 @@ pub struct BigSpaceStationaryPlugin;
 impl Plugin for BigSpaceStationaryPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Stationary>()
-            .register_type::<StationaryComputed>()
+            .register_type::<StationaryInitialized>()
             .register_type::<GridDirtyTick>();
 
         #[cfg(feature = "std")]
@@ -222,12 +228,12 @@ impl Plugin for BigSpaceStationaryPlugin {
                 .before(Grid::propagate_high_precision)
                 .after(BigSpaceSystems::LocalFloatingOrigins)
         };
-        // mark_stationary_computed runs in Last (not PostUpdate) so it cannot trigger
+        // mark_stationary_initialized runs in Last (not PostUpdate) so it cannot trigger
         // Bevy's auto-apply_deferred before any PostUpdate system that filters
-        // Without<StationaryComputed> (e.g. CellId::initialize_stationary).
+        // Without<StationaryInitialized> (e.g. CellId::compute_stationary_cell).
         app.add_systems(PostUpdate, dirty_configs())
             .add_systems(PostStartup, dirty_configs())
-            .add_systems(Last, mark_stationary_computed);
+            .add_systems(Last, mark_stationary_initialized);
     }
 }
 
@@ -307,7 +313,7 @@ mod tests {
 
         // Remove Stationary, move the entity far enough to trigger recentering, then re-add
         app.world_mut().entity_mut(entity).remove::<Stationary>();
-        app.update(); // cleanup_removed_stationary removes StationaryComputed
+        app.update(); // cleanup_removed_stationary removes StationaryInitialized
 
         app.world_mut()
             .entity_mut(entity)
@@ -325,12 +331,13 @@ mod tests {
 
         // Re-add Stationary
         app.world_mut().entity_mut(entity).insert(Stationary);
-        app.update();
+        app.update(); // Frame 1: systems process the entity (one-frame delay)
+        app.update(); // Frame 2: mark_stationary_initialized inserts StationaryInitialized
 
-        // Verify StationaryComputed is re-applied and the entity is in the CellLookup
+        // Verify StationaryInitialized is re-applied and the entity is in the CellLookup
         assert!(
-            app.world().get::<StationaryComputed>(entity).is_some(),
-            "StationaryComputed should be re-inserted after re-adding Stationary"
+            app.world().get::<StationaryInitialized>(entity).is_some(),
+            "StationaryInitialized should be re-inserted after re-adding Stationary"
         );
 
         let cell_id = *app.world().get::<CellId>(entity).unwrap();
@@ -470,14 +477,26 @@ mod tests {
             assert_eq!(changed_cells.len(), 100);
         }
 
-        // Second frame - nothing should change
+        // Second frame - StationaryInitialized not yet inserted (one-frame delay), so
+        // compute_stationary_cell runs again (idempotent but populates ChangedCells).
+        app.update();
+        {
+            let changed_cells = app.world().resource::<ChangedCells<()>>();
+            assert_eq!(
+                changed_cells.len(),
+                100,
+                "Extra frame before StationaryInitialized"
+            );
+        }
+
+        // Third frame - StationaryInitialized now present, nothing should change
         app.update();
         {
             let changed_cells = app.world().resource::<ChangedCells<()>>();
             assert_eq!(
                 changed_cells.len(),
                 0,
-                "No updates should happen for stationary entities after the first frame"
+                "No updates should happen for stationary entities after initialization"
             );
         }
 
@@ -723,8 +742,8 @@ mod tests {
     /// After removing [`Stationary`] and changing [`CellCoord`], the entity should re-enter the
     /// spatial hash update path and be tracked in [`CellLookup`] at its new cell.
     ///
-    /// This catches timing issues where [`StationaryComputed`] lingers or [`Changed<CellCoord>`]
-    /// detection fails after archetype changes from removing Stationary/StationaryComputed.
+    /// This catches timing issues where [`StationaryInitialized`] lingers or [`Changed<CellCoord>`]
+    /// detection fails after archetype changes from removing Stationary/StationaryInitialized.
     #[test]
     fn entity_reenters_spatial_hash_after_stationary_removed() {
         let mut app = App::new();
@@ -750,18 +769,18 @@ mod tests {
             .set_parent_in_place(grid_entity)
             .id();
 
-        // Frame 1: initialize_stationary adds CellId
+        // Frame 1: compute_stationary_cell adds CellId
         app.update();
         assert!(
             app.world().get::<CellId>(entity).is_some(),
             "Entity should have CellId after first frame"
         );
 
-        // Frame 2: mark_stationary_computed adds StationaryComputed (runs in Last)
+        // Frame 2: mark_stationary_initialized adds StationaryInitialized (runs in Last)
         app.update();
         assert!(
-            app.world().get::<StationaryComputed>(entity).is_some(),
-            "StationaryComputed should be present after stabilization"
+            app.world().get::<StationaryInitialized>(entity).is_some(),
+            "StationaryInitialized should be present after stabilization"
         );
 
         let old_cell_id = *app.world().get::<CellId>(entity).unwrap();
@@ -785,14 +804,14 @@ mod tests {
             .unwrap()
             .x = 5;
 
-        // This frame should: remove StationaryComputed (via Stationary on_remove hook),
+        // This frame should: remove StationaryInitialized (via Stationary on_remove hook),
         // then CellId::update detects Changed<CellCoord> + Without<Stationary> → updates CellId.
         app.update();
 
-        // Verify StationaryComputed was removed
+        // Verify StationaryInitialized was removed
         assert!(
-            app.world().get::<StationaryComputed>(entity).is_none(),
-            "StationaryComputed should be removed after Stationary is removed"
+            app.world().get::<StationaryInitialized>(entity).is_none(),
+            "StationaryInitialized should be removed after Stationary is removed"
         );
         // Verify Stationary was removed
         assert!(
@@ -865,11 +884,11 @@ mod tests {
             .set_parent_in_place(grid_entity)
             .id();
 
-        // Stabilize: CellId created, StationaryComputed added
+        // Stabilize: CellId created, StationaryInitialized added
         app.update();
         app.update();
 
-        assert!(app.world().get::<StationaryComputed>(entity).is_some());
+        assert!(app.world().get::<StationaryInitialized>(entity).is_some());
         assert!(app.world().get::<Stationary>(entity).is_some());
         let old_cell_id = *app.world().get::<CellId>(entity).unwrap();
 
@@ -894,8 +913,8 @@ mod tests {
             "Stationary should be removed"
         );
         assert!(
-            app.world().get::<StationaryComputed>(entity).is_none(),
-            "StationaryComputed should be removed via hook chain"
+            app.world().get::<StationaryInitialized>(entity).is_none(),
+            "StationaryInitialized should be removed via hook chain"
         );
 
         // THE CRITICAL CHECK: CellId must reflect the new CellCoord
@@ -963,7 +982,7 @@ mod tests {
         app.update();
 
         assert!(app.world().get::<CellId>(entity).is_some());
-        assert!(app.world().get::<StationaryComputed>(entity).is_some());
+        assert!(app.world().get::<StationaryInitialized>(entity).is_some());
         let old_cell_id = *app.world().get::<CellId>(entity).unwrap();
 
         // Verify entity is in the filtered CellLookup
@@ -1007,8 +1026,8 @@ mod tests {
             "Stationary should be removed"
         );
         assert!(
-            app.world().get::<StationaryComputed>(entity).is_none(),
-            "StationaryComputed should be removed"
+            app.world().get::<StationaryInitialized>(entity).is_none(),
+            "StationaryInitialized should be removed"
         );
 
         // CellId must reflect the new CellCoord
@@ -1039,15 +1058,14 @@ mod tests {
         );
     }
 
-    /// Regression test for a bug where an entity that gained `Stationary` + `StationaryComputed`
-    /// in the same frame cycle (Stationary inserted late + `mark_stationary_computed` in Last)
-    /// was never processed by `initialize_stationary`. When `CellCoord` was also changed in that
-    /// frame, `CellId::update` (which has `Without<Stationary>`) skipped the entity, and
-    /// `initialize_stationary` (which has `Without<StationaryComputed>`) also skipped it.
-    /// The entity's `CellId` became permanently stale, causing `PartitionEntities` desync.
+    /// Regression test for a bug where an entity that gained `Stationary` + `StationaryInitialized`
+    /// in the same frame cycle was never processed by `compute_stationary_cell`. When `CellCoord`
+    /// was also changed in that frame, `CellId::update` (which has `Without<Stationary>`) skipped
+    /// the entity, and `compute_stationary_cell` (which has `Without<StationaryInitialized>`)
+    /// also skipped it. The entity's `CellId` became permanently stale.
     ///
-    /// Fixed by having `initialize_stationary` insert `StationaryComputed` reactively, and
-    /// narrowing `mark_stationary_computed` to `Without<CellId>` so it no longer races.
+    /// Fixed by delaying `StationaryInitialized` insertion until the frame after `Stationary`
+    /// is added, giving all systems one full pass to process the entity.
     #[test]
     fn late_stationary_insert_updates_cellid() {
         #[derive(Component)]
@@ -1116,21 +1134,21 @@ mod tests {
         // Frame 1: late_stationary_insert writes CellCoord(5,0,0) and inserts Stationary.
         app.update();
 
-        // Frame 2: initialize_stationary sees Without<StationaryComputed> is no longer
-        // satisfied (StationaryComputed was inserted reactively), so it re-processes the
-        // entity and updates CellId to match the new CellCoord.
+        // Frame 2: compute_stationary_cell sees Without<StationaryInitialized> still satisfied
+        // (one-frame delay) so it re-processes the entity and updates CellId to match the
+        // new CellCoord. StationaryInitialized is inserted in Last this frame.
         app.update();
         // Extra frame for good measure
         app.update();
 
-        // Verify the entity has both Stationary and StationaryComputed
+        // Verify the entity has both Stationary and StationaryInitialized
         assert!(
             app.world().get::<Stationary>(entity).is_some(),
             "Entity should have Stationary"
         );
         assert!(
-            app.world().get::<StationaryComputed>(entity).is_some(),
-            "Entity should have StationaryComputed"
+            app.world().get::<StationaryInitialized>(entity).is_some(),
+            "Entity should have StationaryInitialized"
         );
 
         // Previously CellId would be stuck at (1,0,0) here; now it must match CellCoord.
@@ -1145,10 +1163,64 @@ mod tests {
             current_cid.coord(),
             current_coord,
             "CellId ({:?}) must match CellCoord ({:?}). Previously failed when the entity \
-             gained Stationary + StationaryComputed before initialize_stationary could \
+             gained Stationary + StationaryInitialized before compute_stationary_cell could \
              process the CellCoord change.",
             current_cid.coord(),
             current_coord,
+        );
+    }
+
+    /// Regression test: with multiple `CellHashingPlugin<F>` instances, a stationary entity
+    /// matching both filters must appear in both `ChangedCells<F1>` and `ChangedCells<F2>`.
+    ///
+    /// Previously, the first filter's `compute_stationary_cell` inserted `StationaryInitialized`,
+    /// causing the second filter's version to skip the entity. Now `StationaryInitialized` is
+    /// inserted by `mark_stationary_initialized` with a one-frame delay, so all filters get a
+    /// chance to process the entity.
+    #[test]
+    fn stationary_populates_all_changed_cells_with_multiple_filters() {
+        #[derive(Component)]
+        struct TagA;
+        #[derive(Component)]
+        struct TagB;
+
+        let mut app = App::new();
+        app.add_plugins(BigSpaceMinimalPlugins)
+            .add_plugins(BigSpaceStationaryPlugin)
+            .add_plugins(CellHashingPlugin::<With<TagA>>::new())
+            .add_plugins(CellHashingPlugin::<With<TagB>>::new());
+
+        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+
+        app.world_mut()
+            .spawn((CellCoord::default(), FloatingOrigin))
+            .set_parent_in_place(grid_entity);
+
+        // Entity matches BOTH filters
+        let entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(Vec3::ZERO),
+                CellCoord::new(1, 0, 0),
+                TagA,
+                TagB,
+                Stationary,
+            ))
+            .set_parent_in_place(grid_entity)
+            .id();
+
+        app.update();
+
+        let changed_a = app.world().resource::<ChangedCells<With<TagA>>>();
+        assert!(
+            changed_a.iter().any(|&e| e == entity),
+            "Stationary entity must appear in ChangedCells<With<TagA>>"
+        );
+
+        let changed_b = app.world().resource::<ChangedCells<With<TagB>>>();
+        assert!(
+            changed_b.iter().any(|&e| e == entity),
+            "Stationary entity must appear in ChangedCells<With<TagB>>"
         );
     }
 

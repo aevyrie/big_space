@@ -256,8 +256,16 @@ impl CellId {
         self.grid
     }
 
-    /// One-time initialization for [`Stationary`] entities.
-    pub fn initialize_stationary<F: SpatialHashFilter>(
+    /// One-time [`CellId`] computation for [`Stationary`] entities matching filter `F`.
+    ///
+    /// Computes and inserts [`CellId`]/[`CellHash`] and populates [`ChangedCells<F>`].
+    /// [`StationaryInitialized`] is inserted later by [`BigSpaceStationaryPlugin`], giving
+    /// every system one full frame to process the entity before it goes to sleep.
+    ///
+    /// When multiple [`CellHashingPlugin<F>`] instances exist with overlapping filters, the
+    /// `CellId` computation is idempotent ([`set_if_neq`](DetectChangesMut::set_if_neq))
+    /// and each variant populates its own [`ChangedCells<F>`].
+    pub fn compute_stationary_cell<F: SpatialHashFilter>(
         mut commands: Commands,
         grids: Query<&Grid>,
         mut stationary: Query<
@@ -269,7 +277,7 @@ impl CellId {
                 Option<&mut CellId>,
                 Option<&mut CellHash>,
             ),
-            (F, With<Stationary>, Without<StationaryComputed>),
+            (F, With<Stationary>, Without<StationaryInitialized>),
         >,
         mut changed_cells: ResMut<ChangedCells<F>>,
     ) {
@@ -292,7 +300,6 @@ impl CellId {
                     commands.entity(entity).insert((current_id, fast_hash));
                 }
                 changed_cells.insert(entity);
-                commands.entity(entity).insert(StationaryComputed);
             }
         }
     }
