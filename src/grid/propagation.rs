@@ -123,7 +123,7 @@ impl Grid {
     pub fn propagate_high_precision_channeled(
         system_ticks: SystemChangeTick,
         mut stats: Option<ResMut<crate::timing::PropagationStats>>,
-        grids: Query<(&Grid, Option<&GridDirtyTick>, Option<&Children>)>,
+        grids: Query<(Entity, &Grid, Option<&GridDirtyTick>, Option<&Children>)>,
         entities: Query<
             (
                 Ref<CellCoord>,
@@ -180,7 +180,7 @@ impl Grid {
                                 };
 
                                 // Read-only lookup of the parent grid.
-                                let Ok((grid, _, _)) = shared_grids.get(parent.parent()) else {
+                                let Ok((_, grid, _, _)) = shared_grids.get(parent.parent()) else {
                                     continue;
                                 };
 
@@ -200,13 +200,15 @@ impl Grid {
             }
             drop(rx);
 
-            // Producers: parallel-iterate grids, skip clean subtrees, and feed
-            // dirty children into the channel. Each grid is processed on a
-            // par_iter worker thread, parallelizing across grids in wide
-            // hierarchies.
+            // Producers: par_iter over grids for wide-hierarchy parallelism.
+            // Small dirty grids send children directly from the par_iter thread.
+            // Large dirty grids are collected via thread-local storage (no
+            // contention) and chunked into separate scope tasks after par_iter.
+            let min_chunk = n_threads * 10;
+            let mut large_grids = bevy_utils::Parallel::<alloc::vec::Vec<(Entity, bool)>>::default();
             grids.par_iter().for_each_init(
                 || tx.clone(),
-                |sender, (grid, dirty_tick, children)| {
+                |sender, (grid_entity, grid, dirty_tick, children)| {
                     let fo_unchanged = grid.local_floating_origin().is_local_origin_unchanged();
                     let subtree_clean = dirty_tick.is_some_and(|dt| !dt.is_dirty(system_ticks));
                     if fo_unchanged && subtree_clean {
@@ -214,14 +216,42 @@ impl Grid {
                     }
                     let Some(children) = children else { return };
 
-                    for child in children.iter() {
-                        if fo_unchanged && shared_filter.contains(child) {
-                            continue;
+                    if children.len() < min_chunk {
+                        // Small grid — send directly from this par_iter thread.
+                        for child in children.iter() {
+                            if fo_unchanged && shared_filter.contains(child) {
+                                continue;
+                            }
+                            sender.send_blocking(child).ok();
                         }
-                        sender.send_blocking(child).ok();
+                    } else {
+                        // Large grid — collect into thread-local vec for chunking.
+                        large_grids.borrow_local_mut().push((grid_entity, fo_unchanged));
                     }
                 },
             );
+
+            // Spawn chunked producer tasks for large grids.
+            for (grid_entity, fo_unchanged) in large_grids.drain() {
+                let Ok((_, _, _, Some(children))) = shared_grids.get(grid_entity) else {
+                    continue;
+                };
+                let chunk_size = (children.len() / n_threads / 10).max(1);
+                for child_chunk in children.chunks(chunk_size) {
+                    let mut chunk_sender = tx.clone();
+                    scope.spawn(
+                        async move {
+                            for &child in child_chunk {
+                                if fo_unchanged && shared_filter.contains(child) {
+                                    continue;
+                                }
+                                chunk_sender.send_blocking(child).ok();
+                            }
+                        }
+                        .instrument(bevy_log::info_span!("hp_propagation_producer")),
+                    );
+                }
+            }
             drop(tx);
         });
 
