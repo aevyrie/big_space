@@ -856,7 +856,7 @@ mod tests {
         assert!(
             lookup
                 .get(&old_cell_id)
-                .map_or(true, |entry| !entry.entities().any(|e| e == entity)),
+                .is_none_or(|entry| !entry.entities().any(|e| e == entity)),
             "Entity should no longer be in CellLookup at old cell"
         );
 
@@ -867,9 +867,9 @@ mod tests {
         );
     }
 
-    /// CellCoord is changed while the entity still has Stationary, then Stationary removal
+    /// `CellCoord` is changed while the entity still has Stationary, then Stationary removal
     /// happens via deferred commands in the same frame. The spatial hash must detect the
-    /// CellCoord change on the next frame after Stationary is gone.
+    /// `CellCoord` change on the next frame after Stationary is gone.
     #[test]
     fn stationary_removal_with_cellcoord_change_detected() {
         let mut app = App::new();
@@ -944,7 +944,7 @@ mod tests {
         assert!(
             lookup
                 .get(&new_cell_id)
-                .map_or(false, |entry| entry.entities().any(|e| e == entity)),
+                .is_some_and(|entry| entry.entities().any(|e| e == entity)),
             "Entity must be tracked in CellLookup at new cell after waking up"
         );
 
@@ -952,13 +952,13 @@ mod tests {
         assert!(
             lookup
                 .get(&old_cell_id)
-                .map_or(true, |entry| !entry.entities().any(|e| e == entity)),
+                .is_none_or(|entry| !entry.entities().any(|e| e == entity)),
             "Entity should no longer be in CellLookup at old cell"
         );
     }
 
-    /// A system running after spatial hash systems changes CellCoord and removes Stationary
-    /// via deferred commands. Next frame's CellId::update must detect the cross-frame
+    /// A system running after spatial hash systems changes `CellCoord` and removes Stationary
+    /// via deferred commands. Next frame's `CellId::update` must detect the cross-frame
     /// Changed<CellCoord>.
     #[test]
     fn late_cellcoord_change_with_deferred_stationary_removal() {
@@ -1001,7 +1001,7 @@ mod tests {
             assert!(
                 lookup
                     .get(&old_cell_id)
-                    .map_or(false, |e| e.entities().any(|e| e == entity)),
+                    .is_some_and(|e| e.entities().any(|e| e == entity)),
                 "Entity should be in filtered CellLookup before wake-up"
             );
         }
@@ -1056,14 +1056,14 @@ mod tests {
         assert!(
             lookup
                 .get(&new_cell_id)
-                .map_or(false, |entry| entry.entities().any(|e| e == entity)),
+                .is_some_and(|entry| entry.entities().any(|e| e == entity)),
             "Entity must be tracked in filtered CellLookup at new cell"
         );
 
         assert!(
             lookup
                 .get(&old_cell_id)
-                .map_or(true, |entry| !entry.entities().any(|e| e == entity)),
+                .is_none_or(|entry| !entry.entities().any(|e| e == entity)),
             "Entity should no longer be in filtered CellLookup at old cell"
         );
     }
