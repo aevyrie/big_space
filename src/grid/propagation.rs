@@ -105,11 +105,9 @@ impl Grid {
     /// Update the [`GlobalTransform`] of all entities with a [`CellCoord`], using a
     /// producer-consumer architecture with a [`BufferedChannel`].
     ///
-    /// A single producer sequentially visits every [`Grid`], checks whether the grid can be
-    /// skipped (unchanged local floating origin **and** clean subtree), and sends the
-    /// [`Children`] of dirty grids through a buffered channel. Consumer tasks, spawned upfront
-    /// on the [`ComputeTaskPool`], pull batches of entities from the channel and update their
-    /// [`GlobalTransform`] via [`Query::get_unchecked`].
+    /// Producer tasks split each dirty [`Grid`]'s children into chunks and send
+    /// non-stationary entities through a buffered channel. Consumer workers pull batches
+    /// concurrently and update [`GlobalTransform`] via [`Query::get_unchecked`].
     ///
     /// This is the default high-precision propagation system on `std` targets. The flat
     /// [`Self::propagate_high_precision`] variant is used on `no_std`.
@@ -137,21 +135,28 @@ impl Grid {
             ),
             With<CellCoord>,
         >,
+        // Lightweight filter used by producers to skip sleeping stationary entities before
+        // sending them through the channel. The `fo_unchanged` guard on the producer side
+        // ensures this is only checked when the floating origin hasn't moved — when the FO
+        // moves, all entities (including sleeping ones) need GT recomputation, so they are
+        // sent unconditionally.
+        stationary_filter: Query<(), (With<Stationary>, With<StationaryInitialized>)>,
         mut channel: Local<crate::buffered_channel::BufferedChannel<Entity>>,
     ) {
         let start = bevy_platform::time::Instant::now();
         let task_pool = bevy_tasks::ComputeTaskPool::get();
         let shared_entities = &entities;
         let shared_grids = &grids;
+        let shared_filter = &stationary_filter;
+        let n_threads = task_pool.thread_num().max(1);
 
         task_pool.scope(|scope| {
-            channel.chunk_size = 1024 * 10;
-            let (rx, tx) = channel.unbounded();
-            let shared_entities = &shared_entities;
+            // Tuned via benchmarking
+            channel.chunk_size = 4096;
+            let (rx, mut tx) = channel.unbounded();
 
-            // Spawn consumer workers upfront.
-            let num_workers = task_pool.thread_num().max(1);
-            for _ in 0..num_workers {
+            // Spawn consumer workers upfront so they start pulling work immediately.
+            for _ in 0..n_threads {
                 let rx = rx.clone();
                 scope.spawn(
                     async move {
@@ -159,7 +164,7 @@ impl Grid {
                             for &entity in chunk.iter() {
                                 // SAFETY: Each entity is sent through the channel at most
                                 // once (each entity has exactly one parent grid, and each
-                                // grid's children are sent exactly once by the producer).
+                                // grid's children are sent exactly once by the producers).
                                 // Therefore, no two consumer tasks will call get_unchecked
                                 // on the same entity.
                                 let Ok((
@@ -193,24 +198,48 @@ impl Grid {
                     .instrument(bevy_log::info_span!("hp_propagation_worker")),
                 );
             }
-            // Drop the extra receiver clone so consumers see channel closure.
             drop(rx);
 
-            // Producer: visit each grid, skip clean subtrees, send dirty children.
-            grids.par_iter().for_each_init(
-                || tx.clone(),
-                |sender, (grid, dirty_tick, children)| {
-                    let subtree_clean = dirty_tick.is_some_and(|dt| !dt.is_dirty(system_ticks));
-                    if grid.local_floating_origin().is_local_origin_unchanged() && subtree_clean {
-                        return;
-                    }
+            // Producers: iterate grids sequentially (typically few grids, so
+            // parallelizing the outer loop adds complexity for little gain), then
+            // split each dirty grid's children into chunks and spawn a producer
+            // task per chunk. The chunking parallelizes the stationary_filter
+            // .contains() work across threads — without it, millions of query
+            // lookups on one thread bottleneck the pipeline.
+            for (grid, dirty_tick, children) in grids.iter() {
+                let fo_unchanged = grid.local_floating_origin().is_local_origin_unchanged();
+                let subtree_clean = dirty_tick.is_some_and(|dt| !dt.is_dirty(system_ticks));
+                if fo_unchanged && subtree_clean {
+                    continue;
+                }
+                let Some(children) = children else { continue };
 
-                    let Some(children) = children else { return };
+                let chunk_size = children.len() / n_threads / 10;
+                if chunk_size < 2 {
+                    // Small grid — not worth spawning tasks, just send directly.
                     for child in children.iter() {
-                        sender.send_blocking(child).ok();
+                        if fo_unchanged && shared_filter.contains(child) {
+                            continue;
+                        }
+                        tx.send_blocking(child).ok();
                     }
-                },
-            );
+                } else {
+                    for child_chunk in children.chunks(chunk_size) {
+                        let mut sender = tx.clone();
+                        scope.spawn(
+                            async move {
+                                for &child in child_chunk {
+                                    if fo_unchanged && shared_filter.contains(child) {
+                                        continue;
+                                    }
+                                    sender.send_blocking(child).ok();
+                                }
+                            }
+                            .instrument(bevy_log::info_span!("hp_propagation_producer")),
+                        );
+                    }
+                }
+            }
             drop(tx);
         });
 
