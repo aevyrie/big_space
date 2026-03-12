@@ -244,6 +244,8 @@ mod tests {
     use crate::prelude::*;
     use bevy::prelude::*;
 
+    /// Stationary entities must not be recentered into a new grid cell, even when their
+    /// [`Transform`] translation is large enough to trigger recentering for normal entities.
     #[test]
     fn stationary_entities_do_not_recenter() {
         let mut app = App::new();
@@ -280,6 +282,8 @@ mod tests {
         assert_eq!(transform.translation.x, 100_000.0);
     }
 
+    /// Removing `Stationary`, moving the entity, and re-adding `Stationary` must correctly
+    /// recenter the entity, update its [`CellId`], and resume skipping updates.
     #[test]
     fn remove_stationary_move_then_readd() {
         let mut app = App::new();
@@ -367,6 +371,8 @@ mod tests {
         );
     }
 
+    /// A newly spawned `Stationary` entity gets a [`CellId`] computed and appears in
+    /// [`CellLookup`] after the first frame.
     #[test]
     fn stationary_entities_are_correctly_initialized() {
         let mut app = App::new();
@@ -404,6 +410,8 @@ mod tests {
             .any(|e| e == stationary));
     }
 
+    /// A `Stationary` entity spawned with an existing [`CellId`] is still picked up by
+    /// [`CellLookup`] and receives [`StationaryInitialized`] after stabilization.
     #[test]
     fn stationary_entity_spawned_with_cellid_is_registered() {
         let mut app = App::new();
@@ -446,6 +454,8 @@ mod tests {
         );
     }
 
+    /// After initialization, `Stationary` entities must not appear in [`ChangedCells`] on
+    /// subsequent frames, even if their [`Transform`] is mutated.
     #[test]
     fn stationary_entities_do_not_trigger_unnecessary_updates() {
         let mut app = App::new();
