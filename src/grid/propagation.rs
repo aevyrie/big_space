@@ -105,11 +105,9 @@ impl Grid {
     /// Update the [`GlobalTransform`] of all entities with a [`CellCoord`], using a
     /// producer-consumer architecture with a [`BufferedChannel`].
     ///
-    /// A single producer sequentially visits every [`Grid`], checks whether the grid can be
-    /// skipped (unchanged local floating origin **and** clean subtree), and sends the
-    /// [`Children`] of dirty grids through a buffered channel. Consumer tasks, spawned upfront
-    /// on the [`ComputeTaskPool`], pull batches of entities from the channel and update their
-    /// [`GlobalTransform`] via [`Query::get_unchecked`].
+    /// Producer tasks split each dirty [`Grid`]'s children into chunks and send
+    /// non-stationary entities through a buffered channel. Consumer workers pull batches
+    /// concurrently and update [`GlobalTransform`] via [`Query::get_unchecked`].
     ///
     /// This is the default high-precision propagation system on `std` targets. The flat
     /// [`Self::propagate_high_precision`] variant is used on `no_std`.
@@ -125,7 +123,7 @@ impl Grid {
     pub fn propagate_high_precision_channeled(
         system_ticks: SystemChangeTick,
         mut stats: Option<ResMut<crate::timing::PropagationStats>>,
-        grids: Query<(&Grid, Option<&GridDirtyTick>, Option<&Children>)>,
+        grids: Query<(Entity, &Grid, Option<&GridDirtyTick>, Option<&Children>)>,
         entities: Query<
             (
                 Ref<CellCoord>,
@@ -137,21 +135,28 @@ impl Grid {
             ),
             With<CellCoord>,
         >,
+        // Lightweight filter used by producers to skip sleeping stationary entities before
+        // sending them through the channel. The `fo_unchanged` guard on the producer side
+        // ensures this is only checked when the floating origin hasn't moved - when the FO
+        // moves, all entities (including sleeping ones) need GT recomputation, so they are
+        // sent unconditionally.
+        stationary_filter: Query<(), (With<Stationary>, With<StationaryInitialized>)>,
         mut channel: Local<crate::buffered_channel::BufferedChannel<Entity>>,
     ) {
         let start = bevy_platform::time::Instant::now();
         let task_pool = bevy_tasks::ComputeTaskPool::get();
         let shared_entities = &entities;
         let shared_grids = &grids;
+        let shared_filter = &stationary_filter;
+        let n_threads = task_pool.thread_num().max(1);
 
         task_pool.scope(|scope| {
-            channel.chunk_size = 1024 * 10;
+            // Tuned via benchmarking
+            channel.chunk_size = 4096;
             let (rx, tx) = channel.unbounded();
-            let shared_entities = &shared_entities;
 
-            // Spawn consumer workers upfront.
-            let num_workers = task_pool.thread_num().max(1);
-            for _ in 0..num_workers {
+            // Spawn consumer workers upfront so they start pulling work immediately.
+            for _ in 0..n_threads {
                 let rx = rx.clone();
                 scope.spawn(
                     async move {
@@ -159,7 +164,7 @@ impl Grid {
                             for &entity in chunk.iter() {
                                 // SAFETY: Each entity is sent through the channel at most
                                 // once (each entity has exactly one parent grid, and each
-                                // grid's children are sent exactly once by the producer).
+                                // grid's children are sent exactly once by the producers).
                                 // Therefore, no two consumer tasks will call get_unchecked
                                 // on the same entity.
                                 let Ok((
@@ -175,7 +180,7 @@ impl Grid {
                                 };
 
                                 // Read-only lookup of the parent grid.
-                                let Ok((grid, _, _)) = shared_grids.get(parent.parent()) else {
+                                let Ok((_, grid, _, _)) = shared_grids.get(parent.parent()) else {
                                     continue;
                                 };
 
@@ -193,24 +198,63 @@ impl Grid {
                     .instrument(bevy_log::info_span!("hp_propagation_worker")),
                 );
             }
-            // Drop the extra receiver clone so consumers see channel closure.
             drop(rx);
 
-            // Producer: visit each grid, skip clean subtrees, send dirty children.
+            // Producers: par_iter over grids for wide-hierarchy parallelism.
+            // Small dirty grids send children directly from the par_iter thread.
+            // Large dirty grids are collected via thread-local storage (no
+            // contention) and chunked into separate scope tasks after par_iter.
+            let min_chunk = n_threads * 10;
+            let mut large_grids =
+                bevy_utils::Parallel::<alloc::vec::Vec<(Entity, bool)>>::default();
             grids.par_iter().for_each_init(
                 || tx.clone(),
-                |sender, (grid, dirty_tick, children)| {
+                |sender, (grid_entity, grid, dirty_tick, children)| {
+                    let fo_unchanged = grid.local_floating_origin().is_local_origin_unchanged();
                     let subtree_clean = dirty_tick.is_some_and(|dt| !dt.is_dirty(system_ticks));
-                    if grid.local_floating_origin().is_local_origin_unchanged() && subtree_clean {
+                    if fo_unchanged && subtree_clean {
                         return;
                     }
-
                     let Some(children) = children else { return };
-                    for child in children.iter() {
-                        sender.send_blocking(child).ok();
+
+                    if children.len() < min_chunk {
+                        // Small grid — send directly from this par_iter thread.
+                        for child in children.iter() {
+                            if fo_unchanged && shared_filter.contains(child) {
+                                continue;
+                            }
+                            sender.send_blocking(child).ok();
+                        }
+                    } else {
+                        // Large grid — collect into thread-local vec for chunking.
+                        large_grids
+                            .borrow_local_mut()
+                            .push((grid_entity, fo_unchanged));
                     }
                 },
             );
+
+            // Spawn chunked producer tasks for large grids.
+            for (grid_entity, fo_unchanged) in large_grids.drain() {
+                let Ok((_, _, _, Some(children))) = shared_grids.get(grid_entity) else {
+                    continue;
+                };
+                let chunk_size = (children.len() / n_threads / 10).max(1);
+                for child_chunk in children.chunks(chunk_size) {
+                    let mut chunk_sender = tx.clone();
+                    scope.spawn(
+                        async move {
+                            for &child in child_chunk {
+                                if fo_unchanged && shared_filter.contains(child) {
+                                    continue;
+                                }
+                                chunk_sender.send_blocking(child).ok();
+                            }
+                        }
+                        .instrument(bevy_log::info_span!("hp_propagation_producer")),
+                    );
+                }
+            }
             drop(tx);
         });
 

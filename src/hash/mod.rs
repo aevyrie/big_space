@@ -52,13 +52,22 @@ where
                         .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(BigSpaceSystems::RecenterLargeTransforms)
                         .after(SpatialHashSystems::ClearChangedCells),
+                    // NOTE: compute_stationary_cell is intentionally NOT in UpdateCellHashes.
+                    // Placing it in that set would force the entire downstream hashing chain
+                    // (CellLookup → PartitionLookup → PartitionEntities) to complete before
+                    // high-precision propagation can start. By keeping it out of the set and
+                    // using only explicit `.before(PropagateHighPrecision)`, the rest of the
+                    // hashing chain remains free to run in parallel with propagation.
                     CellId::compute_stationary_cell::<F>
-                        .in_set(SpatialHashSystems::UpdateCellHashes)
                         .after(CellId::update::<F>)
-                        .after(SpatialHashSystems::ClearChangedCells),
+                        .after(SpatialHashSystems::ClearChangedCells)
+                        .before(BigSpaceSystems::PropagateHighPrecision),
                     CellLookup::<F>::update
                         .in_set(SpatialHashSystems::UpdateCellLookup)
-                        .after(SpatialHashSystems::UpdateCellHashes),
+                        .after(SpatialHashSystems::UpdateCellHashes)
+                        // Explicit dep ensures stationary entities have CellId before the
+                        // lookup table is rebuilt, without pulling this into UpdateCellHashes.
+                        .after(CellId::compute_stationary_cell::<F>),
                 ),
             );
     }

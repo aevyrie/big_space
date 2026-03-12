@@ -253,6 +253,7 @@ fn move_player(
 
     let t = time.elapsed_secs() * 1.0;
     let scale = MOVEMENT_SPEED;
+    let n_moving = non_player.count();
     if scale.abs() > 0.0 {
         for (mut transform, _, parent) in non_player.iter_mut() {
             // Scale movement relative to the parent grid's half_width so entities don't
@@ -310,6 +311,7 @@ F to spawn 1,000/grid, G to double
 
 Grids: {: >15}
 Population: {: >8} Entities
+Moving: {: >12} Entities
 
 Transform Propagation
 Cell Recentering: {: >11.1?}
@@ -334,6 +336,7 @@ Total: {: >22.1?}",
             .map(core::str::from_utf8)
             .collect::<Result<Vec<&str>, _>>()?
             .join(","),
+        n_moving,
         //
         prop_stats.avg().grid_recentering(),
         prop_stats.avg().low_precision_root_tagging(),

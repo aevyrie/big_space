@@ -87,23 +87,27 @@ impl GridDirtyTick {
     }
 }
 
+/// Observer that inserts [`GridDirtyTick`] on any entity that gains a [`Grid`] component.
+fn on_grid_added(trigger: On<Add, Grid>, mut commands: Commands) {
+    commands
+        .entity(trigger.event_target())
+        .insert(GridDirtyTick::default());
+}
+
 /// Marks grid subtrees as dirty when non-[`Stationary`] entities change.
 ///
 /// This pre-pass runs before [`Grid::propagate_high_precision`]. It walks the ancestors
 /// of changed non-stationary entities and marks each ancestor [`Grid`] dirty via
-/// [`GridDirtyTick`]. It also auto-inserts [`GridDirtyTick`] on any [`Grid`] that doesn't
-/// have it yet.
+/// [`GridDirtyTick`].
 ///
 /// Additionally, any [`Grid`] whose [`Children`] list changed this frame (entities added
 /// or removed) marks itself and all ancestor grids dirty, ensuring newly spawned entities
 /// (including [`Stationary`] ones excluded by `changed`) always get their initial
 /// [`GlobalTransform`] computed even if the grid subtree was previously clean.
 pub(crate) fn mark_dirty_subtrees(
-    mut commands: Commands,
     system_ticks: SystemChangeTick,
     parents: Query<&ChildOf>,
     mut dirty_ticks: Query<&mut GridDirtyTick>,
-    grids_without: Query<Entity, (With<Grid>, Without<GridDirtyTick>)>,
     changed: Query<
         &ChildOf,
         (
@@ -115,13 +119,6 @@ pub(crate) fn mark_dirty_subtrees(
     // Stationary entities excluded by `changed`) without scanning all CellCoord entities.
     grids_with_changed_children: Query<Entity, (With<Grid>, Changed<Children>)>,
 ) {
-    // Auto-insert on any Grid that doesn't have GridDirtyTick yet.
-    // Commands are deferred, so newly inserted grids treat themselves as dirty (correct for
-    // first GT initialization).
-    for entity in grids_without.iter() {
-        commands.entity(entity).insert(GridDirtyTick::default());
-    }
-
     let current_tick = system_ticks.this_run().get();
 
     for parent_rel in changed.iter() {
@@ -214,15 +211,23 @@ impl Plugin for BigSpaceStationaryPlugin {
             .register_type::<StationaryInitialized>()
             .register_type::<GridDirtyTick>();
 
+        // Observer ensures GridDirtyTick is present on every Grid entity as soon as it's
+        // spawned, without a per-frame system that would need Commands in PostUpdate.
+        app.add_observer(on_grid_added);
+
+        // mark_dirty_subtrees intentionally does NOT use Commands, so Bevy won't insert an
+        // apply_deferred sync point before propagation. This allows the spatial hashing
+        // chain (CellLookup → PartitionLookup → PartitionEntities) to run in parallel with
+        // high-precision propagation.
         #[cfg(feature = "std")]
-        let dirty_configs = || {
+        let dirty_config = || {
             mark_dirty_subtrees
                 .in_set(BigSpaceSystems::PropagateHighPrecision)
                 .before(Grid::propagate_high_precision_channeled)
                 .after(BigSpaceSystems::LocalFloatingOrigins)
         };
         #[cfg(not(feature = "std"))]
-        let dirty_configs = || {
+        let dirty_config = || {
             mark_dirty_subtrees
                 .in_set(BigSpaceSystems::PropagateHighPrecision)
                 .before(Grid::propagate_high_precision)
@@ -231,8 +236,8 @@ impl Plugin for BigSpaceStationaryPlugin {
         // mark_stationary_initialized runs in Last (not PostUpdate) so it cannot trigger
         // Bevy's auto-apply_deferred before any PostUpdate system that filters
         // Without<StationaryInitialized> (e.g. CellId::compute_stationary_cell).
-        app.add_systems(PostUpdate, dirty_configs())
-            .add_systems(PostStartup, dirty_configs())
+        app.add_systems(PostUpdate, dirty_config())
+            .add_systems(PostStartup, dirty_config())
             .add_systems(Last, mark_stationary_initialized);
     }
 }
