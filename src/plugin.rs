@@ -50,7 +50,7 @@ impl PluginGroup for BigSpaceDefaultPlugins {
         }
         #[cfg(feature = "camera")]
         {
-            group = group.add(BigSpaceCameraControllerPlugin);
+            group = group.add(BigSpaceCameraControllerPlugin::default());
         }
         group
     }
