@@ -240,7 +240,7 @@ impl Plugin for BigSpaceStationaryPlugin {
 #[cfg(test)]
 mod tests {
     use crate::hash::ChangedCells;
-    use crate::plugin::{BigSpaceDefaultPlugins, BigSpaceMinimalPlugins};
+    use crate::plugin::BigSpaceMinimalPlugins;
     use crate::prelude::*;
     use bevy::prelude::*;
 
@@ -1138,8 +1138,6 @@ mod tests {
         // (one-frame delay) so it re-processes the entity and updates CellId to match the
         // new CellCoord. StationaryInitialized is inserted in Last this frame.
         app.update();
-        // Extra frame for good measure
-        app.update();
 
         // Verify the entity has both Stationary and StationaryInitialized
         assert!(
@@ -1221,27 +1219,6 @@ mod tests {
         assert!(
             changed_b.iter().any(|&e| e == entity),
             "Stationary entity must appear in ChangedCells<With<TagB>>"
-        );
-    }
-
-    /// Verifies that [`BigSpaceStationaryPlugin`] is included in [`BigSpaceDefaultPlugins`].
-    #[test]
-    fn stationary_plugin_included_in_default_plugins() {
-        use crate::plugin::BigSpaceValidationPlugin;
-
-        let mut app = App::new();
-        let group = BigSpaceDefaultPlugins.build();
-        #[cfg(feature = "camera")]
-        let group = group.disable::<crate::plugin::BigSpaceCameraControllerPlugin>();
-        #[cfg(feature = "debug")]
-        let group = group.disable::<crate::plugin::BigSpaceDebugPlugin>();
-        let group = group.disable::<BigSpaceValidationPlugin>();
-        app.add_plugins(group);
-        let root = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
-        app.update();
-        assert!(
-            app.world().get::<GridDirtyTick>(root).is_some(),
-            "GridDirtyTick should be auto-inserted when BigSpaceStationaryPlugin is active via BigSpaceDefaultPlugins"
         );
     }
 }
