@@ -3,6 +3,7 @@
 //! See [`Stationary`], [`BigSpaceStationaryPlugin`].
 
 use crate::prelude::*;
+use alloc::vec::Vec;
 use bevy_app::prelude::*;
 use bevy_ecs::{
     change_detection::Tick, lifecycle::HookContext, prelude::*, system::SystemChangeTick,
@@ -163,23 +164,66 @@ fn mark_ancestor_grids(
     }
 }
 
+/// Tracks whether at least one [`FixedUpdate`] tick has executed since stationary processing.
+///
+/// Automatically initialized by [`BigSpaceStationaryPlugin`] when
+/// [`TimePlugin`](bevy_time::TimePlugin) is present. [`FixedUpdateRan::set_ran`] runs each
+/// `FixedUpdate` tick to set the flag; [`mark_stationary_initialized`] reads and resets it
+/// so that [`StationaryInitialized`] is never inserted before the `FixedUpdate` pipeline
+/// has processed the entity.
+///
+/// When this resource is absent (no `TimePlugin`), [`mark_stationary_initialized`] uses a
+/// simple frame-delay with no `FixedUpdate` gating.
+#[derive(Resource, Default)]
+pub struct FixedUpdateRan(pub bool);
+
+impl FixedUpdateRan {
+    /// System that sets the flag to `true`. Registered in [`FixedUpdate`] by
+    /// [`BigSpaceStationaryPlugin`] so downstream systems can order relative to it.
+    pub fn set_ran(mut ran: ResMut<FixedUpdateRan>) {
+        ran.0 = true;
+    }
+}
+
 /// Inserts [`StationaryInitialized`] on [`Stationary`] entities that have been present for at
-/// least one full frame.
+/// least one full frame **and** one `FixedUpdate` tick (if a `FixedUpdate` pipeline exists).
 ///
-/// By waiting until [`Ref::is_added`] returns `false`, every system (propagation, spatial
-/// hashing, etc.) gets one pass to process the entity before it goes to sleep.
+/// The `!is_added()` check ensures a full main-schedule frame has passed. The [`FixedUpdateRan`]
+/// check ensures the `FixedUpdate` pipeline has had at least one tick since the entity was spawned,
+/// preventing the race where `StationaryInitialized` is inserted before the `FixedUpdate` pipeline
+/// processes the entity.
 ///
-/// Runs in [`Last`] so that its deferred commands cannot trigger Bevy's automatic
-/// `apply_deferred` during [`PostUpdate`], which would interfere with systems that filter
+/// Runs in [`Last`] so that its deferred commands cannot trigger Bevy's automatic `apply_deferred`
+/// during [`PostUpdate`], which would interfere with systems that filter
 /// `Without<StationaryInitialized>`.
-fn mark_stationary_initialized(
+pub fn mark_stationary_initialized(
     mut commands: Commands,
     uninitialized: Query<(Entity, Ref<Stationary>), Without<StationaryInitialized>>,
+    mut fixed_update_ran: Option<ResMut<FixedUpdateRan>>,
 ) {
-    for (entity, stationary) in uninitialized.iter() {
-        if !stationary.is_added() {
-            commands.entity(entity).insert(StationaryInitialized);
-        }
+    // When FixedUpdateRan is present, wait until FixedUpdate has ticked this frame at least once.
+    // This prevents StationaryInitialized from being inserted before FixedUpdate systems (e.g.,
+    // compute_stationary_cell) process the entity. When absent, fall back to the frame-delay
+    // behavior (no FixedUpdate gating).
+    let fixed_ready = fixed_update_ran.as_ref().is_none_or(|r| r.0);
+    if !fixed_ready {
+        return;
+    }
+
+    let to_init: Vec<(Entity, StationaryInitialized)> = uninitialized
+        .iter()
+        .filter(|(_, stationary)| !stationary.is_added())
+        .map(|(entity, _)| (entity, StationaryInitialized))
+        .collect();
+    if !to_init.is_empty() {
+        commands.queue(move |world: &mut World| {
+            world.insert_batch(to_init);
+        });
+    }
+
+    // Reset so the next frame starts with false; FixedUpdate will set it back to true.
+    if let Some(ref mut r) = fixed_update_ran {
+        r.0 = false;
     }
 }
 
@@ -233,21 +277,139 @@ impl Plugin for BigSpaceStationaryPlugin {
                 .before(Grid::propagate_high_precision)
                 .after(BigSpaceSystems::LocalFloatingOrigins)
         };
-        // mark_stationary_initialized runs in Last (not PostUpdate) so it cannot trigger
+        // mark_stationary_initialized runs in Last (not PostUpdate), so it cannot trigger
         // Bevy's auto-apply_deferred before any PostUpdate system that filters
-        // Without<StationaryInitialized> (e.g. CellId::compute_stationary_cell).
+        // Without<StationaryInitialized> (e.g., CellId::compute_stationary_cell).
         app.add_systems(PostUpdate, dirty_config())
             .add_systems(PostStartup, dirty_config())
             .add_systems(Last, mark_stationary_initialized);
+
+        // If TimePlugin is already present, FixedUpdate will tick. Init the
+        // resource now so gating is active from the first frame.
+        // If TimePlugin is added later (by a later plugin), users can
+        // manually init FixedUpdateRan and register set_ran.
+        if app.is_plugin_added::<bevy_time::TimePlugin>() {
+            app.init_resource::<FixedUpdateRan>()
+                .add_systems(FixedUpdate, FixedUpdateRan::set_ran);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::FixedUpdateRan;
     use crate::hash::ChangedCells;
     use crate::plugin::BigSpaceMinimalPlugins;
     use crate::prelude::*;
     use bevy::prelude::*;
+    use bevy_platform::thread;
+
+    /// With [`bevy_time::TimePlugin`] present, [`BigSpaceStationaryPlugin`] automatically
+    /// inits [`FixedUpdateRan`] and registers [`FixedUpdateRan::set_ran`] in `FixedUpdate`.
+    ///
+    /// Verifies:
+    /// 1. The resource is created at plugin init (detected `TimePlugin` in `build()`).
+    /// 2. `StationaryInitialized` is NOT inserted while `is_added()` is true (frame delay).
+    /// 3. `StationaryInitialized` is NOT inserted before `FixedUpdate` ticks (gating).
+    /// 4. `StationaryInitialized` IS inserted once both conditions are met.
+    #[test]
+    fn fixed_update_gates_stationary_initialized() {
+        let mut app = App::new();
+        app.add_plugins((
+            bevy::time::TimePlugin,
+            BigSpaceMinimalPlugins,
+            BigSpaceStationaryPlugin,
+        ));
+
+        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+
+        // Resource should exist immediately (build detected TimePlugin).
+        assert!(
+            app.world().get_resource::<FixedUpdateRan>().is_some(),
+            "FixedUpdateRan should exist (TimePlugin detected in build)"
+        );
+
+        // Initialize TimePlugin clock baseline.
+        app.update();
+
+        // Spawn entity after clock init so is_added() timing is predictable.
+        let entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(Vec3::ZERO),
+                CellCoord::default(),
+                Stationary,
+            ))
+            .set_parent_in_place(grid_entity)
+            .id();
+
+        // Next update without sleeping: FixedUpdate may not tick (near-zero delta).
+        // is_added() is true regardless → no init.
+        app.update();
+        assert!(
+            app.world().get::<StationaryInitialized>(entity).is_none(),
+            "StationaryInitialized should not be inserted (is_added still true)"
+        );
+
+        // Sleep so FixedUpdate ticks. is_added() is now false → both gates are satisfied.
+        thread::sleep(core::time::Duration::from_millis(20));
+        app.update();
+        assert!(
+            app.world().get::<StationaryInitialized>(entity).is_some(),
+            "StationaryInitialized should be inserted after frame-delay + FixedUpdate tick"
+        );
+    }
+
+    /// Entity spawned on the very first frame (before any `app.update()`) must NOT
+    /// receive [`StationaryInitialized`] until `FixedUpdate` has actually ticked.
+    /// This catches the first-frame race where the resource didn't exist yet and
+    /// gating was bypassed.
+    #[test]
+    fn first_frame_spawn_waits_for_fixed_update() {
+        let mut app = App::new();
+        app.add_plugins((
+            bevy::time::TimePlugin,
+            BigSpaceMinimalPlugins,
+            BigSpaceStationaryPlugin,
+        ));
+
+        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+
+        // Spawn BEFORE any update — this is the first-frame scenario.
+        let entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(Vec3::ZERO),
+                CellCoord::default(),
+                Stationary,
+            ))
+            .set_parent_in_place(grid_entity)
+            .id();
+
+        // Frame 0: clock init. is_added() true → no init. FixedUpdate has zero
+        // delta, so it won't tick, but gating resource exists at false regardless.
+        app.update();
+        assert!(
+            app.world().get::<StationaryInitialized>(entity).is_none(),
+            "Frame 0: should not init (is_added)"
+        );
+
+        // Frame 1: near-zero delta, FixedUpdate likely doesn't tick.
+        // is_added() is now false, but FixedUpdateRan is false → gated.
+        app.update();
+        assert!(
+            app.world().get::<StationaryInitialized>(entity).is_none(),
+            "Frame 1: should not init (FixedUpdate hasn't ticked yet)"
+        );
+
+        // Sleep so FixedUpdate ticks. Now both conditions are met.
+        thread::sleep(core::time::Duration::from_millis(20));
+        app.update();
+        assert!(
+            app.world().get::<StationaryInitialized>(entity).is_some(),
+            "Should be initialized after FixedUpdate ticks"
+        );
+    }
 
     /// Stationary entities must not be recentered into a new grid cell, even when their
     /// [`Transform`] translation is large enough to trigger recentering for normal entities.

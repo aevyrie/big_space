@@ -15,7 +15,7 @@ all-features = true
 [features]
 default = ["std"]
 debug = ["std", "bevy_gizmos", "bevy_color"]
-camera = ["std", "bevy_camera", "bevy_time", "bevy_input"]
+camera = ["std", "bevy_camera", "bevy_input"]
 i8 = []
 i16 = []
 i32 = []
@@ -32,7 +32,7 @@ std = [
   "bevy_platform/std",
   "bevy_color?/std",
   "bevy_input?/std",
-  "bevy_time?/std",
+  "bevy_time/std",
   "dep:async-channel",
 ]
 libm = ["bevy_math/libm", "dep:libm"]
@@ -65,7 +65,7 @@ bevy_input = { version = "0.18.0", default-features = false, optional = true, fe
   "keyboard",
   "mouse",
 ] }
-bevy_time = { version = "0.18.0", default-features = false, optional = true }
+bevy_time = { version = "0.18.0", default-features = false }
 libm = { version = "0.2", default-features = false, optional = true }
 async-channel = { version = "2.5", optional = true }
 

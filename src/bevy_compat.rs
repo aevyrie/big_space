@@ -1,12 +1,12 @@
 //! Systems for [`Transform`] propagation compatibility with entities outside a
-//! [`BigSpace`](crate::BigSpace), needed when bevy's built in transform propagation is disabled.
+//! [`BigSpace`](crate::BigSpace), needed when bevy's built-in transform propagation is disabled.
 
 use alloc::vec::Vec;
 use bevy_ecs::{change_detection::Ref, prelude::*};
 use bevy_transform::prelude::*;
 
 /// Copied from bevy. This is the simpler propagation implementation that doesn't use dirty tree
-/// marking. This is needed because dirty tree marking doesn't start from the root, and will end up
+/// marking. This is needed because dirty tree marking doesn't start from the root and will end up
 /// doing the work for big space hierarchies, which it cannot affect anyway.
 pub fn propagate_parent_transforms(
     mut root_query: Query<
@@ -28,7 +28,7 @@ pub fn propagate_parent_transforms(
         |(entity, children, transform, mut global_transform)| {
             let changed = transform.is_changed() || global_transform.is_added() || orphaned_entities.binary_search(&entity).is_ok();
             if changed {
-                *global_transform = GlobalTransform::from(*transform);
+                global_transform.set_if_neq(GlobalTransform::from(*transform));
             }
 
             for (child, child_of) in child_query.iter_many(children) {
@@ -125,7 +125,7 @@ unsafe fn propagate_recursive(
 
         changed |= transform.is_changed() || global_transform.is_added();
         if changed {
-            *global_transform = parent.mul_transform(*transform);
+            global_transform.set_if_neq(parent.mul_transform(*transform));
         }
         (global_transform, children)
     };

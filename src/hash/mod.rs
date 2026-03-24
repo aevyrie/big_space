@@ -62,12 +62,15 @@ where
                         .after(CellId::update::<F>)
                         .after(SpatialHashSystems::ClearChangedCells)
                         .before(BigSpaceSystems::PropagateHighPrecision),
+                    // Flush deferred commands from compute_stationary_cell so that
+                    // newly-inserted CellId/CellHash components are visible to
+                    // CellLookup::update in the same frame.
+                    ApplyDeferred
+                        .after(CellId::compute_stationary_cell::<F>)
+                        .before(CellLookup::<F>::update),
                     CellLookup::<F>::update
                         .in_set(SpatialHashSystems::UpdateCellLookup)
-                        .after(SpatialHashSystems::UpdateCellHashes)
-                        // Explicit dep ensures stationary entities have CellId before the
-                        // lookup table is rebuilt, without pulling this into UpdateCellHashes.
-                        .after(CellId::compute_stationary_cell::<F>),
+                        .after(SpatialHashSystems::UpdateCellHashes),
                 ),
             );
     }

@@ -197,13 +197,12 @@
 
 #![allow(clippy::type_complexity)]
 #![warn(missing_docs)]
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
-#[allow(unused_imports)] // For docs
+// Handy to re-export privately so we can `use crate::*;`
 use bevy_transform::prelude::*;
-#[allow(unused_imports)] // For docs
 use prelude::*;
 
 pub(crate) mod portable_par;

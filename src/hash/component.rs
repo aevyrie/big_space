@@ -221,11 +221,11 @@ impl CellId {
             |(entity, parent, cell, mut cell_guid, mut fast_hash)| {
                 let parent_entity = parent.parent();
                 if cell_guid.coord == *cell && cell_guid.grid == parent_entity {
-                    // Values are already correct. If the entity was just spawned with a
-                    // pre-computed CellId (Added), register it so CellLookup picks it up.
-                    if cell.is_added() {
-                        thread_updated_hashes.scope(|tl| tl.push(entity));
-                    }
+                    // Values are already correct. Always register in ChangedCells so
+                    // CellLookup picks up the entity. This covers initial spawn with a
+                    // pre-computed CellId as well as re-entry into the pipeline after
+                    // the entity temporarily stopped matching the filter.
+                    thread_updated_hashes.scope(|tl| tl.push(entity));
                     return;
                 }
 
@@ -281,6 +281,11 @@ impl CellId {
         >,
         mut changed_cells: ResMut<ChangedCells<F>>,
     ) {
+        // Collect entities that need CellId/CellHash inserted (don't have them yet).
+        // This is separated from the main loop so we can use par_iter_mut for the
+        // common case (entities that already have CellId).
+        let mut needs_insert: Vec<(Entity, CellId, CellHash)> = Vec::new();
+
         for (entity, mut grid_pos, mut transform, parent, cell_id, cell_hash) in
             stationary.iter_mut()
         {
@@ -296,11 +301,21 @@ impl CellId {
                     existing_id.set_if_neq(current_id);
                     existing_hash.set_if_neq(CellHash::from(current_id));
                 } else {
-                    let fast_hash: CellHash = current_id.into();
-                    commands.entity(entity).insert((current_id, fast_hash));
+                    needs_insert.push((entity, current_id, current_id.into()));
                 }
                 changed_cells.insert(entity);
             }
+        }
+
+        // Batch-insert CellId/CellHash for entities that didn't have them.
+        if !needs_insert.is_empty() {
+            commands.queue(move |world: &mut World| {
+                world.insert_batch(
+                    needs_insert
+                        .into_iter()
+                        .map(|(entity, cell_id, cell_hash)| (entity, (cell_id, cell_hash))),
+                );
+            });
         }
     }
 }

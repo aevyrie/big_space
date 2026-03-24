@@ -46,7 +46,7 @@ impl PluginGroup for BigSpaceDefaultPlugins {
         }
         #[cfg(feature = "debug")]
         {
-            group = group.add(BigSpaceDebugPlugin);
+            group = group.add(BigSpaceDebugPlugin::default());
         }
         #[cfg(feature = "camera")]
         {

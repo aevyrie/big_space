@@ -66,7 +66,7 @@ impl<F: SpatialHashFilter> FromWorld for PartitionEntities<F> {
 }
 
 impl<F: SpatialHashFilter> PartitionEntities<F> {
-    fn update(
+    pub(crate) fn update(
         mut this: ResMut<Self>,
         cells: Res<CellLookup<F>>,
         changed_cells: Res<ChangedCells<F>>,
@@ -122,18 +122,20 @@ impl<F: SpatialHashFilter> PartitionEntities<F> {
         // It's important this is run after the moved-entity checks in step 2, because the entities
         // found from cell changes may *also* have moved, and we would miss that information if we
         // only used cell-level tracking.
-        for (cell_id, entry) in cells.all_entries() {
-            if let Some(&new_pid) = partitions.get(cell_id) {
-                if let Some(&old_pid) = old_reverse.get(cell_id) {
-                    if new_pid != old_pid {
-                        for entity in entry.entities.iter().copied() {
-                            this.changed
-                                .entry(entity)
-                                // Don't overwrite entities that moved cells, they have already been tracked.
-                                .or_insert((Some(old_pid), Some(new_pid)));
-                        }
-                    }
-                }
+        for (cell, dest_pid, src_pid) in cells.all_entries().filter_map(|(cell_id, entry)| {
+            partitions
+                .get(cell_id)
+                .zip(old_reverse.get(cell_id))
+                // Optimization: iterating over all entities is very slow, se can first check if the
+                // cell has changed partition.
+                .filter(|(dest, src)| dest != src)
+                .map(|(dest, src)| (entry, dest, src))
+        }) {
+            for entity in cell.entities.iter().copied() {
+                this.changed
+                    .entry(entity)
+                    // Don't overwrite entities that moved cells, they have already been tracked.
+                    .or_insert((Some(*src_pid), Some(*dest_pid)));
             }
         }
 
@@ -141,12 +143,8 @@ impl<F: SpatialHashFilter> PartitionEntities<F> {
         let PartitionEntities { map, changed, .. } = this.as_mut();
         for (entity, (_source, destination)) in changed.iter() {
             match destination {
-                Some(pid) => {
-                    map.insert(*entity, *pid);
-                }
-                None => {
-                    map.remove(entity);
-                }
+                Some(pid) => map.insert(*entity, *pid),
+                None => map.remove(entity),
             };
         }
 

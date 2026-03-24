@@ -129,6 +129,12 @@ where
         self.map.inner.contains_key(hash)
     }
 
+    /// Returns `true` if this entity is tracked in the lookup (has been inserted via `update`).
+    #[inline]
+    pub fn contains_entity(&self, entity: Entity) -> bool {
+        self.reverse_map.contains_key(&entity)
+    }
+
     /// An iterator visiting all spatial hash cells and their contents in arbitrary order.
     #[inline]
     pub fn all_entries(&self) -> impl Iterator<Item = (&CellId, &CellLookupEntry)> {
@@ -248,7 +254,7 @@ where
 {
     /// Update the [`CellLookup`] with entities that have changed [`CellId`]es, and meet the
     /// optional [`SpatialHashFilter`].
-    pub(super) fn update(
+    pub(crate) fn update(
         mut spatial_map: ResMut<Self>,
         changed_hashes: Res<super::ChangedCells<F>>,
         all_hashes: Query<(Entity, &CellId), F>,
@@ -269,12 +275,10 @@ where
         }
 
         // See the docs on ChangedGridHash understand why we don't use query change detection.
-        for (entity, spatial_hash) in changed_hashes
-            .updated
-            .iter()
-            .filter_map(|entity| all_hashes.get(*entity).ok())
-        {
-            spatial_map.insert(entity, *spatial_hash);
+        for entity in changed_hashes.updated.iter() {
+            if let Ok((entity, spatial_hash)) = all_hashes.get(*entity) {
+                spatial_map.insert(entity, *spatial_hash);
+            }
         }
 
         if let Some(ref mut stats) = stats {
