@@ -555,7 +555,7 @@ mod tests {
             .add_children(&[child_1, child_2]);
 
         let mut state = SystemState::<GridsMut>::new(app.world_mut());
-        let mut grids = state.get_mut(app.world_mut());
+        let mut grids = state.get_mut(app.world_mut()).unwrap();
 
         // Children
         let result = grids.child_grids(root).collect::<Vec<_>>();
@@ -613,7 +613,7 @@ mod tests {
         app.world_mut().entity_mut(root).add_child(child);
 
         let mut state = SystemState::<GridsMut>::new(app.world_mut());
-        let mut grids = state.get_mut(app.world_mut());
+        let mut grids = state.get_mut(app.world_mut()).unwrap();
 
         // The function we are testing
         propagate_origin_to_child(root, &mut grids, child);
@@ -670,7 +670,7 @@ mod tests {
         app.world_mut().entity_mut(root).add_child(child);
 
         let mut state = SystemState::<GridsMut>::new(app.world_mut());
-        let mut grids = state.get_mut(app.world_mut());
+        let mut grids = state.get_mut(app.world_mut()).unwrap();
 
         // The function we are testing
         propagate_origin_to_parent(child, &mut grids, root);
@@ -734,7 +734,7 @@ mod tests {
         app.world_mut().entity_mut(root).add_child(child);
 
         let mut state = SystemState::<GridsMut>::new(app.world_mut());
-        let mut grids = state.get_mut(app.world_mut());
+        let mut grids = state.get_mut(app.world_mut()).unwrap();
 
         propagate_origin_to_child(root, &mut grids, child);
 

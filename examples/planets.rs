@@ -4,7 +4,7 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 use bevy::core_pipeline::Skybox;
-use bevy::render::view::Hdr;
+use bevy::camera::Hdr;
 use bevy::window::CursorOptions;
 use bevy::{
     camera::Exposure,
@@ -137,7 +137,7 @@ fn spawn_solar_system(
         DirectionalLight {
             color: Color::WHITE,
             illuminance: 120_000.,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         CascadeShadowConfigBuilder {
@@ -339,13 +339,12 @@ fn configure_skybox_image(
     }
 
     if asset_server.load_state(&cubemap.0).is_loaded() {
-        let image = images.get_mut(&cubemap.0).unwrap();
+        let mut image = images.get_mut(&cubemap.0).unwrap();
         // NOTE: PNGs do not have any metadata that could indicate they contain a cubemap texture,
         // so they appear as one texture. The following code reconfigures the texture as necessary.
         if image.texture_descriptor.array_layer_count() == 1 {
-            image
-                .reinterpret_stacked_2d_as_array(image.height() / image.width())
-                .unwrap();
+            let layers = image.height() / image.width();
+            image.reinterpret_stacked_2d_as_array(layers).unwrap();
             image.texture_view_descriptor =
                 Some(bevy::render::render_resource::TextureViewDescriptor {
                     dimension: Some(bevy::render::render_resource::TextureViewDimension::Cube),

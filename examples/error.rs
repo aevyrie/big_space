@@ -103,7 +103,7 @@ fn setup_ui(mut commands: Commands) {
     commands.spawn((
         Text::default(),
         TextFont {
-            font_size: 30.0,
+            font_size: FontSize::Px(30.0),
             ..default()
         },
         Node {
