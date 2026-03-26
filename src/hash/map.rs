@@ -254,7 +254,7 @@ where
 {
     /// Update the [`CellLookup`] with entities that have changed [`CellId`]es, and meet the
     /// optional [`SpatialHashFilter`].
-    pub(crate) fn update(
+    pub fn update(
         mut spatial_map: ResMut<Self>,
         changed_hashes: Res<super::ChangedCells<F>>,
         all_hashes: Query<(Entity, &CellId), F>,

@@ -66,7 +66,8 @@ impl<F: SpatialHashFilter> FromWorld for PartitionEntities<F> {
 }
 
 impl<F: SpatialHashFilter> PartitionEntities<F> {
-    pub(crate) fn update(
+    /// System to update the partition map for entities.
+    pub fn update(
         mut this: ResMut<Self>,
         cells: Res<CellLookup<F>>,
         changed_cells: Res<ChangedCells<F>>,

@@ -182,7 +182,8 @@ where
         }
     }
 
-    pub(crate) fn update(
+    /// System to update the partition map
+    pub fn update(
         mut partitions: ResMut<Self>,
         mut timing: Option<ResMut<crate::timing::GridHashStats>>,
         cells: Res<CellLookup<F>>,
@@ -329,7 +330,8 @@ where
     }
 }
 
-pub(crate) struct SplitResult {
+/// The result of splitting a partition.
+pub struct SplitResult {
     original_partition_id: PartitionId,
     new_partitions: Vec<CellHashSet>,
 }
