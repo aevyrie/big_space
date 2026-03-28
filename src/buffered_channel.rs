@@ -75,7 +75,7 @@ impl<'a, T: Send> BufferedReceiver<'a, T> {
         #[cfg(all(feature = "std", not(target_family = "wasm")))]
         let buffer = self.rx.recv_blocking()?;
         #[cfg(any(not(feature = "std"), target_family = "wasm"))]
-        let buffer = bevy_platform::future::block_on(self.rx.recv())?;
+        let buffer = bevy_tasks::block_on(self.rx.recv())?;
 
         Ok(RecycledVec {
             buffer: Some(buffer),
@@ -226,7 +226,7 @@ impl<'a, T: Send> BufferedSender<'a, T> {
             #[cfg(all(feature = "std", not(target_family = "wasm")))]
             self.tx.send_blocking(full_buffer)?;
             #[cfg(any(not(feature = "std"), target_family = "wasm"))]
-            bevy_platform::future::block_on(self.tx.send(full_buffer))?;
+            bevy_tasks::block_on(self.tx.send(full_buffer))?;
         }
         Ok(())
     }
@@ -239,7 +239,7 @@ impl<'a, T: Send> BufferedSender<'a, T> {
                 #[cfg(all(feature = "std", not(target_family = "wasm")))]
                 let _ = self.tx.send_blocking(buffer);
                 #[cfg(any(not(feature = "std"), target_family = "wasm"))]
-                let _ = bevy_platform::future::block_on(self.tx.send(buffer));
+                let _ = bevy_tasks::block_on(self.tx.send(buffer));
             } else {
                 // If it's empty, just return it to the pool.
                 self.channel.recycle(buffer);
