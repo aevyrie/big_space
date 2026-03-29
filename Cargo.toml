@@ -96,7 +96,7 @@ noise = "0.9"
 turborand = "0.10"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
-bevy = { version = "0.18.0", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", branch = "main", default-features = false, features = [
   "multi_threaded",
   "x11",
   "bevy_remote",
@@ -106,7 +106,7 @@ bevy = { version = "0.18.0", default-features = false, features = [
 version = "0.8"
 
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
-bevy = { version = "0.18.0", default-features = false, features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", branch = "main", default-features = false, features = [
   "web",
   "webgpu",
 ] }
