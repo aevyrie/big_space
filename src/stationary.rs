@@ -146,10 +146,7 @@ fn mark_ancestor_grids(
     parents: &Query<&ChildOf>,
 ) {
     let mut ancestor = start;
-    loop {
-        let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) else {
-            break;
-        };
+    while let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) {
         // bypass_change_detection to avoid spurious Changed<GridDirtyTick> noise
         let d = dirty.bypass_change_detection();
         // Early exit: if already marked this tick, all ancestors were marked too

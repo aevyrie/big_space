@@ -103,7 +103,7 @@ fn setup_ui(mut commands: Commands) {
     commands.spawn((
         Text::default(),
         TextFont {
-            font_size: 30.0,
+            font_size: FontSize::Px(30.0),
             ..default()
         },
         Node {
@@ -126,13 +126,13 @@ fn setup_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
         root.spawn_spatial((distant_grid_cell, FloatingOrigin));
 
         root.spawn_spatial((
-            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            WorldAssetRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_scale(Vec3::splat(0.2)),
             distant_grid_cell,
             Rotator,
         ))
         .with_child((
-            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            WorldAssetRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 20.0),
         ));
         // light

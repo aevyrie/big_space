@@ -84,11 +84,11 @@ fn ui_setup(mut commands: Commands) {
     commands.spawn((
         Text::default(),
         TextFont {
-            font_size: 18.0,
+            font_size: FontSize::Px(18.0),
             ..default()
         },
         TextColor(Color::WHITE),
-        TextLayout::new_with_justify(Justify::Left),
+        TextLayout::justify(Justify::Left),
         Node {
             position_type: PositionType::Absolute,
             top: Val::Px(10.0),
@@ -101,11 +101,11 @@ fn ui_setup(mut commands: Commands) {
     commands.spawn((
         Text::default(),
         TextFont {
-            font_size: 52.0,
+            font_size: FontSize::Px(52.0),
             ..default()
         },
         TextColor(Color::WHITE),
-        TextLayout::new_with_justify(Justify::Center),
+        TextLayout::justify(Justify::Center),
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(10.0),

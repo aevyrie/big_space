@@ -51,7 +51,7 @@ fn setup_scene(
         // entities (with a GridCell), is also supported. We demonstrate this here by loading in a
         // GLTF scene, which will be added as a child of this entity using low precision Transforms.
         root_grid.spawn_spatial((
-            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            WorldAssetRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_translation(cell_offset - 10.0),
             grid_cell,
         ));

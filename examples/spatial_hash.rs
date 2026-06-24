@@ -4,8 +4,8 @@
 //! rather than one mega grid.
 
 use bevy::{
-    core_pipeline::tonemapping::Tonemapping, post_process::bloom::Bloom, prelude::*,
-    render::view::Hdr, window::CursorOptions,
+    camera::Hdr, core_pipeline::tonemapping::Tonemapping, post_process::bloom::Bloom, prelude::*,
+    window::CursorOptions,
 };
 use bevy_ecs::entity::EntityHasher;
 use bevy_math::DVec3;
@@ -548,8 +548,8 @@ fn setup_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             parent.spawn((
                 Text::default(),
                 TextFont {
-                    font: asset_server.load("fonts/FiraMono-Regular.ttf"),
-                    font_size: 14.0,
+                    font: asset_server.load("fonts/FiraMono-Regular.ttf").into(),
+                    font_size: FontSize::Px(14.0),
                     ..default()
                 },
             ));

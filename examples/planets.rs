@@ -4,10 +4,9 @@ extern crate alloc;
 use alloc::collections::VecDeque;
 
 use bevy::core_pipeline::Skybox;
-use bevy::render::view::Hdr;
 use bevy::window::CursorOptions;
 use bevy::{
-    camera::Exposure,
+    camera::{Exposure, Hdr},
     color::palettes,
     light::{CascadeShadowConfigBuilder, NotShadowCaster},
     math::DVec3,
@@ -137,7 +136,7 @@ fn spawn_solar_system(
         DirectionalLight {
             color: Color::WHITE,
             illuminance: 120_000.,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             ..default()
         },
         CascadeShadowConfigBuilder {
@@ -261,7 +260,7 @@ fn spawn_solar_system(
                     floating_origin.with_spatial(|ship_scene| {
                         ship_scene.insert((
                             Spaceship,
-                            SceneRoot(
+                            WorldAssetRoot(
                                 asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0"),
                             ),
                             Transform::from_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
@@ -339,12 +338,14 @@ fn configure_skybox_image(
     }
 
     if asset_server.load_state(&cubemap.0).is_loaded() {
-        let image = images.get_mut(&cubemap.0).unwrap();
+        let mut image = images.get_mut(&cubemap.0).unwrap();
+        let height = image.height();
+        let width = image.width();
         // NOTE: PNGs do not have any metadata that could indicate they contain a cubemap texture,
         // so they appear as one texture. The following code reconfigures the texture as necessary.
         if image.texture_descriptor.array_layer_count() == 1 {
             image
-                .reinterpret_stacked_2d_as_array(image.height() / image.width())
+                .reinterpret_stacked_2d_as_array(height / width)
                 .unwrap();
             image.texture_view_descriptor =
                 Some(bevy::render::render_resource::TextureViewDescriptor {
@@ -354,7 +355,7 @@ fn configure_skybox_image(
         }
         let camera = cameras.single().unwrap();
         commands.entity(camera).insert(Skybox {
-            image: cubemap.0.clone(),
+            image: Some(cubemap.0.clone()),
             ..Default::default()
         });
         cubemap.1 = true;
