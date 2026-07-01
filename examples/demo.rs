@@ -150,7 +150,7 @@ fn ui_text_system(
     let translation = origin_pos.transform.translation;
 
     let grid_text = format!(
-        "GridCell: {}x, {}y, {}z",
+        "CellCoord: {}x, {}y, {}z",
         origin_pos.cell.x, origin_pos.cell.y, origin_pos.cell.z
     );
 

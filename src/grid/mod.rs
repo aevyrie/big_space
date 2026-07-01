@@ -28,8 +28,8 @@ pub mod propagation;
 /// other using 64-bit float transforms.
 #[derive(Debug, Clone, Reflect, Component)]
 #[reflect(Component)]
-// We do not require the Transform, GlobalTransform, or GridCell, because these are not required in
-// all cases: e.g. BigSpace should not have a Transform or GridCell.
+// We do not require the Transform, GlobalTransform, or CellCoord, because these are not required in
+// all cases: e.g. BigSpace should not have a Transform or CellCoord.
 pub struct Grid {
     /// The high-precision position of the floating origin's current grid cell local to this grid.
     local_floating_origin: LocalFloatingOrigin,

@@ -32,7 +32,7 @@ fn setup_scene(
         // Because BIG_DISTANCE is so large, we want to avoid using bevy's f32 transforms alone and
         // experience rounding errors. Instead, we use this helper to convert f64 position into a
         // grid cell and f32 offset.
-        let (grid_cell, cell_offset) = root_grid
+        let (cell_coord, cell_offset) = root_grid
             .grid()
             .translation_to_grid(DVec3::splat(BIG_DISTANCE));
 
@@ -44,16 +44,16 @@ fn setup_scene(
             Mesh3d(meshes.add(Sphere::default())),
             MeshMaterial3d(materials.add(Color::WHITE)),
             Transform::from_translation(cell_offset),
-            grid_cell,
+            cell_coord,
         ));
 
-        // Spawning low-precision entities (without a GridCell) as children of high-precision
-        // entities (with a GridCell), is also supported. We demonstrate this here by loading in a
+        // Spawning low-precision entities (without a CellCoord) as children of high-precision
+        // entities (with a CellCoord), is also supported. We demonstrate this here by loading in a
         // GLTF scene, which will be added as a child of this entity using low precision Transforms.
         root_grid.spawn_spatial((
             SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_translation(cell_offset - 10.0),
-            grid_cell,
+            cell_coord,
         ));
 
         // Any spatial entity can be the floating origin. Attaching it to the camera ensures the
@@ -61,7 +61,7 @@ fn setup_scene(
         root_grid.spawn_spatial((
             Camera3d::default(),
             Transform::from_translation(cell_offset + Vec3::new(0.0, 0.0, 10.0)),
-            grid_cell,
+            cell_coord,
             FloatingOrigin,
             BigSpaceCameraController::default(),
         ));

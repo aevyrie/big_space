@@ -373,7 +373,7 @@ impl GridsMut<'_, '_> {
     pub fn position(&self, grid_entity: Entity) -> (CellCoord, Transform) {
         let (cell, transform) = (CellCoord::default(), Transform::default());
         let (cell, transform) = self.position.get(grid_entity).unwrap_or_else(|_| {
-        assert!(self.parent.get(grid_entity).is_err(), "Grid entity {grid_entity:?} is missing a GridCell and Transform. This is valid only if this is a root grid, but this is not.");
+        assert!(self.parent.get(grid_entity).is_err(), "Grid entity {grid_entity:?} is missing a CellCoord and Transform. This is valid only if this is a root grid, but this is not.");
             (&cell, &transform)
         });
         (*cell, *transform)

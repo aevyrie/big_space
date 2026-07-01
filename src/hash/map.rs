@@ -92,7 +92,7 @@ where
     F: SpatialHashFilter,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("GridHashMap")
+        f.debug_struct("CellLookup")
             .field("map", &self.map)
             .field("reverse_map", &self.reverse_map)
             .finish()
@@ -143,7 +143,7 @@ where
 
     /// Iterate over this cell and its non-empty adjacent neighbors.
     ///
-    /// `GridHashEntry`s cache information about their neighbors as the spatial map is updated,
+    /// `CellLookupEntry`s cache information about their neighbors as the spatial map is updated,
     /// making it faster to look up neighboring entries when compared to computing all neighbor
     /// hashes and checking if they exist.
     ///
@@ -474,7 +474,7 @@ where
                 let entry = self
                     .spatial_map
                     .get(neighbor_hash)
-                    .expect("Neighbor hashes in GridHashEntry are guaranteed to exist.");
+                    .expect("Neighbor hashes in CellLookupEntry are guaranteed to exist.");
                 (neighbor_hash, entry)
             })
         {

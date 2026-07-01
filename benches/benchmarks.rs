@@ -174,7 +174,7 @@ fn spatial_hashing(c: &mut Criterion) {
         .all_entries()
         .find(|(_, entry)| !entry.entities.is_empty())
         .unwrap();
-    group.bench_function("GridHashMap::get", |b| {
+    group.bench_function("CellLookup::get", |b| {
         b.iter(|| {
             black_box(map.get(first.0).unwrap());
         });
@@ -190,8 +190,8 @@ fn spatial_hashing(c: &mut Criterion) {
         });
     });
 
-    // let parent = app .world_mut() .query::<&GridHash>() .get(app.world(), ent)
-    //     .unwrap(); let map = app.world().resource::<GridHashMap>(); let entry =
+    // let parent = app .world_mut() .query::<&CellId>() .get(app.world(), ent)
+    //     .unwrap(); let map = app.world().resource::<CellLookup>(); let entry =
     //     map.get(parent).unwrap();
 
     // group.bench_function("Neighbors radius: 4", |b| {

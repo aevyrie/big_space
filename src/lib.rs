@@ -72,7 +72,7 @@
 //! over the others are:
 //! - Absolute high-precision positions in space that do not change when the camera moves. The only
 //!   component that is affected by precision loss is the `GlobalTransform` used for rendering. The
-//!   `GridCell` and `Transform` only change when an entity moves. This is especially useful for
+//!   `CellCoord` and `Transform` only change when an entity moves. This is especially useful for
 //!   multiplayer - the server needs a source of truth for position that doesn't drift over time.
 //! - Virtually limitless volume and scale; you can work at the scale of subatomic particles, across
 //!   the width of the observable universe. Double precision is downright suffocating in comparison.
@@ -81,15 +81,15 @@
 //!   from the origin of the current grid cell.
 //! - High precision coordinates are invisible if you don't need them. You can move objects using
 //!   their `Transform` alone, which results in decent ecosystem compatibility.
-//! - High precision coordinates optional. If you don't add the `GridCell` component to an entity,
+//! - High precision coordinates optional. If you don't add the `CellCoord` component to an entity,
 //!   it behaves like a normal single precision transform, with the same performance cost, yet it
 //!   can exist in the high-precision hierarchy. This allows you to load in GLTFs or other
 //!   low-precision entity hierarchies with no added effort or cost.
 //!
 //! While using the [`BigSpaceDefaultPlugins`], the position of entities is now defined with the [`Grid`],
 //! [`CellCoord`], and [`Transform`] components. The `Grid` is a large integer grid of cells;
-//! entities are located within this grid as children using the `GridCell` component. Finally, the
-//! `Transform` is used to position the entity relative to the center of its `GridCell`. If an
+//! entities are located within this grid as children using the `CellCoord` component. Finally, the
+//! `Transform` is used to position the entity relative to the center of its `CellCoord`. If an
 //! entity moves into a neighboring cell, its transform will be automatically recomputed relative to
 //! the center of that new cell. This prevents `Transforms` from ever becoming larger than a single
 //! grid cell and thus prevents floating point precision artifacts.
@@ -133,7 +133,7 @@
 //! only affects the `GlobalTransform` and not the `Transform`, this also means that entities will
 //! never permanently lose precision just because they were far from the origin at some point. The
 //! lossy calculation only occurs when computing the `GlobalTransform` of entities, the
-//! high-precision `GridCell` and `Transform` are not affected.
+//! high-precision `CellCoord` and `Transform` are not affected.
 //!
 //! # Usage
 //!

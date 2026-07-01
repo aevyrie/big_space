@@ -79,7 +79,7 @@ pub struct CellId {
     grid: Entity,
     // The hashed value of the `cell` and `grid` fields. Hash collisions are possible, especially
     // for grids with very large `GridPrecision`s, because a single u64 can only represent the
-    // fraction of possible states compared to an `Entity` (2x u32) and `GridCell` (3x i128)
+    // fraction of possible states compared to an `Entity` (2x u32) and `CellCoord` (3x i128)
     // combined.
     pre_hash: u64,
 }

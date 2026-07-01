@@ -2,6 +2,16 @@
 
 ## UNRELEASED
 
+Stationary optimization
+
+## v0.12.0 - 2026-02-08
+
+Bevy 0.18.0, Partition change tracking
+
+## v0.11.0 - 2025-10-20
+
+Bevy 0.17.1
+
 ### Renamed types for consistency
 
 Redundant `Grid` prefix removed.
