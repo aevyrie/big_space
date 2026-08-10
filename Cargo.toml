@@ -168,6 +168,7 @@ doc-scrape-examples = false
 [[example]]
 name = "error"
 path = "examples/error.rs"
+required-features = ["debug"]
 doc-scrape-examples = false
 
 [[example]]
