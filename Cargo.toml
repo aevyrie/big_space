@@ -191,7 +191,7 @@ doc-scrape-examples = false
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
-required-features = ["camera"]
+required-features = ["camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
