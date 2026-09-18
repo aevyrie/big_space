@@ -89,7 +89,7 @@ impl GridDirtyTick {
 }
 
 /// Observer that inserts [`GridDirtyTick`] on any entity that gains a [`Grid`] component.
-fn on_grid_added(trigger: On<Add, Grid>, mut commands: Commands) {
+fn on_grid_added(trigger: On<Add<Grid>>, mut commands: Commands) {
     commands
         .entity(trigger.event_target())
         .insert(GridDirtyTick::default());

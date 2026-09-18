@@ -105,7 +105,7 @@ pub fn validate_hierarchy<V: 'static + ValidHierarchyNode + Default>(world: &mut
                         .inspect_entity(*entity)
                         .into_iter()
                         .flatten()
-                        .for_each(|info| {
+                        .for_each(|(_id, info)| {
                             inspect.push_str("  - ");
                             inspect.push_str(&info.name());
                             inspect.push('\n');
