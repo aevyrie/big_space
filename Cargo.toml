@@ -168,6 +168,7 @@ doc-scrape-examples = false
 [[example]]
 name = "error"
 path = "examples/error.rs"
+required-features = ["debug"]
 doc-scrape-examples = false
 
 [[example]]
@@ -191,7 +192,7 @@ doc-scrape-examples = false
 [[example]]
 name = "planets"
 path = "examples/planets.rs"
-required-features = ["camera"]
+required-features = ["camera", "debug"]
 doc-scrape-examples = false
 
 [[example]]
