@@ -2,6 +2,11 @@
 
 ## UNRELEASED
 
+### Updated: Bevy 0.20
+
+Updated to bevy `0.20.0-rc.2`. Bevy 0.20 and its shader dependencies require Rust 1.97.1 or
+newer.
+
 ## v0.13.0 - 2026-10-07
 
 Bevy 0.19, `Stationary` optimization, faster propagation, explicit debug plugin group.
