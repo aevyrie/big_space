@@ -7,6 +7,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpaceDefaultPlugins,
+            BigSpaceDebugPlugins::default(),
         ))
         .add_systems(Startup, setup_scene)
         .run();

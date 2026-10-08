@@ -217,7 +217,7 @@ impl Grid {
                     let Some(children) = children else { return };
 
                     if children.len() < min_chunk {
-                        // Small grid — send directly from this par_iter thread.
+                        // Small grid - send directly from this par_iter thread.
                         for child in children.iter() {
                             if fo_unchanged && shared_filter.contains(child) {
                                 continue;
@@ -225,7 +225,7 @@ impl Grid {
                             sender.send_blocking(child).ok();
                         }
                     } else {
-                        // Large grid — collect into thread-local vec for chunking.
+                        // Large grid - collect into thread-local vec for chunking.
                         large_grids
                             .borrow_local_mut()
                             .push((grid_entity, fo_unchanged));
@@ -471,8 +471,8 @@ mod tests {
 
     /// Verifies that entities in sub-grids get the correct `GlobalTransform`.
     ///
-    /// Hierarchy: Root `BigSpace` → `SubGrid` (`CellCoord` + Grid + Transform(100,0,0))
-    ///                                  → Entity (`CellCoord` + Transform(50,0,0))
+    /// Hierarchy: Root `BigSpace` -> `SubGrid` (`CellCoord` + Grid + Transform(100,0,0))
+    ///                                  -> Entity (`CellCoord` + Transform(50,0,0))
     ///
     /// Entity's GT should be 100 + 50 = 150 from the root FO.
     #[test]

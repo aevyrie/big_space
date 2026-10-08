@@ -134,7 +134,7 @@ fn nested_sub_grid_entity_gt_updates_correctly() {
                 // Sub-grid at (1000, 0, 0) in root.
                 root.with_grid_default(|sub_grid| {
                     sub_grid.insert(Transform::from_xyz(1000.0, 0.0, 0.0));
-                    // Entity inside sub-grid at (500, 0, 0) → total GT = 1000 + 500 = 1500
+                    // Entity inside sub-grid at (500, 0, 0) -> total GT = 1000 + 500 = 1500
                     sub_grid.spawn_spatial((Transform::from_xyz(500.0, 0.0, 0.0), Marker));
                 });
             });

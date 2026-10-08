@@ -260,6 +260,8 @@ pub mod prelude {
 
     #[cfg(feature = "camera")]
     pub use camera::BigSpaceCameraController;
+    #[cfg(feature = "debug")]
+    pub use plugin::BigSpaceDebugPlugins;
 }
 
 /// Contains the [`GridPrecision`] integer index type, which defines how much precision is available

@@ -14,7 +14,12 @@ use bevy_transform::prelude::*;
 use core::hash::Hasher;
 use core::marker::PhantomData;
 
-/// This plugin will render the bounds of occupied grid cells.
+/// Renders debug visualizations for `big_space`.
+///
+/// Requires [`CellHashingPlugin::<F>`] and [`PartitionPlugin::<F>`] to be installed alongside;
+/// those are not added here because spatial hashing has runtime cost that should stay an
+/// explicit opt-in. For the common unfiltered case, add
+/// [`BigSpaceDebugPlugins`], which bundles all three.
 pub struct BigSpaceDebugPlugin<F: SpatialHashFilter = ()>(PhantomData<F>);
 
 impl Default for BigSpaceDebugPlugin<()> {
@@ -41,6 +46,27 @@ impl<F: SpatialHashFilter> Plugin for BigSpaceDebugPlugin<F> {
                     .after(TransformSystems::Propagate)
                     .after(SpatialHashSystems::UpdatePartitionLookup),
             );
+    }
+
+    /// Runs after every plugin has finished building, so `is_plugin_added` reflects the final
+    /// app composition. Warns if required dependencies are missing.
+    fn finish(&self, app: &mut App) {
+        let filter = core::any::type_name::<F>();
+        let missing_hashing = !app.is_plugin_added::<CellHashingPlugin<F>>();
+        let missing_partition = !app.is_plugin_added::<PartitionPlugin<F>>();
+        if missing_hashing || missing_partition {
+            let missing = [
+                missing_hashing.then_some(alloc::format!("CellHashingPlugin::<{filter}>")),
+                missing_partition.then_some(alloc::format!("PartitionPlugin::<{filter}>")),
+            ]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join(" + ");
+            bevy_log::warn!(
+                "BigSpaceDebugPlugin::<{filter}> will not work correctly without {missing}."
+            );
+        }
     }
 }
 

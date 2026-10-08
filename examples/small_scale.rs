@@ -19,6 +19,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpaceDefaultPlugins,
+            BigSpaceDebugPlugins::default(),
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, (bounce_atoms, toggle_cam_pos))
@@ -79,7 +80,7 @@ fn setup_scene(
 
         // A spaceship
         root_grid.spawn_spatial((
-            SceneRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
+            WorldAssetRoot(asset_server.load("models/low_poly_spaceship/scene.gltf#Scene0")),
             Transform::from_xyz(0.0, 0.0, 2.5)
                 .with_rotation(Quat::from_rotation_y(core::f32::consts::PI)),
             cell,

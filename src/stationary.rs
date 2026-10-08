@@ -146,10 +146,7 @@ fn mark_ancestor_grids(
     parents: &Query<&ChildOf>,
 ) {
     let mut ancestor = start;
-    loop {
-        let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) else {
-            break;
-        };
+    while let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) {
         // bypass_change_detection to avoid spurious Changed<GridDirtyTick> noise
         let d = dirty.bypass_change_detection();
         // Early exit: if already marked this tick, all ancestors were marked too
@@ -261,7 +258,7 @@ impl Plugin for BigSpaceStationaryPlugin {
 
         // mark_dirty_subtrees intentionally does NOT use Commands, so Bevy won't insert an
         // apply_deferred sync point before propagation. This allows the spatial hashing
-        // chain (CellLookup → PartitionLookup → PartitionEntities) to run in parallel with
+        // chain (CellLookup -> PartitionLookup -> PartitionEntities) to run in parallel with
         // high-precision propagation.
         #[cfg(feature = "std")]
         let dirty_config = || {
@@ -344,14 +341,14 @@ mod tests {
             .id();
 
         // Next update without sleeping: FixedUpdate may not tick (near-zero delta).
-        // is_added() is true regardless → no init.
+        // is_added() is true regardless -> no init.
         app.update();
         assert!(
             app.world().get::<StationaryInitialized>(entity).is_none(),
             "StationaryInitialized should not be inserted (is_added still true)"
         );
 
-        // Sleep so FixedUpdate ticks. is_added() is now false → both gates are satisfied.
+        // Sleep so FixedUpdate ticks. is_added() is now false -> both gates are satisfied.
         thread::sleep(core::time::Duration::from_millis(20));
         app.update();
         assert!(
@@ -375,7 +372,12 @@ mod tests {
 
         let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
 
-        // Spawn BEFORE any update — this is the first-frame scenario.
+        // Pause virtual time so FixedUpdate cannot tick until we explicitly unpause. Without
+        // this, a slow or contended machine can accumulate >16.67ms between Frame 0 and Frame 1,
+        // FixedUpdate ticks, and the "Frame 1: should not init" assertion flakes.
+        app.world_mut().resource_mut::<Time<Virtual>>().pause();
+
+        // Spawn BEFORE any update - this is the first-frame scenario.
         let entity = app
             .world_mut()
             .spawn((
@@ -386,23 +388,22 @@ mod tests {
             .set_parent_in_place(grid_entity)
             .id();
 
-        // Frame 0: clock init. is_added() true → no init. FixedUpdate has zero
-        // delta, so it won't tick, but gating resource exists at false regardless.
+        // Frame 0: is_added() true, so no init.
         app.update();
         assert!(
             app.world().get::<StationaryInitialized>(entity).is_none(),
             "Frame 0: should not init (is_added)"
         );
 
-        // Frame 1: near-zero delta, FixedUpdate likely doesn't tick.
-        // is_added() is now false, but FixedUpdateRan is false → gated.
+        // Frame 1: is_added() is now false, but FixedUpdateRan is false, so still gated.
         app.update();
         assert!(
             app.world().get::<StationaryInitialized>(entity).is_none(),
             "Frame 1: should not init (FixedUpdate hasn't ticked yet)"
         );
 
-        // Sleep so FixedUpdate ticks. Now both conditions are met.
+        // Unpause and sleep so FixedUpdate ticks. Now both conditions are met.
+        app.world_mut().resource_mut::<Time<Virtual>>().unpause();
         thread::sleep(core::time::Duration::from_millis(20));
         app.update();
         assert!(
@@ -982,7 +983,7 @@ mod tests {
             .x = 5;
 
         // This frame should: remove StationaryInitialized (via Stationary on_remove hook),
-        // then CellId::update detects Changed<CellCoord> + Without<Stationary> → updates CellId.
+        // then CellId::update detects Changed<CellCoord> + Without<Stationary> -> updates CellId.
         app.update();
 
         // Verify StationaryInitialized was removed

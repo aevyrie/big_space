@@ -3,6 +3,8 @@
 use crate::*;
 use bevy_app::{prelude::*, PluginGroupBuilder};
 use bevy_ecs::prelude::*;
+#[cfg(feature = "debug")]
+use core::marker::PhantomData;
 
 pub use crate::{timing::BigSpaceTimingStatsPlugin, validation::BigSpaceValidationPlugin};
 #[cfg(feature = "camera")]
@@ -25,10 +27,13 @@ impl PluginGroup for BigSpaceMinimalPlugins {
 ///
 /// By default,
 /// - `BigSpaceValidationPlugin` is enabled in debug, and disabled in release.
-/// - `BigSpaceDebugPlugin` is enabled if the `debug` feature is enabled.
 /// - `BigSpaceCameraControllerPlugin` is enabled if the `camera` feature is enabled.
 ///
 /// Hierarchy validation is not behind a feature flag because it does not add dependencies.
+///
+/// Debug visualization is not included here. It requires spatial hashing, which has runtime
+/// cost that should be an explicit opt-in; add [`BigSpaceDebugPlugins`] alongside this group
+/// when you want debug gizmos.
 pub struct BigSpaceDefaultPlugins;
 
 impl PluginGroup for BigSpaceDefaultPlugins {
@@ -44,15 +49,53 @@ impl PluginGroup for BigSpaceDefaultPlugins {
         {
             group = group.add(BigSpaceValidationPlugin);
         }
-        #[cfg(feature = "debug")]
-        {
-            group = group.add(BigSpaceDebugPlugin::default());
-        }
         #[cfg(feature = "camera")]
         {
             group = group.add(BigSpaceCameraControllerPlugin::default());
         }
         group
+    }
+}
+
+/// Bundles [`BigSpaceDebugPlugin<F>`] with its spatial-hashing dependencies so cell gizmos
+/// work out of the box. Spatial hashing has per-frame cost, so this group is kept separate
+/// from [`BigSpaceDefaultPlugins`] and must be added explicitly.
+///
+/// Defaults to the unfiltered case (`F = ()`); use the turbofish form
+/// (`BigSpaceDebugPlugins::<With<Foo>>::default()`) to bundle filtered variants of all three
+/// plugins so their [`SpatialHashFilter`](crate::hash::SpatialHashFilter) parameters match.
+///
+/// If the app already installs [`CellHashingPlugin<F>`] or [`PartitionPlugin<F>`] with the
+/// same filter, add [`BigSpaceDebugPlugin<F>`] directly instead of this group to avoid adding
+/// the same plugin twice (which Bevy rejects).
+#[cfg(feature = "debug")]
+pub struct BigSpaceDebugPlugins<F: hash::SpatialHashFilter = ()>(PhantomData<F>);
+
+#[cfg(feature = "debug")]
+impl<F: hash::SpatialHashFilter> BigSpaceDebugPlugins<F> {
+    /// Construct the group with an explicit [`SpatialHashFilter`](crate::hash::SpatialHashFilter).
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+// Matches the `Default` shape on `CellHashingPlugin`/`PartitionPlugin`: only the unfiltered
+// case is `Default`, so a bare `BigSpaceDebugPlugins::default()` resolves to `<()>` without
+// needing a turbofish. Filtered variants use `BigSpaceDebugPlugins::<With<Foo>>::new()`.
+#[cfg(feature = "debug")]
+impl Default for BigSpaceDebugPlugins<()> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+#[cfg(feature = "debug")]
+impl<F: hash::SpatialHashFilter> PluginGroup for BigSpaceDebugPlugins<F> {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(CellHashingPlugin::<F>::new())
+            .add(PartitionPlugin::<F>::new())
+            .add(BigSpaceDebugPlugin::<F>::new())
     }
 }
 

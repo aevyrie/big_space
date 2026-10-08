@@ -17,6 +17,7 @@ fn main() {
         .add_plugins((
             DefaultPlugins.build().disable::<TransformPlugin>(),
             BigSpaceDefaultPlugins,
+            BigSpaceDebugPlugins::default(),
         ))
         .add_systems(Startup, setup)
         .add_systems(Update, set_camera_viewports)

@@ -2,6 +2,59 @@
 
 ## UNRELEASED
 
+## v0.13.0 - 2026-10-07
+
+Bevy 0.19, `Stationary` optimization, faster propagation, explicit debug plugin group.
+
+### Updated: Bevy 0.19
+
+Updated to bevy `0.19.0`. Renames: `SceneRoot` -> `WorldAssetRoot`, `font_size: f32` ->
+`FontSize::Px`, `TextLayout::new_with_justify` -> `TextLayout::justify`,
+`shadows_enabled` -> `shadow_maps_enabled`, `Skybox::image` is now optional, `Hdr` moved
+from `bevy::render::view` to `bevy::camera`, `SystemState::get_mut` is fallible.
+
+### Added: `multi_threaded` feature
+
+Bevy no longer implies parallel transform propagation via `std`; it is an explicit
+`multi_threaded` opt-in. `big_space` mirrors this with a `multi_threaded` feature that
+enables the parallel code paths in `bevy_ecs`, `bevy_tasks`, and `bevy_transform`. Apps
+that depend on `bevy` with its `multi_threaded` feature get this automatically through
+feature unification.
+
+### Added: BSN compatibility
+
+`BigSpace` now derives `Clone` and `FloatingOrigin` now derives `Default + Clone + Copy +
+Debug`. This makes both usable in bevy 0.19's `bsn!` scene templates, which is otherwise
+blanket-implemented for `Default + Clone` components. `Grid` and `CellCoord` were already
+compatible.
+
+### Changed: `BigSpaceDebugPlugins` group
+
+`BigSpaceDefaultPlugins` no longer adds `BigSpaceDebugPlugin`. Add `BigSpaceDebugPlugins` to
+get debug rendering. The group contains the debug plugin together with the
+`CellHashingPlugin` and `PartitionPlugin` it depends on.
+
+### Added: `Stationary` component
+
+With `BigSpaceStationaryPlugin`, entities marked `Stationary` are processed once and then skip
+recentering, spatial hashing, and propagation, so entities that never move stop costing time
+every frame. To move one, remove `Stationary`, move it, and add it back.
+
+### Changed: Faster propagation and nearest-object search
+
+High precision transform propagation is faster. The camera controller finds the nearest object
+through partitions instead of a brute-force search, and it considers descendants of
+`CellCoord` entities, so loaded scenes slow the camera down too. The new `require_visibility`
+option on the camera controller skips hidden entities in this search.
+
+## v0.12.0 - 2026-02-08
+
+Bevy 0.18, partition change tracking.
+
+## v0.11.0 - 2025-10-20
+
+Bevy 0.17.1.
+
 ### Renamed types for consistency
 
 Redundant `Grid` prefix removed.

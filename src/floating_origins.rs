@@ -15,8 +15,8 @@ use bevy_reflect::prelude::*;
 /// The [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all entities within this
 /// [`BigSpace`] will be computed relative to this floating origin's cell. There should always be
 /// exactly one entity marked with this component within a [`BigSpace`].
-#[derive(Component, Reflect)]
-#[reflect(Component)]
+#[derive(Component, Default, Clone, Copy, Debug, Reflect)]
+#[reflect(Component, Default)]
 pub struct FloatingOrigin;
 
 /// A "big space" is a hierarchy of high precision [`Grid`](crate::Grid)s, rendered relative to a
@@ -32,8 +32,8 @@ pub struct FloatingOrigin;
 /// [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all spatial entities within
 /// that [`BigSpace`]. This is needed for features like split screen, where you may need to render
 /// the world from viewpoints that are very far from each other.
-#[derive(Debug, Default, Component, Reflect)]
-#[reflect(Component)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
 // We do not require Grid, because we want more control over when the grid is inserted, especially
 // with the command extension.
 pub struct BigSpace {
@@ -54,7 +54,7 @@ impl BigSpace {
     ) -> Option<Entity> {
         let floating_origin = self.floating_origin?;
         let origin_root_entity = parents.iter_ancestors(floating_origin).last()?;
-        Some(floating_origin).filter(|_| origin_root_entity == this_entity)
+        (origin_root_entity == this_entity).then_some(floating_origin)
     }
 
     /// Automatically update all [`BigSpace`]s, finding the current floating origin entity within

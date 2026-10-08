@@ -54,7 +54,7 @@ where
                         .after(SpatialHashSystems::ClearChangedCells),
                     // NOTE: compute_stationary_cell is intentionally NOT in UpdateCellHashes.
                     // Placing it in that set would force the entire downstream hashing chain
-                    // (CellLookup → PartitionLookup → PartitionEntities) to complete before
+                    // (CellLookup -> PartitionLookup -> PartitionEntities) to complete before
                     // high-precision propagation can start. By keeping it out of the set and
                     // using only explicit `.before(PropagateHighPrecision)`, the rest of the
                     // hashing chain remains free to run in parallel with propagation.
@@ -429,7 +429,7 @@ mod tests {
 
         // This system mimics `move_player` from the spatial_hash example.
         // It runs BEFORE UpdateCellLookup (wrong ordering), so the entity should NOT be
-        // in the lookup on the first frame – replicating the crash.
+        // in the lookup on the first frame - replicating the crash.
         let check = |all_hashes: Query<(Entity, &CellId)>, lookup: Res<CellLookup>| {
             let target = *ENTITY.get().unwrap();
             if let Some((_, hash)) = all_hashes.iter().find(|(e, _)| *e == target) {
