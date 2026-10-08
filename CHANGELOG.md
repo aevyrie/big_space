@@ -2,6 +2,10 @@
 
 ## UNRELEASED
 
+## v0.13.0 - 2026-10-07
+
+Bevy 0.19, `Stationary` optimization, faster propagation, explicit debug plugin group.
+
 ### Updated: Bevy 0.19
 
 Updated to bevy `0.19.0`. Renames: `SceneRoot` -> `WorldAssetRoot`, `font_size: f32` ->
@@ -23,6 +27,33 @@ feature unification.
 Debug`. This makes both usable in bevy 0.19's `bsn!` scene templates, which is otherwise
 blanket-implemented for `Default + Clone` components. `Grid` and `CellCoord` were already
 compatible.
+
+### Changed: `BigSpaceDebugPlugins` group
+
+`BigSpaceDefaultPlugins` no longer adds `BigSpaceDebugPlugin`. Add `BigSpaceDebugPlugins` to
+get debug rendering. The group contains the debug plugin together with the
+`CellHashingPlugin` and `PartitionPlugin` it depends on.
+
+### Added: `Stationary` component
+
+With `BigSpaceStationaryPlugin`, entities marked `Stationary` are processed once and then skip
+recentering, spatial hashing, and propagation, so entities that never move stop costing time
+every frame. To move one, remove `Stationary`, move it, and add it back.
+
+### Changed: Faster propagation and nearest-object search
+
+High precision transform propagation is faster. The camera controller finds the nearest object
+through partitions instead of a brute-force search, and it considers descendants of
+`CellCoord` entities, so loaded scenes slow the camera down too. The new `require_visibility`
+option on the camera controller skips hidden entities in this search.
+
+## v0.12.0 - 2026-02-08
+
+Bevy 0.18, partition change tracking.
+
+## v0.11.0 - 2025-10-20
+
+Bevy 0.17.1.
 
 ### Renamed types for consistency
 
