@@ -155,9 +155,9 @@ impl core::ops::Sub<IVec3> for CellCoord {
 
     fn sub(self, rhs: IVec3) -> Self::Output {
         CellCoord {
-            x: self.x.wrapping_add(-rhs.x as GridPrecision),
-            y: self.y.wrapping_add(-rhs.y as GridPrecision),
-            z: self.z.wrapping_add(-rhs.z as GridPrecision),
+            x: self.x.wrapping_sub(rhs.x as GridPrecision),
+            y: self.y.wrapping_sub(rhs.y as GridPrecision),
+            z: self.z.wrapping_sub(rhs.z as GridPrecision),
         }
     }
 }
@@ -259,5 +259,23 @@ impl core::ops::Div<GridPrecision> for &CellCoord {
 
     fn div(self, rhs: GridPrecision) -> Self::Output {
         (*self).div(rhs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subtracting_minimum_ivec3_does_not_overflow() {
+        let cell = CellCoord::new(10, 20, 30);
+        let result = cell - IVec3::splat(i32::MIN);
+        let expected = CellCoord::new(
+            cell.x.wrapping_sub(i32::MIN as GridPrecision),
+            cell.y.wrapping_sub(i32::MIN as GridPrecision),
+            cell.z.wrapping_sub(i32::MIN as GridPrecision),
+        );
+
+        assert_eq!(result, expected);
     }
 }
