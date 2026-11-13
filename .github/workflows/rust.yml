@@ -44,6 +44,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
+      - run: sudo apt-get update -yq && sudo apt-get install -yq --no-install-recommends libasound2-dev
       - run: cargo check --all-features --all-targets
 
   check-no-defaults:
@@ -53,6 +54,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
+      - run: sudo apt-get update -yq && sudo apt-get install -yq --no-install-recommends libasound2-dev
       - run: cargo check --no-default-features --all-targets --features=libm
 
   clippy:
@@ -63,6 +65,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
       - run: rustup component add clippy
+      - run: sudo apt-get update -yq && sudo apt-get install -yq --no-install-recommends libasound2-dev
       - run: cargo clippy --all-features --all-targets -- -D warnings
 
   doc:
@@ -83,6 +86,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
+      - run: sudo apt-get update -yq && sudo apt-get install -yq --no-install-recommends libasound2-dev
       - run: cargo test --all-features
 
   check-wasm:
@@ -102,4 +106,5 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2.7.0
+      - run: sudo apt-get update -yq && sudo apt-get install -yq --no-install-recommends libasound2-dev
       - run: cargo test --all-features --doc
